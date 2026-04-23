@@ -1,3 +1,5 @@
+from typing import Any
+
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
@@ -27,7 +29,28 @@ class ChunkDocument(BaseModel):
     embedding_model: str
     language: str = "en"
     tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     score: float = 0.0
+
+
+class SourceDocument(BaseModel):
+    tenant_id: str
+    source_system: str
+    source_container: str
+    source_item_id: str
+    source_url: str
+    title: str
+    file_name: str
+    file_extension: str
+    mime_type: str | None = None
+    section_path: str | None = None
+    last_modified_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    acl_tags: list[str] = Field(default_factory=list)
+    content_hash: str
+    content_text: str
+    language: str = "en"
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class RetrievalRequest(BaseModel):

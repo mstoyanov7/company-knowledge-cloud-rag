@@ -7,7 +7,7 @@ from sync_worker.runner import WorkerRunner
 
 
 def run() -> None:
-    parser = argparse.ArgumentParser(description="Run the sync worker skeleton.")
+    parser = argparse.ArgumentParser(description="Plan configured sync jobs.")
     parser.add_argument(
         "--run-once",
         action="store_true",

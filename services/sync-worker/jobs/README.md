@@ -1,6 +1,11 @@
 # Sync Worker Jobs
 
-This directory is reserved for future queue-backed job entrypoints.
+This directory contains the runnable SharePoint job entrypoints:
 
-Phase 1 keeps execution in-process through `sync_worker.runner.WorkerRunner`
-so the repository stays runnable without a queue framework.
+- `sharepoint_bootstrap`
+- `sharepoint_incremental`
+- `onenote_bootstrap`
+- `onenote_incremental`
+
+The current implementation runs in-process so the repository stays runnable
+without an external queue framework.

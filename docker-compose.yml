@@ -66,6 +66,7 @@ services:
     build:
       context: .
       dockerfile: services/sync-worker/Dockerfile
+    command: ["sharepoint_incremental", "--run-loop"]
     env_file:
       - .env
     depends_on:

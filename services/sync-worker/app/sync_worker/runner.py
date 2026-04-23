@@ -17,7 +17,7 @@ class WorkerRunner:
         now = datetime.now(UTC)
         return [
             SyncJob(
-                job_name="sharepoint_incremental_job",
+                job_name="sharepoint_bootstrap",
                 connector_name=self.sharepoint.connector_name,
                 schedule_interval_seconds=self.sharepoint.sync_interval_seconds(),
                 scope_summary=self.sharepoint.describe_scope(),
@@ -25,7 +25,23 @@ class WorkerRunner:
                 next_run_utc=now,
             ),
             SyncJob(
-                job_name="onenote_incremental_job",
+                job_name="sharepoint_incremental",
+                connector_name=self.sharepoint.connector_name,
+                schedule_interval_seconds=self.sharepoint.sync_interval_seconds(),
+                scope_summary=self.sharepoint.describe_scope(),
+                status=JobStatus.planned,
+                next_run_utc=now,
+            ),
+            SyncJob(
+                job_name="onenote_bootstrap",
+                connector_name=self.onenote.connector_name,
+                schedule_interval_seconds=self.onenote.sync_interval_seconds(),
+                scope_summary=self.onenote.describe_scope(),
+                status=JobStatus.planned,
+                next_run_utc=now,
+            ),
+            SyncJob(
+                job_name="onenote_incremental",
                 connector_name=self.onenote.connector_name,
                 schedule_interval_seconds=self.onenote.sync_interval_seconds(),
                 scope_summary=self.onenote.describe_scope(),
