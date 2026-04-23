@@ -1,0 +1,11 @@
+.pytest_cache/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+htmlcov/
+.env
+.env.*
+!.env.example

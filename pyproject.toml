@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cloud-rag-diploma"
+version = "0.1.0"
+description = "Model-agnostic enterprise cloud RAG onboarding chatbot proof of concept"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "pydantic>=2.8,<3.0",
+    "pydantic-settings>=2.4,<3.0",
+    "uvicorn[standard]>=0.30,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.27,<1.0",
+    "pytest>=8.3,<9.0",
+]
+
+[project.scripts]
+rag-api = "rag_api.main:run"
+sync-worker = "sync_worker.main:run"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools.packages.find]
+where = [
+    "services/rag-api/app",
+    "services/sync-worker/app",
+    "libs/shared-schemas/python",
+    "services/graph-connectors",
+]
+include = [
+    "graph_connectors*",
+    "rag_api*",
+    "shared_schemas*",
+    "sync_worker*",
+]
