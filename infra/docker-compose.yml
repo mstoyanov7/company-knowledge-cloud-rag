@@ -41,6 +41,14 @@ services:
       dockerfile: services/rag-api/Dockerfile
     env_file:
       - ../.env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      RAG_API_PORT: 8080
     ports:
       - "${RAG_API_PORT}:8080"
     depends_on:
@@ -66,9 +74,16 @@ services:
     build:
       context: ..
       dockerfile: services/sync-worker/Dockerfile
-    command: ["sharepoint_incremental", "--run-loop"]
+    command: ["ops_worker"]
     env_file:
       - ../.env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,6 +101,17 @@ services:
       ENABLE_OPENAI_API: "true"
       OPENAI_API_BASE_URL: http://rag-api:8080/v1
       OPENAI_API_KEY: ${MOCK_API_KEY}
+      WEBUI_URL: ${WEBUI_URL}
+      ENABLE_OAUTH_SIGNUP: ${ENABLE_OAUTH_SIGNUP}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
+      MICROSOFT_CLIENT_TENANT_ID: ${MICROSOFT_CLIENT_TENANT_ID}
+      MICROSOFT_REDIRECT_URI: ${MICROSOFT_REDIRECT_URI}
+      OPENID_PROVIDER_URL: ${OPENID_PROVIDER_URL}
+      OAUTH_SCOPES: ${OAUTH_SCOPES}
+      OAUTH_GROUP_CLAIM: ${OAUTH_GROUP_CLAIM}
+      ENABLE_OAUTH_GROUP_MANAGEMENT: ${ENABLE_OAUTH_GROUP_MANAGEMENT}
+      ENABLE_OAUTH_GROUP_CREATION: ${ENABLE_OAUTH_GROUP_CREATION}
     volumes:
       - open-webui-data:/app/backend/data
     depends_on:

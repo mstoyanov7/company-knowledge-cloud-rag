@@ -6,6 +6,10 @@ __pycache__/
 *.pyd
 *.egg-info/
 htmlcov/
+eval/results/
+benchmarks/results/*
+!benchmarks/results/templates/
+!benchmarks/results/templates/**
 .env
 .env.*
 !.env.example

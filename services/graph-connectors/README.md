@@ -22,3 +22,11 @@ Phase 3 adds a separate OneNote boundary:
 
 OneNote authentication is delegated-only in this repository. The connector targets
 site-hosted team notebooks via `/sites/{site-id}/onenote` endpoints.
+
+Phase 5 adds a Graph subscription boundary:
+
+- `graph_connectors.subscriptions.MicrosoftGraphSubscriptionClient`
+- `graph_connectors.subscriptions.MockGraphSubscriptionClient`
+
+Subscription creation and renewal are isolated from indexing logic. The sync
+worker uses this client only for webhook subscription lifecycle operations.

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from shared_schemas import Citation, ChunkDocument, RetrievalRequest
+from shared_schemas import Citation, ChunkDocument, RetrievalRequest, RetrievalResult
 
 
 @dataclass(slots=True)
@@ -22,7 +22,7 @@ class GenerationResult:
 class RetrievalPort(Protocol):
     name: str
 
-    async def retrieve(self, request: RetrievalRequest) -> list[ChunkDocument]:
+    async def retrieve(self, request: RetrievalRequest) -> RetrievalResult:
         ...
 
     async def ready(self) -> bool:
@@ -40,4 +40,11 @@ class LlmPort(Protocol):
         ...
 
     async def list_models(self) -> list[str]:
+        ...
+
+
+class RerankerPort(Protocol):
+    name: str
+
+    def rerank(self, question: str, chunks: list[ChunkDocument], *, top_k: int) -> list[ChunkDocument]:
         ...

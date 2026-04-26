@@ -14,81 +14,85 @@ class PostgresMetadataStore:
     def ensure_schema(self) -> None:
         with psycopg.connect(self.settings.postgres_dsn) as connection:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS sharepoint_checkpoints (
-                        scope_key TEXT PRIMARY KEY,
-                        sync_mode TEXT NOT NULL,
-                        site_id TEXT,
-                        drive_id TEXT,
-                        cursor_url TEXT,
-                        delta_link TEXT,
-                        page_count INTEGER NOT NULL DEFAULT 0,
-                        item_count INTEGER NOT NULL DEFAULT 0,
-                        updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                    );
+                cursor.execute("SELECT pg_advisory_lock(hashtext('cloud_rag_metadata_schema'))")
+                try:
+                    cursor.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS sharepoint_checkpoints (
+                            scope_key TEXT PRIMARY KEY,
+                            sync_mode TEXT NOT NULL,
+                            site_id TEXT,
+                            drive_id TEXT,
+                            cursor_url TEXT,
+                            delta_link TEXT,
+                            page_count INTEGER NOT NULL DEFAULT 0,
+                            item_count INTEGER NOT NULL DEFAULT 0,
+                            updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        );
 
-                    CREATE TABLE IF NOT EXISTS onenote_checkpoints (
-                        scope_key TEXT PRIMARY KEY,
-                        sync_mode TEXT NOT NULL,
-                        site_id TEXT,
-                        notebook_scope TEXT,
-                        last_modified_cursor_utc TIMESTAMPTZ,
-                        page_count INTEGER NOT NULL DEFAULT 0,
-                        item_count INTEGER NOT NULL DEFAULT 0,
-                        updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                    );
+                        CREATE TABLE IF NOT EXISTS onenote_checkpoints (
+                            scope_key TEXT PRIMARY KEY,
+                            sync_mode TEXT NOT NULL,
+                            site_id TEXT,
+                            notebook_scope TEXT,
+                            last_modified_cursor_utc TIMESTAMPTZ,
+                            page_count INTEGER NOT NULL DEFAULT 0,
+                            item_count INTEGER NOT NULL DEFAULT 0,
+                            updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        );
 
-                    CREATE TABLE IF NOT EXISTS source_documents (
-                        source_item_id TEXT PRIMARY KEY,
-                        tenant_id TEXT NOT NULL,
-                        scope_key TEXT NOT NULL,
-                        source_system TEXT NOT NULL,
-                        source_container TEXT NOT NULL,
-                        source_url TEXT NOT NULL,
-                        title TEXT NOT NULL,
-                        file_name TEXT NOT NULL,
-                        file_extension TEXT NOT NULL,
-                        mime_type TEXT,
-                        section_path TEXT,
-                        last_modified_utc TIMESTAMPTZ NOT NULL,
-                        acl_tags_json TEXT NOT NULL,
-                        content_hash TEXT NOT NULL,
-                        content_text TEXT NOT NULL,
-                        language TEXT NOT NULL,
-                        tags_json TEXT NOT NULL,
-                        metadata_json TEXT NOT NULL,
-                        is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-                        updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                        deleted_at_utc TIMESTAMPTZ
-                    );
+                        CREATE TABLE IF NOT EXISTS source_documents (
+                            source_item_id TEXT PRIMARY KEY,
+                            tenant_id TEXT NOT NULL,
+                            scope_key TEXT NOT NULL,
+                            source_system TEXT NOT NULL,
+                            source_container TEXT NOT NULL,
+                            source_url TEXT NOT NULL,
+                            title TEXT NOT NULL,
+                            file_name TEXT NOT NULL,
+                            file_extension TEXT NOT NULL,
+                            mime_type TEXT,
+                            section_path TEXT,
+                            last_modified_utc TIMESTAMPTZ NOT NULL,
+                            acl_tags_json TEXT NOT NULL,
+                            content_hash TEXT NOT NULL,
+                            content_text TEXT NOT NULL,
+                            language TEXT NOT NULL,
+                            tags_json TEXT NOT NULL,
+                            metadata_json TEXT NOT NULL,
+                            is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+                            updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                            deleted_at_utc TIMESTAMPTZ
+                        );
 
-                    CREATE TABLE IF NOT EXISTS chunk_documents (
-                        chunk_id TEXT PRIMARY KEY,
-                        source_item_id TEXT NOT NULL REFERENCES source_documents(source_item_id) ON DELETE CASCADE,
-                        tenant_id TEXT NOT NULL,
-                        scope_key TEXT NOT NULL,
-                        source_system TEXT NOT NULL,
-                        source_container TEXT NOT NULL,
-                        source_url TEXT NOT NULL,
-                        title TEXT NOT NULL,
-                        section_path TEXT,
-                        last_modified_utc TIMESTAMPTZ NOT NULL,
-                        acl_tags_json TEXT NOT NULL,
-                        content_hash TEXT NOT NULL,
-                        chunk_index INTEGER NOT NULL,
-                        chunk_text TEXT NOT NULL,
-                        embedding_model TEXT NOT NULL,
-                        language TEXT NOT NULL,
-                        tags_json TEXT NOT NULL,
-                        metadata_json TEXT NOT NULL,
-                        updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                    );
+                        CREATE TABLE IF NOT EXISTS chunk_documents (
+                            chunk_id TEXT PRIMARY KEY,
+                            source_item_id TEXT NOT NULL REFERENCES source_documents(source_item_id) ON DELETE CASCADE,
+                            tenant_id TEXT NOT NULL,
+                            scope_key TEXT NOT NULL,
+                            source_system TEXT NOT NULL,
+                            source_container TEXT NOT NULL,
+                            source_url TEXT NOT NULL,
+                            title TEXT NOT NULL,
+                            section_path TEXT,
+                            last_modified_utc TIMESTAMPTZ NOT NULL,
+                            acl_tags_json TEXT NOT NULL,
+                            content_hash TEXT NOT NULL,
+                            chunk_index INTEGER NOT NULL,
+                            chunk_text TEXT NOT NULL,
+                            embedding_model TEXT NOT NULL,
+                            language TEXT NOT NULL,
+                            tags_json TEXT NOT NULL,
+                            metadata_json TEXT NOT NULL,
+                            updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        );
 
-                    CREATE INDEX IF NOT EXISTS idx_source_documents_scope_key ON source_documents(scope_key);
-                    CREATE INDEX IF NOT EXISTS idx_chunk_documents_source_item_id ON chunk_documents(source_item_id);
-                    """
-                )
+                        CREATE INDEX IF NOT EXISTS idx_source_documents_scope_key ON source_documents(scope_key);
+                        CREATE INDEX IF NOT EXISTS idx_chunk_documents_source_item_id ON chunk_documents(source_item_id);
+                        """
+                    )
+                finally:
+                    cursor.execute("SELECT pg_advisory_unlock(hashtext('cloud_rag_metadata_schema'))")
             connection.commit()
 
     def get_checkpoint(self, scope_key: str) -> SharePointCheckpoint | None:

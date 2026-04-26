@@ -8,3 +8,8 @@ Root tests cover the current foundation:
 - OpenAI-compatible API smoke coverage
 - SharePoint hashing, normalization, and checkpoint-driven sync behavior
 - OneNote HTML parsing plus incremental checkpoint and reconciliation behavior
+- ACL-aware retrieval filtering and citation mapping
+- Microsoft Graph webhook validation, clientState rejection, lifecycle queueing, and retry backoff
+- Microsoft Entra token validation and group/role-to-scope mapping
+- fixed onboarding evaluation harness execution and metric calculation
+- benchmark dataset structure and k6 scenario asset presence

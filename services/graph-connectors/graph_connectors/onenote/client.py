@@ -4,7 +4,6 @@ import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urljoin
 
 import httpx
 from shared_schemas import AppSettings
@@ -54,6 +53,14 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
         self.http_client = http_client or httpx.Client(timeout=60.0)
 
     def resolve_site(self) -> OneNoteSite:
+        if self.settings.resolved_onenote_scope_mode == "me":
+            return OneNoteSite(
+                id="me",
+                name="Personal OneNote",
+                web_url="https://www.onenote.com",
+                hostname="me",
+                relative_path="onenote",
+            )
         payload = self._request_json(
             "GET",
             f"/sites/{self.settings.resolved_onenote_site_hostname}:/{self.settings.resolved_onenote_site_scope}",
@@ -69,7 +76,7 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
     def list_notebooks(self, site_id: str) -> list[OneNoteNotebook]:
         payload = self._request_json(
             "GET",
-            f"/sites/{site_id}/onenote/notebooks",
+            f"{self._onenote_root(site_id)}/notebooks",
             params={
                 "$select": "id,displayName,links,sectionsUrl",
                 "$orderby": "displayName asc",
@@ -91,7 +98,7 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
     def list_sections(self, site_id: str) -> list[OneNoteSection]:
         payload = self._request_json(
             "GET",
-            f"/sites/{site_id}/onenote/sections",
+            f"{self._onenote_root(site_id)}/sections",
             params={
                 "$select": "id,displayName,links,parentNotebook",
                 "$expand": "parentNotebook($select=id,displayName)",
@@ -132,12 +139,17 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
             }
             if modified_since:
                 params["$filter"] = f"lastModifiedDateTime ge {modified_since.astimezone(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}"
-            payload = self._request_json("GET", f"/sites/{site_id}/onenote/pages", params=params)
+            payload = self._request_json("GET", f"{self._onenote_root(site_id)}/pages", params=params)
         pages = [self._parse_page(raw) for raw in payload.get("value", [])]
         return pages, payload.get("@odata.nextLink")
 
     def get_page_content(self, content_url: str) -> str:
         return self._request_text("GET", content_url, absolute=True, headers={"Accept": "text/html"})
+
+    def _onenote_root(self, site_id: str) -> str:
+        if self.settings.resolved_onenote_scope_mode == "me":
+            return "/me/onenote"
+        return f"/sites/{site_id}/onenote"
 
     def _parse_page(self, raw: dict[str, Any]) -> OneNotePage:
         parent_notebook = raw.get("parentNotebook") or {}
@@ -190,7 +202,7 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
         absolute: bool = False,
         headers: dict[str, str] | None = None,
     ) -> httpx.Response:
-        url = path_or_url if absolute else urljoin(self.settings.graph_api_base_url, path_or_url)
+        url = path_or_url if absolute else _graph_url(self.settings.graph_api_base_url, path_or_url)
         merged_headers = {
             "Authorization": f"Bearer {self.auth_provider.get_access_token()}",
             "Accept": "application/json",
@@ -207,7 +219,8 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
                     wait_seconds = float(retry_after) if retry_after else self.settings.onenote_retry_backoff_seconds * (2 ** (attempt - 1))
                     time.sleep(wait_seconds)
                     continue
-                response.raise_for_status()
+                if response.is_error:
+                    raise RuntimeError(_format_response_error(method, url, response))
                 return response
             except (httpx.HTTPError, ValueError) as error:
                 last_error = error
@@ -221,13 +234,22 @@ class MockOneNoteGraphClient(GraphOneNoteClient):
     def __init__(self, settings: AppSettings) -> None:
         self.settings = settings
         site_scope = settings.resolved_onenote_site_scope
-        self._site = OneNoteSite(
-            id="mock-onenote-site",
-            name="Onboarding Site",
-            web_url=f"https://{settings.resolved_onenote_site_hostname}/{site_scope}",
-            hostname=settings.resolved_onenote_site_hostname,
-            relative_path=site_scope,
-        )
+        if settings.resolved_onenote_scope_mode == "me":
+            self._site = OneNoteSite(
+                id="me",
+                name="Personal OneNote",
+                web_url="https://www.onenote.com",
+                hostname="me",
+                relative_path="onenote",
+            )
+        else:
+            self._site = OneNoteSite(
+                id="mock-onenote-site",
+                name="Onboarding Site",
+                web_url=f"https://{settings.resolved_onenote_site_hostname}/{site_scope}",
+                hostname=settings.resolved_onenote_site_hostname,
+                relative_path=site_scope,
+            )
         notebook_specs = (
             [(settings.graph_onenote_notebook_scope, "Orientation")]
             if settings.graph_onenote_notebook_scope
@@ -362,3 +384,18 @@ def _parse_graph_datetime(value: str | None) -> datetime:
     if not value:
         return datetime.now(UTC)
     return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+
+
+def _graph_url(base_url: str, path: str) -> str:
+    return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+
+
+def _format_response_error(method: str, url: str, response: httpx.Response) -> str:
+    response_body = response.text.strip()
+    if len(response_body) > 1000:
+        response_body = f"{response_body[:1000]}..."
+    return (
+        "OneNote request failed: "
+        f"{method} {url} returned HTTP {response.status_code} {response.reason_phrase}. "
+        f"Response body: {response_body or '<empty>'}"
+    )

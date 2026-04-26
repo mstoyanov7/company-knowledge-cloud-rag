@@ -12,9 +12,9 @@ from rag_api.api.openai_models import (
     ModelCard,
     ModelListResponse,
 )
-from rag_api.dependencies import get_answer_service, verify_openai_api_key
+from rag_api.dependencies import get_answer_service, get_runtime_settings, verify_openai_api_key
 from rag_api.services import AnswerService
-from shared_schemas import AnswerRequest
+from shared_schemas import AnswerRequest, AppSettings, UserContext
 
 router = APIRouter(prefix="/v1", tags=["openai-compatible"], dependencies=[Depends(verify_openai_api_key)])
 
@@ -29,6 +29,7 @@ async def list_models(service: AnswerService = Depends(get_answer_service)) -> M
 async def create_chat_completion(
     request: ChatCompletionRequest,
     service: AnswerService = Depends(get_answer_service),
+    settings: AppSettings = Depends(get_runtime_settings),
 ) -> ChatCompletionResponse | StreamingResponse:
     user_message = next((message.content for message in reversed(request.messages) if message.role == "user"), None)
     if not user_message:
@@ -37,7 +38,8 @@ async def create_chat_completion(
             detail="At least one user message is required.",
         )
 
-    answer_response = await service.answer(AnswerRequest(question=user_message))
+    user_context = UserContext(acl_tags=settings.auth_default_acl_tag_list)
+    answer_response = await service.answer(AnswerRequest(question=user_message, user_context=user_context))
     prompt_tokens = len(user_message.split())
     completion_tokens = len(answer_response.answer.split())
     model_name = request.model or answer_response.metadata.model

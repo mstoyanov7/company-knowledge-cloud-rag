@@ -10,8 +10,8 @@ class MockLlmAdapter:
     async def generate(self, prompt: PromptContext) -> GenerationResult:
         if not prompt.citations:
             answer = (
-                "I could not find a relevant onboarding source in the mock index. "
-                "Try asking about day-one setup, benefits, or remote work."
+                "I could not find a relevant source in the configured retrieval index. "
+                "Check that content has been indexed and that your local ACL tags include access to it."
             )
             return GenerationResult(
                 provider=self.provider_name,

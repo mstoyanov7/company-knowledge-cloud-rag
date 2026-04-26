@@ -14,6 +14,8 @@ class OneNoteConnector(ConnectorBase):
 
     def describe_scope(self) -> str:
         notebook_scope = self.settings.graph_onenote_notebook_scope or "all notebooks"
+        if self.settings.resolved_onenote_scope_mode == "me":
+            return f"OneNote personal scope: /me/onenote notebook={notebook_scope}"
         return (
             "OneNote onboarding scope: "
             f"{self.settings.resolved_onenote_site_hostname}/{self.settings.resolved_onenote_site_scope} "

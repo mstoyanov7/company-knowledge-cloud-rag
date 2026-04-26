@@ -29,7 +29,7 @@ class OneNoteDocumentNormalizer:
             mime_type="text/html",
             section_path=section_path,
             last_modified_utc=page.last_modified_utc,
-            acl_tags=[],
+            acl_tags=["employees"],
             content_hash=compute_content_hash(parsed_page.text),
             content_text=parsed_page.text,
             tags=["onenote", page.notebook_name.lower().replace(" ", "-")],
@@ -55,5 +55,6 @@ class OneNoteDocumentNormalizer:
                     for resource in parsed_page.resources
                 ],
                 "parser_stats": parsed_page.metadata,
+                "acl_source": "restricted-onboarding-default",
             },
         )

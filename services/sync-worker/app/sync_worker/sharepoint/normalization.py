@@ -16,6 +16,7 @@ class SharePointDocumentNormalizer:
         extracted_content: ExtractedContent,
     ) -> SourceDocument:
         section_path = item.parent_path or "/"
+        acl_tags = item.acl_tags or ["employees"]
         return SourceDocument(
             tenant_id="local-tenant",
             source_system="sharepoint",
@@ -28,7 +29,7 @@ class SharePointDocumentNormalizer:
             mime_type=item.mime_type,
             section_path=section_path,
             last_modified_utc=item.last_modified_utc,
-            acl_tags=item.acl_tags,
+            acl_tags=acl_tags,
             content_hash=compute_content_hash(extracted_content.text),
             content_text=extracted_content.text,
             tags=["sharepoint", drive.name.lower()],
@@ -43,5 +44,6 @@ class SharePointDocumentNormalizer:
                 "mime_type": item.mime_type,
                 "e_tag": item.e_tag,
                 "c_tag": item.c_tag,
+                "acl_source": "graph" if item.acl_tags else "restricted-onboarding-default",
             },
         )

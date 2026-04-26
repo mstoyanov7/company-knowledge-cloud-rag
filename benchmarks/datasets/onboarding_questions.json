@@ -1,0 +1,66 @@
+{
+  "name": "onboarding-benchmark-v1",
+  "description": "Fixed benchmark set for chat API and retrieval pipeline performance tests.",
+  "cases": [
+    {
+      "case_id": "day-one-setup",
+      "question": "What should I do on day one?",
+      "expected_source_item_ids": ["sp-001"],
+      "user_context": {
+        "user_id": "bench-employee-001",
+        "email": "employee001@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": ["public", "employees"]
+      },
+      "top_k": 3
+    },
+    {
+      "case_id": "benefits-enrollment",
+      "question": "Which benefits should I review during onboarding?",
+      "expected_source_item_ids": ["on-001"],
+      "user_context": {
+        "user_id": "bench-employee-002",
+        "email": "employee002@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": ["public", "employees"]
+      },
+      "top_k": 3
+    },
+    {
+      "case_id": "remote-work-engineering",
+      "question": "What repository access should engineering teammates request?",
+      "expected_source_item_ids": ["sp-002"],
+      "user_context": {
+        "user_id": "bench-engineer-001",
+        "email": "engineer001@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": ["engineering"]
+      },
+      "top_k": 3
+    },
+    {
+      "case_id": "first-week-plan",
+      "question": "What should a new hire complete during the first week?",
+      "expected_source_item_ids": ["sp-001", "on-001"],
+      "user_context": {
+        "user_id": "bench-employee-003",
+        "email": "employee003@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": ["public", "employees"]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "unauthorized-engineering",
+      "question": "What repository access should engineering teammates request?",
+      "expected_source_item_ids": [],
+      "user_context": {
+        "user_id": "bench-employee-004",
+        "email": "employee004@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": ["public", "employees"]
+      },
+      "top_k": 3
+    }
+  ]
+}

@@ -4,7 +4,8 @@ import uvicorn
 from fastapi import FastAPI
 from shared_schemas import AppSettings, get_settings
 
-from rag_api.api import answer_router, openai_compat_router, system_router
+from rag_api.api import answer_router, graph_notifications_router, openai_compat_router, system_router
+from rag_api.observability import configure_observability
 
 
 def create_app(settings: AppSettings | None = None) -> FastAPI:
@@ -15,8 +16,10 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
         description="Local proof-of-concept backend for enterprise onboarding RAG.",
     )
     application.state.settings = resolved_settings
+    configure_observability(application, resolved_settings, default_service_name="rag-api")
     application.include_router(system_router)
     application.include_router(answer_router)
+    application.include_router(graph_notifications_router)
     application.include_router(openai_compat_router)
     return application
 

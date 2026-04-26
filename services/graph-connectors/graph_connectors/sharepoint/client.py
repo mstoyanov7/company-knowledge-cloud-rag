@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urljoin
 
 import httpx
 from shared_schemas import AppSettings
@@ -95,7 +94,7 @@ class MicrosoftGraphSharePointClient(GraphSharePointClient):
 
     def download_file(self, drive_id: str, item_id: str) -> bytes:
         response = self.http_client.get(
-            urljoin(self.settings.graph_api_base_url, f"/drives/{drive_id}/items/{item_id}/content"),
+            _graph_url(self.settings.graph_api_base_url, f"/drives/{drive_id}/items/{item_id}/content"),
             headers=self._headers(),
         )
         response.raise_for_status()
@@ -117,7 +116,7 @@ class MicrosoftGraphSharePointClient(GraphSharePointClient):
         headers = self._headers()
         if extra_headers:
             headers.update(extra_headers)
-        response = self.http_client.get(urljoin(self.settings.graph_api_base_url, path), params=params, headers=headers)
+        response = self.http_client.get(_graph_url(self.settings.graph_api_base_url, path), params=params, headers=headers)
         response.raise_for_status()
         return response.json()
 
@@ -255,3 +254,7 @@ def _parse_graph_datetime(value: str | None) -> datetime:
         return datetime.now(UTC)
     normalized = value.replace("Z", "+00:00")
     return datetime.fromisoformat(normalized).astimezone(UTC)
+
+
+def _graph_url(base_url: str, path: str) -> str:
+    return f"{base_url.rstrip('/')}/{path.lstrip('/')}"

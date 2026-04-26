@@ -1,6 +1,30 @@
 from shared_schemas.answer import AnswerMetadata, AnswerRequest, AnswerResponse, Citation
+from shared_schemas.auth import AuthenticatedPrincipal, SecurityAuditEvent, TokenValidationResult
 from shared_schemas.config import AppSettings, get_settings
-from shared_schemas.documents import ChunkDocument, RetrievalRequest, SourceDocument, UserContext
+from shared_schemas.documents import (
+    AccessScope,
+    AclBinding,
+    ChunkDocument,
+    RetrievalMetadata,
+    RetrievalRequest,
+    RetrievalResult,
+    SourceDocument,
+    UserContext,
+)
+from shared_schemas.evaluation import EvaluationCase, EvaluationCaseResult, EvaluationReport, EvaluationSummary
+from shared_schemas.ops import (
+    DeadLetterRecord,
+    GraphChangeNotification,
+    GraphLifecycleEvent,
+    GraphNotificationEnvelope,
+    GraphResourceData,
+    GraphSubscriptionRecord,
+    GraphSubscriptionStatus,
+    GraphWebhookAccepted,
+    OpsJobRecord,
+    OpsJobStatus,
+    OpsJobType,
+)
 from shared_schemas.sync import JobStatus, OneNoteCheckpoint, SharePointCheckpoint, SyncJob, SyncMode, SyncReport
 
 __all__ = [
@@ -8,16 +32,38 @@ __all__ = [
     "AnswerRequest",
     "AnswerResponse",
     "AppSettings",
+    "AccessScope",
+    "AclBinding",
     "ChunkDocument",
     "Citation",
+    "DeadLetterRecord",
+    "AuthenticatedPrincipal",
+    "EvaluationCase",
+    "EvaluationCaseResult",
+    "EvaluationReport",
+    "EvaluationSummary",
+    "GraphChangeNotification",
+    "GraphLifecycleEvent",
+    "GraphNotificationEnvelope",
+    "GraphResourceData",
+    "GraphSubscriptionRecord",
+    "GraphSubscriptionStatus",
+    "GraphWebhookAccepted",
     "JobStatus",
     "OneNoteCheckpoint",
+    "OpsJobRecord",
+    "OpsJobStatus",
+    "OpsJobType",
+    "RetrievalMetadata",
     "RetrievalRequest",
+    "RetrievalResult",
     "SharePointCheckpoint",
+    "SecurityAuditEvent",
     "SourceDocument",
     "SyncJob",
     "SyncMode",
     "SyncReport",
+    "TokenValidationResult",
     "UserContext",
     "get_settings",
 ]

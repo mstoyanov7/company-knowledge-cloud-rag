@@ -3,6 +3,7 @@ import logging
 
 from shared_schemas import get_settings
 
+from sync_worker.observability import configure_observability
 from sync_worker.runner import WorkerRunner
 
 
@@ -20,6 +21,7 @@ def run() -> None:
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    configure_observability(settings, default_service_name="sync-worker")
 
     runner = WorkerRunner(settings)
     if args.run_once:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import UTC, datetime
 
 from shared_schemas import AppSettings, SharePointCheckpoint, SyncMode, SyncReport
@@ -9,6 +10,11 @@ from graph_connectors.sharepoint.connector import SharePointConnector
 from sync_worker.ingestion import CompositeFileExtractor, DeterministicEmbedder, TextChunker, UnsupportedFileTypeError
 from sync_worker.sharepoint.normalization import SharePointDocumentNormalizer
 from sync_worker.sharepoint.ports import MetadataStorePort, VectorStorePort
+
+try:
+    from opentelemetry import metrics
+except ModuleNotFoundError:  # pragma: no cover - optional runtime dependency
+    metrics = None
 
 
 class SharePointSyncService:
@@ -34,6 +40,9 @@ class SharePointSyncService:
         self.metadata_store = metadata_store
         self.vector_store = vector_store
         self.logger = logger or logging.getLogger("sync_worker.sharepoint")
+        meter = metrics.get_meter("sync_worker.sharepoint") if metrics else None
+        self.sync_latency_ms = meter.create_histogram("sharepoint_sync_latency_ms") if meter else None
+        self.items_counter = meter.create_counter("sharepoint_sync_items_total") if meter else None
 
     def bootstrap(self) -> SyncReport:
         return self._sync(SyncMode.bootstrap)
@@ -49,6 +58,7 @@ class SharePointSyncService:
         return self._sync(SyncMode.incremental)
 
     def _sync(self, mode: SyncMode) -> SyncReport:
+        started = time.perf_counter()
         self.metadata_store.ensure_schema()
         self.vector_store.ensure_collection()
 
@@ -118,6 +128,17 @@ class SharePointSyncService:
             report.items_deleted,
             report.chunks_written,
         )
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        if self.sync_latency_ms:
+            self.sync_latency_ms.record(duration_ms, {"mode": mode.value})
+        if self.items_counter:
+            for state, value in [
+                ("seen", report.items_seen),
+                ("changed", report.items_changed),
+                ("skipped", report.items_skipped),
+                ("deleted", report.items_deleted),
+            ]:
+                self.items_counter.add(value, {"mode": mode.value, "state": state})
         return report
 
     def _process_item(self, *, site, drive, item, report: SyncReport) -> None:

@@ -222,6 +222,28 @@ def test_mock_onenote_client_uses_all_notebooks_when_scope_is_blank() -> None:
     assert {page.notebook_name for page in pages} == {"Team Notebook", "Engineering Notebook"}
 
 
+def test_onenote_personal_scope_does_not_require_sharepoint_site() -> None:
+    settings = AppSettings(
+        app_env="test",
+        onenote_graph_mode="mock",
+        graph_onenote_scope_mode="me",
+        graph_onenote_site_hostname="",
+        graph_onenote_site_scope="",
+        graph_onenote_notebook_scope="",
+    )
+    connector = OneNoteConnector(settings, client=MockOneNoteGraphClient(settings))
+
+    site, notebooks, sections = connector.resolve_scope()
+
+    assert site.id == "me"
+    assert site.hostname == "me"
+    assert site.relative_path == "onenote"
+    assert settings.onenote_scope_key == "onenote::me::personal::all-notebooks"
+    assert "/me/onenote" in connector.describe_scope()
+    assert {notebook.display_name for notebook in notebooks} == {"Team Notebook", "Engineering Notebook"}
+    assert {section.display_name for section in sections} == {"Orientation", "Tooling"}
+
+
 def test_onenote_bootstrap_persists_checkpoint_and_chunks() -> None:
     page = make_page("page-1")
     service, metadata_store, vector_store = build_service(

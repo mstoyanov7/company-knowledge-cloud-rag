@@ -41,6 +41,7 @@ class TextChunker:
                         section_path=document.section_path,
                         last_modified_utc=document.last_modified_utc,
                         acl_tags=document.acl_tags,
+                        acl_bindings=document.acl_bindings,
                         content_hash=document.content_hash,
                         chunk_id=f"{document.source_item_id}-chunk-{chunk_index}",
                         chunk_index=chunk_index,

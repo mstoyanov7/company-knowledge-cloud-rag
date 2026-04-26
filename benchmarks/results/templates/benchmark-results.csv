@@ -1,0 +1,1 @@
+run_id,date,scenario,tool,users_or_vus,duration_seconds,requests,throughput_rps,failure_rate,http_p50_ms,http_p95_ms,http_p99_ms,answer_p50_ms,answer_p95_ms,answer_p99_ms,retrieval_p50_ms,retrieval_p95_ms,retrieval_p99_ms,completion_p50_ms,completion_p95_ms,completion_p99_ms,freshness_p50_ms,freshness_p95_ms,freshness_p99_ms,avg_citation_count,notes

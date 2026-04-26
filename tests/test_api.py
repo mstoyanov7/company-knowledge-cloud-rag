@@ -8,7 +8,10 @@ def create_test_client() -> TestClient:
     settings = AppSettings(
         app_env="test",
         mock_api_key="test-key",
+        rag_api_key="",
+        retrieval_provider="mock",
         default_model_name="mock-onboarding-assistant",
+        security_audit_enabled=False,
     )
     return TestClient(create_app(settings))
 
@@ -47,7 +50,50 @@ def test_answer_endpoint_returns_answer_and_citations() -> None:
     assert response.status_code == 200
     assert "answer" in payload
     assert payload["citations"]
+    assert "retrieval_meta" in payload
     assert payload["metadata"]["retrieved_chunk_count"] >= 1
+
+
+def test_answer_endpoint_excludes_unauthorized_content() -> None:
+    client = create_test_client()
+
+    response = client.post(
+        "/api/v1/answer",
+        json={
+            "question": "incident repository production",
+            "user_context": {"acl_tags": ["public", "employees"]},
+        },
+    )
+
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["metadata"]["retrieved_chunk_count"] == 0
+    assert payload["citations"] == []
+    assert payload["retrieval_meta"]["filtered_count"] >= 1
+
+
+def test_answer_endpoint_allows_authorized_content_and_maps_citations() -> None:
+    client = create_test_client()
+
+    response = client.post(
+        "/api/v1/answer",
+        json={
+            "question": "What repository access do engineering teammates need?",
+            "user_context": {"acl_tags": ["engineering"]},
+        },
+    )
+
+    payload = response.json()
+    citation = payload["citations"][0]
+
+    assert response.status_code == 200
+    assert payload["metadata"]["retrieved_chunk_count"] == 1
+    assert citation["source_item_id"] == "sp-002"
+    assert citation["chunk_index"] == 0
+    assert citation["source_system"] == "sharepoint"
+    assert citation["source_url"].endswith("/remote-work")
+    assert citation["title"] == "Engineering remote work guide"
 
 
 def test_openai_compatible_chat_completion_and_models() -> None:
