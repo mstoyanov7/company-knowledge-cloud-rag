@@ -94,8 +94,13 @@ class AppSettings(BaseSettings):
     embedding_vector_size: int = 32
 
     default_llm_provider: str = "mock"
-    default_embedding_provider: str = "mock"
+    default_embedding_provider: str = "token-hash-v1"
     default_model_name: str = "mock-onboarding-assistant"
+    llm_openai_base_url: str = "http://host.docker.internal:11434/v1"
+    llm_openai_api_key: SecretStr = SecretStr("ollama")
+    llm_request_timeout_seconds: float = 120.0
+    llm_temperature: float = 0.2
+    llm_max_tokens: int = 800
     mock_api_key: SecretStr = SecretStr("cloudrag-local-key")
     mock_top_k: int = 3
     rag_api_key: SecretStr = SecretStr("")
@@ -103,6 +108,8 @@ class AppSettings(BaseSettings):
     retrieval_vector_collections: str = ""
     retrieval_candidate_multiplier: int = 3
     retrieval_score_threshold: float | None = None
+    retrieval_min_keyword_overlap: int = 1
+    retrieval_lexical_scan_limit: int = 1000
     rerank_enabled: bool = True
 
     auth_enabled: bool = False

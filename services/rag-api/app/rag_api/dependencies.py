@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from fastapi import Depends, Header, HTTPException, Request, status
 from shared_schemas import AppSettings, UserContext
 
-from rag_api.adapters import MockLlmAdapter, MockRetriever, QdrantAclRetriever
-from rag_api.ports import RetrievalPort
+from rag_api.adapters import MockLlmAdapter, MockRetriever, OpenAICompatibleLlmAdapter, QdrantAclRetriever
+from rag_api.ports import LlmPort, RetrievalPort
 from rag_api.services import (
     AccessScopeResolver,
     AnswerService,
@@ -37,22 +37,29 @@ def get_retriever(settings: AppSettings) -> RetrievalPort:
     return MockRetriever(settings)
 
 
+def get_llm(settings: AppSettings) -> LlmPort:
+    if settings.default_llm_provider.lower() in {"ollama", "openai-compatible", "openai_compatible"}:
+        return OpenAICompatibleLlmAdapter(settings)
+    return MockLlmAdapter(model_name=settings.default_model_name)
+
+
 def get_answer_service(settings: AppSettings = Depends(get_runtime_settings)) -> AnswerService:
     reranker = KeywordOverlapReranker() if settings.rerank_enabled else None
     return AnswerService(
-        llm=MockLlmAdapter(model_name=settings.default_model_name),
+        llm=get_llm(settings),
         prompt_builder=PromptBuilder(),
         retriever=get_retriever(settings),
         access_scope_resolver=AccessScopeResolver(),
         reranker=reranker,
         retrieval_candidate_multiplier=settings.retrieval_candidate_multiplier,
+        min_keyword_overlap=settings.retrieval_min_keyword_overlap,
         audit_logger=get_security_audit_logger(settings),
     )
 
 
 def get_system_service(settings: AppSettings = Depends(get_runtime_settings)) -> SystemService:
     return SystemService(
-        llm=MockLlmAdapter(model_name=settings.default_model_name),
+        llm=get_llm(settings),
         retriever=get_retriever(settings),
         settings=settings,
     )

@@ -183,9 +183,14 @@ class SharePointSyncService:
             drive=drive,
             item=item,
             extracted_content=extracted_content,
+            embedding_model=self.settings.default_embedding_provider,
         )
         existing = self.metadata_store.get_source_document(item.id)
-        if existing and existing.content_hash == document.content_hash:
+        if (
+            existing
+            and existing.content_hash == document.content_hash
+            and existing.metadata.get("embedding_model") == document.metadata.get("embedding_model")
+        ):
             self.metadata_store.upsert_source_document(self.settings.sharepoint_scope_key, document)
             report.items_skipped += 1
             self.logger.info(

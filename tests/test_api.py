@@ -10,6 +10,7 @@ def create_test_client() -> TestClient:
         mock_api_key="test-key",
         rag_api_key="",
         retrieval_provider="mock",
+        default_llm_provider="mock",
         default_model_name="mock-onboarding-assistant",
         security_audit_enabled=False,
     )
@@ -141,3 +142,23 @@ def test_openai_compatible_streaming_chat_completion() -> None:
     assert response.status_code == 200
     assert "chat.completion.chunk" in body
     assert "[DONE]" in body
+
+
+def test_openai_compatible_chat_filters_to_onenote_sources() -> None:
+    client = create_test_client()
+    headers = {"Authorization": "Bearer test-key"}
+
+    response = client.post(
+        "/v1/chat/completions",
+        headers=headers,
+        json={
+            "model": "mock-onboarding-assistant",
+            "messages": [
+                {"role": "user", "content": "What repository access should engineering teammates request?"}
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["choices"][0]["message"]["content"] == "No information"
+    assert response.json()["citations"] == []

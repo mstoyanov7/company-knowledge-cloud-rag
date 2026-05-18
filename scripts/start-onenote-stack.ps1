@@ -166,9 +166,18 @@ try {
             GRAPH_ONENOTE_SCOPE_MODE       = "me"
             GRAPH_ONENOTE_SITE_HOSTNAME    = ""
             GRAPH_ONENOTE_SITE_SCOPE       = ""
+            DEFAULT_LLM_PROVIDER           = "ollama"
+            DEFAULT_MODEL_NAME             = "gpt-oss:120b-cloud"
+            DEFAULT_EMBEDDING_PROVIDER     = "token-hash-v1"
+            LLM_OPENAI_BASE_URL            = "http://host.docker.internal:11434/v1"
+            LLM_OPENAI_API_KEY             = "ollama"
             RETRIEVAL_PROVIDER             = "qdrant"
             RETRIEVAL_VECTOR_COLLECTIONS   = "onenote_chunks"
+            RETRIEVAL_MIN_KEYWORD_OVERLAP  = "1"
+            RETRIEVAL_LEXICAL_SCAN_LIMIT   = "1000"
             AUTH_DEFAULT_ACL_TAGS          = "public,employees"
+            ENABLE_PERSISTENT_CONFIG       = "false"
+            ENABLE_OLLAMA_API              = "false"
         }
     }
 

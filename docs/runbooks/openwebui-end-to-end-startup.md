@@ -7,7 +7,7 @@ Current behavior:
 - Open WebUI is the frontend.
 - `rag-api` owns retrieval, ACL filtering, prompt construction, and citations.
 - OneNote indexing writes chunks to PostgreSQL and Qdrant.
-- The backend currently uses the mock LLM adapter unless an Ollama adapter is added.
+- The backend can use either the mock LLM adapter or an Ollama/OpenAI-compatible model.
 
 ## 1. Prerequisites
 
@@ -54,11 +54,31 @@ The script:
 Use `-NoEnvUpdate` if you do not want the script to update non-secret OneNote-only `.env` defaults.
 Use `-SkipOpsWorker` if you only want the one-off OneNote sync and do not want the background worker container.
 
+The startup script also sets:
+
+```env
+ENABLE_PERSISTENT_CONFIG=false
+ENABLE_OLLAMA_API=false
+```
+
+This is intentional. It prevents Open WebUI from using a previously saved direct
+Ollama connection and forces it to call `rag-api` only.
+
 If PowerShell blocks script execution, run it through bypass mode for this command only:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-onenote-stack.ps1 -Build -Bootstrap
 ```
+
+If Open WebUI is reachable but answers look wrong, run:
+
+```powershell
+.\scripts\diagnose-local-stack.ps1
+```
+
+This verifies that Open WebUI is calling `rag-api`, `rag-api` is using Qdrant and
+Ollama, OneNote chunks exist, and direct secured retrieval returns only OneNote
+sources.
 
 ## 3. Required `.env` Values
 
@@ -105,6 +125,14 @@ GRAPH_ONENOTE_NOTEBOOK_SCOPE=
 Keep retrieval on Qdrant:
 
 ```env
+DEFAULT_LLM_PROVIDER=ollama
+DEFAULT_MODEL_NAME=gpt-oss:120b-cloud
+LLM_OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+LLM_OPENAI_API_KEY=ollama
+LLM_REQUEST_TIMEOUT_SECONDS=120
+LLM_TEMPERATURE=0.2
+LLM_MAX_TOKENS=800
+DEFAULT_EMBEDDING_PROVIDER=token-hash-v1
 RETRIEVAL_PROVIDER=qdrant
 RETRIEVAL_VECTOR_COLLECTIONS=onenote_chunks
 AUTH_DEFAULT_ACL_TAGS=public,employees
@@ -225,6 +253,8 @@ Docker Compose wires Open WebUI to:
 ```env
 OPENAI_API_BASE_URL=http://rag-api:8080/v1
 OPENAI_API_KEY=${MOCK_API_KEY}
+ENABLE_OLLAMA_API=false
+ENABLE_PERSISTENT_CONFIG=false
 ```
 
 In Open WebUI, select the backend model:
@@ -239,11 +269,10 @@ Ask:
 Summarize my OneNote onboarding notes.
 ```
 
-This path is easiest, but it has limitations:
+This path calls `rag-api`, not Ollama directly. The `rag-api` backend retrieves
+OneNote chunks from Qdrant and then calls Ollama internally.
 
-- Open WebUI may not display the structured citation objects.
-- The OpenAI-compatible endpoint uses default user context.
-- For explicit ACL tags and citation display, use the Pipe option below.
+For explicit citation display, use the Pipe option below.
 
 ## 9. Option B: Recommended Pipe Setup
 
@@ -285,7 +314,61 @@ POST /api/v1/answer
 
 and appends source citations to the displayed answer.
 
-## 10. Updating OneNote Content
+The backend is configured as OneNote-only for answers. If retrieved OneNote
+context does not contain enough information, the answer should be exactly:
+
+```text
+No information
+```
+
+If Open WebUI returns a general answer for a question that is not in OneNote,
+it is almost certainly bypassing `rag-api`. Recreate Open WebUI with the current
+Compose settings:
+
+```powershell
+docker compose up -d --force-recreate openwebui
+```
+
+Then check Admin Panel > Settings > Connections and remove any direct Ollama
+connection such as `http://localhost:11434` or `http://host.docker.internal:11434`.
+The only model connection should be:
+
+```text
+http://rag-api:8080/v1
+```
+
+For better precision, keep Pipe `TOP_K` small, usually `3`. Higher values send
+more OneNote chunks to the model and can make it answer from a related but wrong
+note.
+
+## 10. Ollama Model Setup
+
+The backend can call an Ollama model through Ollama's OpenAI-compatible API.
+
+Verify the model is available on your Windows host:
+
+```powershell
+Invoke-RestMethod http://localhost:11434/v1/models
+```
+
+Your `.env` should contain:
+
+```env
+DEFAULT_LLM_PROVIDER=ollama
+DEFAULT_MODEL_NAME=gpt-oss:120b-cloud
+LLM_OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+LLM_OPENAI_API_KEY=ollama
+```
+
+Use `host.docker.internal` because `rag-api` runs inside Docker and must reach Ollama on your PC host.
+
+After changing these values, recreate the backend:
+
+```powershell
+.\scripts\start-onenote-stack.ps1 -Build
+```
+
+## 11. Updating OneNote Content
 
 After editing a OneNote page, run incremental sync:
 
@@ -295,7 +378,7 @@ docker compose run --rm sync-worker python -m sync_worker.jobs.onenote_increment
 
 Then ask again in Open WebUI.
 
-## 11. Normal Startup Order After Initial Setup
+## 12. Normal Startup Order After Initial Setup
 
 Use this order after OneNote auth and indexing are already working:
 
@@ -312,7 +395,7 @@ Then open:
 http://localhost:3000
 ```
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 If the OneNote job says `role "cloudrag" does not exist`, do not run it from Windows host Python. Run it inside Docker:
 
@@ -348,4 +431,16 @@ If Open WebUI cannot reach the backend, remember:
 - From your browser: use `http://localhost:8081`.
 - From Open WebUI container to rag-api container: use `http://rag-api:8080`.
 
-If answers are generic or mock-like, that is expected until an Ollama/OpenAI-compatible LLM adapter is added to `rag-api`.
+If answers are generic or mock-like, confirm `DEFAULT_LLM_PROVIDER=ollama`, rebuild `rag-api`, and verify Ollama is reachable from Docker through `http://host.docker.internal:11434/v1`.
+
+If every question returns the same citations, rebuild the local token-hash vectors by running:
+
+```powershell
+.\scripts\start-onenote-stack.ps1 -Build -Bootstrap
+```
+
+Make sure `.env` contains:
+
+```env
+DEFAULT_EMBEDDING_PROVIDER=token-hash-v1
+```

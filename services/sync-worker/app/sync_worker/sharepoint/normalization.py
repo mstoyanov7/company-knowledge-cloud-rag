@@ -14,6 +14,7 @@ class SharePointDocumentNormalizer:
         drive: SharePointDrive,
         item: SharePointDriveItem,
         extracted_content: ExtractedContent,
+        embedding_model: str = "token-hash-v1",
     ) -> SourceDocument:
         section_path = item.parent_path or "/"
         acl_tags = item.acl_tags or ["employees"]
@@ -44,6 +45,7 @@ class SharePointDocumentNormalizer:
                 "mime_type": item.mime_type,
                 "e_tag": item.e_tag,
                 "c_tag": item.c_tag,
+                "embedding_model": embedding_model,
                 "acl_source": "graph" if item.acl_tags else "restricted-onboarding-default",
             },
         )

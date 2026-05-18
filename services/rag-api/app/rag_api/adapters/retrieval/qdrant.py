@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
+import re
 from typing import Any
 
 from qdrant_client import QdrantClient, models
@@ -20,7 +21,7 @@ from rag_api.adapters.embeddings import DeterministicQueryEmbedder
 
 
 class QdrantAclRetriever:
-    name = "qdrant-vector-acl"
+    name = "qdrant-hybrid-acl"
 
     def __init__(self, settings: AppSettings, *, embedder: DeterministicQueryEmbedder | None = None) -> None:
         self.settings = settings
@@ -40,6 +41,7 @@ class QdrantAclRetriever:
         collections_queried: list[str] = []
 
         for collection_name in collections:
+            collection_was_queried = False
             try:
                 response = self.client.query_points(
                     collection_name=collection_name,
@@ -51,14 +53,23 @@ class QdrantAclRetriever:
                     score_threshold=self.settings.retrieval_score_threshold,
                 )
             except (UnexpectedResponse, ValueError):
-                continue
+                response = None
 
-            collections_queried.append(collection_name)
-            for point in response.points:
-                if point.payload:
-                    candidates.append(self._chunk_from_payload(point.payload, score=float(point.score or 0.0)))
+            if response is not None:
+                collection_was_queried = True
+                for point in response.points:
+                    if point.payload:
+                        candidates.append(self._chunk_from_payload(point.payload, score=float(point.score or 0.0)))
 
-        candidates.sort(key=lambda chunk: (-chunk.score, chunk.title, chunk.chunk_index))
+            lexical_candidates = self._lexical_candidates(collection_name, payload_filter, request.question)
+            if lexical_candidates:
+                collection_was_queried = True
+                candidates.extend(lexical_candidates)
+
+            if collection_was_queried:
+                collections_queried.append(collection_name)
+
+        candidates = self._dedupe_and_rank(candidates)
         chunks = candidates[: request.top_k]
         duration_ms = int((time.perf_counter() - started) * 1000)
 
@@ -77,6 +88,43 @@ class QdrantAclRetriever:
                 duration_ms=duration_ms,
             ),
         )
+
+    def _lexical_candidates(
+        self,
+        collection_name: str,
+        payload_filter: models.Filter,
+        question: str,
+    ) -> list[ChunkDocument]:
+        try:
+            points, _next_offset = self.client.scroll(
+                collection_name=collection_name,
+                scroll_filter=payload_filter,
+                limit=self.settings.retrieval_lexical_scan_limit,
+                with_payload=True,
+                with_vectors=False,
+            )
+        except (UnexpectedResponse, ValueError):
+            return []
+
+        candidates: list[ChunkDocument] = []
+        for point in points:
+            if not point.payload:
+                continue
+            chunk = self._chunk_from_payload(point.payload, score=0.0)
+            lexical_score = lexical_relevance_score(question, chunk)
+            if lexical_score > 0:
+                candidates.append(chunk.model_copy(update={"score": 100.0 + lexical_score}))
+        return candidates
+
+    def _dedupe_and_rank(self, candidates: list[ChunkDocument]) -> list[ChunkDocument]:
+        deduped: dict[str, ChunkDocument] = {}
+        for candidate in candidates:
+            existing = deduped.get(candidate.chunk_id)
+            if existing is None or candidate.score > existing.score:
+                deduped[candidate.chunk_id] = candidate
+        ranked = list(deduped.values())
+        ranked.sort(key=lambda chunk: (-chunk.score, chunk.title, chunk.chunk_index))
+        return ranked
 
     async def ready(self) -> bool:
         try:
@@ -151,3 +199,147 @@ def _parse_datetime(value: Any) -> datetime:
     if isinstance(value, str):
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     return datetime.now().astimezone()
+
+
+_STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "do",
+    "does",
+    "for",
+    "from",
+    "how",
+    "i",
+    "in",
+    "is",
+    "it",
+    "me",
+    "my",
+    "of",
+    "on",
+    "or",
+    "should",
+    "the",
+    "to",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+    "with",
+    "about",
+    "give",
+    "tell",
+    "whate",
+    "whats",
+    "page",
+}
+
+
+def lexical_relevance_score(question: str, chunk: ChunkDocument) -> float:
+    question_tokens = _content_tokens(question)
+    if not question_tokens:
+        return 0.0
+    if _is_value_reference_only(question, chunk.chunk_text):
+        return 0.0
+
+    title_tokens = _content_tokens(chunk.title)
+    section_tokens = _content_tokens(chunk.section_path or "")
+    body_tokens = _content_tokens(chunk.chunk_text)
+    tag_tokens = _content_tokens(" ".join(chunk.tags))
+    all_tokens = title_tokens | section_tokens | body_tokens | tag_tokens
+    overlap = question_tokens.intersection(all_tokens)
+    if not overlap:
+        return 0.0
+
+    title_overlap = question_tokens.intersection(title_tokens)
+    section_overlap = question_tokens.intersection(section_tokens)
+    coverage = len(overlap) / len(question_tokens)
+    score = (
+        len(overlap)
+        + (coverage * 2.0)
+        + (len(title_overlap) * 3.0)
+        + (len(section_overlap) * 0.75)
+    )
+    key_phrase = _question_key_phrase(question)
+    if key_phrase:
+        if _contains_phrase(chunk.title, key_phrase):
+            score += 12.0
+        if _contains_phrase(chunk.section_path or "", key_phrase):
+            score += 4.0
+        if _contains_phrase(chunk.chunk_text, key_phrase):
+            score += 3.0
+        if _line_with_phrase_has_label(chunk.chunk_text, key_phrase):
+            score += 10.0
+    if _is_value_question(question) and _value_signal_present(chunk.chunk_text):
+        score += 4.0
+    return score
+
+
+def _content_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", value.lower())
+        if len(token) > 2 and token not in _STOP_WORDS
+    }
+
+
+def _question_key_phrase(question: str) -> str:
+    tokens = [token for token in re.findall(r"[a-z0-9]+", question.lower()) if token not in _STOP_WORDS]
+    if len(tokens) < 2:
+        return ""
+    return " ".join(tokens[-4:])
+
+
+def _contains_phrase(value: str, phrase: str) -> bool:
+    if not phrase:
+        return False
+    return phrase in _normalized_words(value)
+
+
+def _normalized_words(value: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", value.lower()))
+
+
+def _line_with_phrase_has_label(value: str, phrase: str) -> bool:
+    normalized_phrase = _normalized_words(phrase)
+    for line in value.splitlines():
+        normalized_line = _normalized_words(line)
+        if normalized_phrase in normalized_line and ":" in line:
+            return True
+    return False
+
+
+def _is_value_question(question: str) -> bool:
+    normalized = _normalized_words(question)
+    return bool(
+        "working hours" in normalized
+        or "office hours" in normalized
+        or "what time" in normalized
+        or "what hours" in normalized
+        or re.search(r"\b(when|how many|how much)\b", normalized)
+    )
+
+
+def _value_signal_present(value: str) -> bool:
+    return bool(
+        re.search(r"\b\d{1,2}:\d{2}\b", value)
+        or re.search(r"\b\d+\s*(hours?|days?|minutes?)\b", value, flags=re.IGNORECASE)
+        or re.search(r"\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b", value, flags=re.IGNORECASE)
+    )
+
+
+def _is_value_reference_only(question: str, value: str) -> bool:
+    if not _is_value_question(question):
+        return False
+    key_phrase = _question_key_phrase(question)
+    if not key_phrase or not _contains_phrase(value, key_phrase):
+        return False
+    return not _value_signal_present(value)

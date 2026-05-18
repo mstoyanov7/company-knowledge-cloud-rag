@@ -10,6 +10,7 @@ def test_evaluation_harness_records_retrieval_and_citation_metrics() -> None:
     settings = AppSettings(
         app_env="test",
         retrieval_provider="mock",
+        default_llm_provider="mock",
         security_audit_enabled=False,
     )
     cases = [

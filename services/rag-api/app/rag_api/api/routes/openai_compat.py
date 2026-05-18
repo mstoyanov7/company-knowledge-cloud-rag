@@ -39,7 +39,13 @@ async def create_chat_completion(
         )
 
     user_context = UserContext(acl_tags=settings.auth_default_acl_tag_list)
-    answer_response = await service.answer(AnswerRequest(question=user_message, user_context=user_context))
+    answer_response = await service.answer(
+        AnswerRequest(
+            question=user_message,
+            user_context=user_context,
+            source_filters=["onenote"],
+        )
+    )
     prompt_tokens = len(user_message.split())
     completion_tokens = len(answer_response.answer.split())
     model_name = request.model or answer_response.metadata.model

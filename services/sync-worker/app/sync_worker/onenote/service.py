@@ -153,7 +153,12 @@ class OneNoteSyncService:
         html = self.connector.client.get_page_content(page.content_url)
         parsed = self.parser.parse(html)
         self.resource_hook.handle_resources(page.id, parsed.resources)
-        document = self.normalizer.normalize(site=site, page=page, parsed_page=parsed)
+        document = self.normalizer.normalize(
+            site=site,
+            page=page,
+            parsed_page=parsed,
+            embedding_model=self.settings.default_embedding_provider,
+        )
         existing = self.metadata_store.get_source_document(document.source_item_id)
 
         if existing and not self._document_changed(existing, document):
@@ -241,6 +246,7 @@ class OneNoteSyncService:
                 existing.metadata.get("section_id") != current.metadata.get("section_id"),
                 existing.metadata.get("notebook_id") != current.metadata.get("notebook_id"),
                 existing.metadata.get("page_order") != current.metadata.get("page_order"),
+                existing.metadata.get("embedding_model") != current.metadata.get("embedding_model"),
             ]
         )
 

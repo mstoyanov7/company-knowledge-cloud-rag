@@ -7,9 +7,20 @@ OpenAI-compatible endpoints exposed by `rag-api`:
 
 - `OPENAI_API_BASE_URL=http://rag-api:8080/v1`
 - `OPENAI_API_KEY=${MOCK_API_KEY}`
+- `ENABLE_OLLAMA_API=false`
+- `ENABLE_PERSISTENT_CONFIG=false`
 
 That lets Open WebUI talk to the backend without moving retrieval or citation logic
 into the frontend.
+
+Open WebUI must not be pointed directly at Ollama. The required path is:
+
+```text
+Open WebUI -> rag-api -> OneNote retrieval -> Ollama
+```
+
+If Open WebUI calls Ollama directly, the model can answer from general model
+knowledge and bypass the OneNote-only controls.
 
 For ACL-aware retrieval, import `cloud_rag_pipe.py` into Open WebUI as a Pipe
 Function. Configure it with:
@@ -20,6 +31,8 @@ Function. Configure it with:
 - `FORWARD_USER_TOKEN=true` to forward an OAuth/OIDC token from Open WebUI user metadata when available
 
 The pipe calls `/api/v1/answer` and displays the backend answer with source citations.
+It sends `source_filters=["onenote"]` and returns `No information` if the backend
+does not return OneNote citations.
 
 ## Microsoft Entra ID SSO
 
@@ -43,6 +56,5 @@ from Entra `groups` and `roles` claims.
 
 Notes:
 
-- Open WebUI persists configuration in its data volume.
-- If you change OpenAI connection settings and need a clean reset, remove the
-  `open-webui-data` volume and recreate the stack.
+- Open WebUI persists many connection settings in its data volume unless `ENABLE_PERSISTENT_CONFIG=false`.
+- If you still see direct Ollama behavior, remove any Ollama connection in Admin Panel > Settings > Connections or recreate Open WebUI with the current Compose settings.

@@ -14,6 +14,7 @@ class OneNoteDocumentNormalizer:
         site: OneNoteSite,
         page: OneNotePage,
         parsed_page: ParsedOneNotePage,
+        embedding_model: str = "token-hash-v1",
     ) -> SourceDocument:
         source_item_id = f"onenote:{page.id}"
         section_path = f"{page.notebook_name} / {page.section_name}"
@@ -44,6 +45,7 @@ class OneNoteDocumentNormalizer:
                 "content_url": page.content_url,
                 "page_level": page.page_level,
                 "page_order": page.page_order,
+                "embedding_model": embedding_model,
                 "resource_refs": [
                     {
                         "resource_type": resource.resource_type,

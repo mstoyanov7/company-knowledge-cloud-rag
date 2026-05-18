@@ -1,8 +1,5 @@
-from __future__ import annotations
-
-import hashlib
-
 from shared_schemas import AppSettings
+from shared_schemas.embeddings import embed_text_token_hash
 
 
 class DeterministicQueryEmbedder:
@@ -10,12 +7,4 @@ class DeterministicQueryEmbedder:
         self.settings = settings
 
     def embed_text(self, text: str) -> list[float]:
-        vector: list[float] = []
-        seed = text.encode("utf-8")
-        while len(vector) < self.settings.embedding_vector_size:
-            seed = hashlib.blake2b(seed, digest_size=32).digest()
-            for byte in seed:
-                vector.append((byte / 255.0) * 2.0 - 1.0)
-                if len(vector) == self.settings.embedding_vector_size:
-                    break
-        return vector
+        return embed_text_token_hash(text, vector_size=self.settings.embedding_vector_size)

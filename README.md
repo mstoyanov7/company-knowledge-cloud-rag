@@ -10,6 +10,7 @@ Open WebUI remains the frontend. The repository provides:
 - PostgreSQL, Redis, Qdrant, and Open WebUI via Docker Compose
 - ACL-aware retrieval and answer assembly that returns citations and retrieval metadata
 - an OpenAI-compatible `/v1` surface so Open WebUI can call the backend locally
+- an OpenAI-compatible outbound LLM adapter for Ollama-compatible models
 - a SharePoint ingestion pipeline with bootstrap and incremental jobs
 - a Graph client boundary isolated from extraction, normalization, and indexing
 - a OneNote ingestion pipeline with delegated-auth support for site-hosted notebooks
@@ -251,3 +252,16 @@ Phase 7 adds benchmark and thesis-packaging assets:
 - `docs/demo`: live demo script and thesis figure checklist
 
 The benchmark scripts collect p50/p95/p99 latency, throughput, failure rate, retrieval latency, completion latency, freshness delay, and citation count. Enable OpenTelemetry before benchmark runs to correlate client-side results with backend traces and metrics.
+
+## Ollama LLM
+
+For local real-model answers, run Ollama on the host and set:
+
+```env
+DEFAULT_LLM_PROVIDER=ollama
+DEFAULT_MODEL_NAME=gpt-oss:120b-cloud
+LLM_OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+LLM_OPENAI_API_KEY=ollama
+```
+
+`host.docker.internal` lets the Dockerized `rag-api` call Ollama on your PC.

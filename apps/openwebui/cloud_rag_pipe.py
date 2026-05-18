@@ -13,7 +13,7 @@ class Pipe:
         DEFAULT_TENANT_ID: str = Field(default="local-tenant")
         DEFAULT_ACL_TAGS: str = Field(default="public,employees")
         FORWARD_USER_TOKEN: bool = Field(default=True)
-        TOP_K: int = Field(default=5, ge=1, le=20)
+        TOP_K: int = Field(default=3, ge=1, le=20)
         TIMEOUT_SECONDS: float = Field(default=60.0, ge=1.0)
 
     def __init__(self) -> None:
@@ -31,6 +31,7 @@ class Pipe:
         payload = {
             "question": user_message,
             "top_k": self.valves.TOP_K,
+            "source_filters": ["onenote"],
             "user_context": {
                 "user_id": str(user.get("id") or "openwebui-user"),
                 "email": str(user.get("email") or user.get("name") or "unknown@example.com"),
@@ -53,7 +54,7 @@ class Pipe:
 
         citations = result.get("citations") or []
         if not citations:
-            return result.get("answer") or "No answer was returned."
+            return "No information"
 
         citation_lines = [
             f"[{citation['index']}] {citation['title']} - {citation['source_url']}"
