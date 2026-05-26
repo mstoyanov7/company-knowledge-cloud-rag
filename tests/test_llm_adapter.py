@@ -9,6 +9,8 @@ from rag_api.ports import PromptContext
 from rag_api.services.prompt_builder import PromptBuilder
 from shared_schemas import AppSettings, ChunkDocument, Citation
 
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+
 
 def test_openai_compatible_llm_calls_chat_completions() -> None:
     requests: list[httpx.Request] = []
@@ -22,7 +24,11 @@ def test_openai_compatible_llm_calls_chat_completions() -> None:
         assert body["messages"][0]["role"] == "system"
         assert "Do not use outside knowledge" in body["messages"][0]["content"]
         assert "Retrieved context" in body["messages"][1]["content"]
-        assert "reply exactly: No information" in body["messages"][1]["content"]
+        assert "This is a new independent retrieval request" in body["messages"][1]["content"]
+        assert "Current user question to answer now" in body["messages"][1]["content"]
+        assert f"reply exactly: {NO_INFORMATION_ANSWER}" in body["messages"][1]["content"]
+        assert "Internal question analysis" in body["messages"][1]["content"]
+        assert "Do not include numeric citation markers" in body["messages"][1]["content"]
         return httpx.Response(
             200,
             json={
@@ -97,6 +103,6 @@ def test_openai_compatible_llm_returns_no_information_without_citations() -> Non
                 citations=[],
             )
         )
-        assert result.answer_text == "No information"
+        assert result.answer_text == NO_INFORMATION_ANSWER
 
     asyncio.run(run())

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import re
+
 import httpx
 from shared_schemas import AppSettings
 
@@ -21,7 +25,7 @@ class OpenAICompatibleLlmAdapter:
             return GenerationResult(
                 provider=self.provider_name,
                 model=self.model_name,
-                answer_text="No information",
+                answer_text="I could not find that information in the available OneNote notes.",
             )
 
         response = await self._request(
@@ -55,22 +59,100 @@ class OpenAICompatibleLlmAdapter:
         payload = response.json()
         return [str(model["id"]) for model in payload.get("data", []) if model.get("id")]
 
+    async def plan_queries(
+        self,
+        *,
+        question: str,
+        detected_language: str,
+        answer_type: str,
+        important_entities: list[str],
+        keyword_queries: list[str],
+        expected_evidence_type: str,
+    ) -> dict:
+        response = await self._request(
+            "POST",
+            "/chat/completions",
+            json={
+                "model": self.model_name,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You generate retrieval query plans for a OneNote RAG system. "
+                            "Use only the user question and generic language understanding. "
+                            "Do not use company-specific facts, OneNote content, memory, or outside knowledge. "
+                            "Return only valid JSON."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "task": "Create search queries for retrieval, not an answer.",
+                                "required_json_keys": [
+                                    "original_question",
+                                    "detected_language",
+                                    "answer_type",
+                                    "important_entities",
+                                    "rewritten_question",
+                                    "semantic_queries",
+                                    "keyword_queries",
+                                    "expected_evidence_type",
+                                ],
+                                "question": question,
+                                "detected_language": detected_language,
+                                "answer_type": answer_type,
+                                "important_entities": important_entities,
+                                "keyword_queries": keyword_queries,
+                                "expected_evidence_type": expected_evidence_type,
+                                "rules": [
+                                    "Base every query only on the user question.",
+                                    "Include exact keywords and reasonable paraphrases.",
+                                    "Do not assume the answer.",
+                                    "Do not include explanations outside JSON.",
+                                ],
+                            }
+                        ),
+                    },
+                ],
+                "temperature": 0.0,
+                "max_tokens": 500,
+                "stream": False,
+            },
+        )
+        content = response.json()["choices"][0]["message"]["content"]
+        return _parse_json_object(content)
+
     def _messages(self, prompt: PromptContext) -> list[dict[str, str]]:
         context = "\n\n".join(prompt.context_blocks)
+        question_analysis = _format_question_analysis(prompt.question_analysis)
+        source_titles = ", ".join(prompt.source_titles)
+        request_fingerprint = hashlib.sha256(
+            f"{prompt.user_question}\n{context}".encode("utf-8")
+        ).hexdigest()[:12]
         user_content = (
-            f"Question:\n{prompt.user_question}\n\n"
+            f"Independent request id: {request_fingerprint}\n"
+            "This is a new independent retrieval request. Ignore any prior answer text from the chat UI. "
+            "Do not repeat a previous answer unless the current question asks for the same information.\n\n"
+            f"Current user question to answer now:\n{prompt.user_question}\n\n"
+            f"Internal question analysis, for retrieval interpretation only:\n{question_analysis}\n\n"
             f"Retrieved context:\n{context}\n\n"
             "Use only the retrieved OneNote context above. "
             "Do not use any outside knowledge. "
-            "Answer the specific question, not a different topic from the context. "
+            "Answer only the current user question, not a different topic from the context. "
+            "Think silently about what the user means, but do not show hidden reasoning or chain-of-thought. "
             "Do not answer by copying only the first keyword-matching sentence. "
             "Use the context to create a clear, descriptive answer that explains the relevant details. "
+            "Answer naturally and politely, like a helpful human assistant. "
             "Return clean Markdown. Use a short heading and bullets for structured facts. "
             "For key-value lines, preserve source labels as bold bullet labels. "
-            "Do not add facts from loosely related chunks and do not add a separate sources section. "
-            "Include citation markers like [1] for every factual claim. "
-            "If the context is related but does not directly answer the question, reply exactly: No information. "
-            "If the context does not answer the question, reply exactly: No information"
+            "Do not add facts from loosely related chunks. "
+            "Do not include numeric citation markers like [1], [2], or source IDs. "
+            f"If you answer with facts, end with an italic Sources line using only these page titles: {source_titles}. "
+            "If the context is related but does not directly answer the question, reply exactly: "
+            "I could not find that information in the available OneNote notes. "
+            "If the context does not answer the question, reply exactly: "
+            "I could not find that information in the available OneNote notes."
         )
         return [
             {"role": "system", "content": prompt.system_instruction},
@@ -93,3 +175,37 @@ class OpenAICompatibleLlmAdapter:
             response = await client.request(method, url, headers=headers, **kwargs)
             response.raise_for_status()
             return response
+
+
+def _format_question_analysis(question_analysis: dict[str, object] | None) -> str:
+    if not question_analysis:
+        return "N/A"
+    lines = []
+    for key in (
+        "detected_language",
+        "answer_type",
+        "important_entities",
+        "rewritten_question",
+        "expected_evidence_type",
+        "specificity",
+    ):
+        value = question_analysis.get(key)
+        if value in (None, "", []):
+            continue
+        lines.append(f"- {key}: {value}")
+    return "\n".join(lines) if lines else "N/A"
+
+
+def _parse_json_object(value: str) -> dict:
+    stripped = value.strip()
+    try:
+        parsed = json.loads(stripped)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", stripped, flags=re.DOTALL)
+        if not match:
+            return {}
+        try:
+            parsed = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return {}
+    return parsed if isinstance(parsed, dict) else {}

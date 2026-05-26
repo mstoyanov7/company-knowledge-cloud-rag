@@ -4,6 +4,9 @@ import httpx
 from pydantic import BaseModel, Field
 
 
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+
+
 class Pipe:
     class Valves(BaseModel):
         MODEL_ID: str = Field(default="cloud-rag-secure")
@@ -54,13 +57,9 @@ class Pipe:
 
         citations = result.get("citations") or []
         if not citations:
-            return "No information"
+            return NO_INFORMATION_ANSWER
 
-        citation_lines = [
-            f"[{citation['index']}] {citation['title']} - {citation['source_url']}"
-            for citation in citations
-        ]
-        return f"{result.get('answer', '')}\n\nSources:\n" + "\n".join(citation_lines)
+        return result.get("answer", "") or NO_INFORMATION_ANSWER
 
 
 def _last_user_message(body: dict) -> str | None:

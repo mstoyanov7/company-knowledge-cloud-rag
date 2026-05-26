@@ -94,6 +94,10 @@ class RetrievalMetadata(BaseModel):
     collections_queried: list[str] = Field(default_factory=list)
     payload_filter: dict[str, Any] = Field(default_factory=dict)
     reranker: str | None = None
+    query_count: int = 1
+    query_variants: list[str] = Field(default_factory=list)
+    question_intent: str | None = None
+    answer_type: str | None = None
     duration_ms: int = 0
 
 

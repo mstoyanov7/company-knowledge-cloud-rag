@@ -71,3 +71,21 @@ def test_lexical_relevance_prefers_exact_working_hours_definition() -> None:
 
     assert lexical_relevance_score(question, definition_chunk) > lexical_relevance_score(question, mention_chunk)
     assert lexical_relevance_score(question, mention_chunk) == 0
+
+
+def test_lexical_relevance_uses_planned_query_terms() -> None:
+    question = "remote work policy work from home allowed approval"
+    remote_chunk = _chunk(
+        "HR Policies",
+        "# Remote Work Policy\n"
+        "Allowed: up to 3 days per week\n"
+        "Must be approved by manager\n"
+        "Employees must be available on Slack during working hours",
+    )
+    unrelated_chunk = _chunk(
+        "Developer setup",
+        "Install Docker Desktop and configure Git credentials.",
+    )
+
+    assert lexical_relevance_score(question, remote_chunk) > 0
+    assert lexical_relevance_score(question, remote_chunk) > lexical_relevance_score(question, unrelated_chunk)

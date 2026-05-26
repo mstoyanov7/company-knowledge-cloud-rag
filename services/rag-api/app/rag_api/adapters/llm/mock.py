@@ -12,15 +12,18 @@ class MockLlmAdapter:
             return GenerationResult(
                 provider=self.provider_name,
                 model=self.model_name,
-                answer_text="No information",
+                answer_text="I could not find that information in the available OneNote notes.",
             )
 
         highlights = []
         for citation in prompt.citations[:2]:
             sentence = citation.snippet.rstrip(".")
-            highlights.append(f"{sentence}. [{citation.index}]")
+            highlights.append(f"{sentence}.")
 
+        sources = "; ".join(dict.fromkeys(citation.title for citation in prompt.citations[:2] if citation.title))
         answer = " ".join(highlights)
+        if sources:
+            answer = f"{answer}\n\n_Source: {sources}_"
         return GenerationResult(
             provider=self.provider_name,
             model=self.model_name,

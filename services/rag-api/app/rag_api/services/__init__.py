@@ -8,6 +8,13 @@ from rag_api.services.auth import (
 )
 from rag_api.services.graph_webhook_service import GraphWebhookService, InvalidGraphNotificationError
 from rag_api.services.prompt_builder import PromptBuilder
+from rag_api.services.query_understanding import (
+    QuestionAnalysis,
+    QueryPlanner,
+    QueryUnderstanding,
+    analyze_question,
+    understand_query,
+)
 from rag_api.services.reranker import KeywordOverlapReranker
 from rag_api.services.security_audit import SecurityAuditLogger
 from rag_api.services.system_service import SystemService
@@ -22,7 +29,12 @@ __all__ = [
     "KeywordOverlapReranker",
     "OidcTokenValidator",
     "PromptBuilder",
+    "QuestionAnalysis",
+    "QueryPlanner",
+    "QueryUnderstanding",
     "SecurityAuditLogger",
     "SystemService",
     "TokenValidationError",
+    "analyze_question",
+    "understand_query",
 ]

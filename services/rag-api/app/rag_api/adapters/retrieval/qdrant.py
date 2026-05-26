@@ -18,6 +18,7 @@ from shared_schemas import (
 )
 
 from rag_api.adapters.embeddings import DeterministicQueryEmbedder
+from rag_api.services.query_understanding import canonical_key_phrase
 
 
 class QdrantAclRetriever:
@@ -210,6 +211,8 @@ _STOP_WORDS = {
     "at",
     "be",
     "by",
+    "can",
+    "could",
     "do",
     "does",
     "for",
@@ -285,13 +288,28 @@ def lexical_relevance_score(question: str, chunk: ChunkDocument) -> float:
 
 def _content_tokens(value: str) -> set[str]:
     return {
-        token
+        _normalize_token(token)
         for token in re.findall(r"[a-z0-9]+", value.lower())
         if len(token) > 2 and token not in _STOP_WORDS
     }
 
 
+def _normalize_token(token: str) -> str:
+    if len(token) > 5 and token.endswith("ies"):
+        return f"{token[:-3]}y"
+    if len(token) > 5 and token.endswith("ing"):
+        return token[:-3]
+    if len(token) > 4 and token.endswith("es"):
+        return token[:-2]
+    if len(token) > 4 and token.endswith("s") and not token.endswith(("ss", "us", "is")):
+        return token[:-1]
+    return token
+
+
 def _question_key_phrase(question: str) -> str:
+    canonical_phrase = canonical_key_phrase(question)
+    if canonical_phrase:
+        return canonical_phrase
     tokens = [token for token in re.findall(r"[a-z0-9]+", question.lower()) if token not in _STOP_WORDS]
     if len(tokens) < 2:
         return ""
@@ -301,18 +319,33 @@ def _question_key_phrase(question: str) -> str:
 def _contains_phrase(value: str, phrase: str) -> bool:
     if not phrase:
         return False
-    return phrase in _normalized_words(value)
+    normalized_value = _normalized_words(value)
+    return any(variant in normalized_value for variant in _phrase_variants(phrase))
+
+
+def _phrase_variants(phrase: str) -> list[str]:
+    normalized_phrase = _normalized_words(phrase)
+    tokens = normalized_phrase.split()
+    if len(tokens) <= 2:
+        return [normalized_phrase] if normalized_phrase else []
+    variants = [normalized_phrase]
+    for size in range(min(3, len(tokens)), 1, -1):
+        suffix = " ".join(tokens[-size:])
+        if suffix not in variants:
+            variants.append(suffix)
+        prefix = " ".join(tokens[:size])
+        if prefix not in variants:
+            variants.append(prefix)
+    return variants
 
 
 def _normalized_words(value: str) -> str:
-    return " ".join(re.findall(r"[a-z0-9]+", value.lower()))
+    return " ".join(_normalize_token(token) for token in re.findall(r"[a-z0-9]+", value.lower()))
 
 
 def _line_with_phrase_has_label(value: str, phrase: str) -> bool:
-    normalized_phrase = _normalized_words(phrase)
     for line in value.splitlines():
-        normalized_line = _normalized_words(line)
-        if normalized_phrase in normalized_line and ":" in line:
+        if _contains_phrase(line, phrase) and ":" in line:
             return True
     return False
 
@@ -320,10 +353,10 @@ def _line_with_phrase_has_label(value: str, phrase: str) -> bool:
 def _is_value_question(question: str) -> bool:
     normalized = _normalized_words(question)
     return bool(
-        "working hours" in normalized
-        or "office hours" in normalized
+        "work hour" in normalized
+        or "office hour" in normalized
         or "what time" in normalized
-        or "what hours" in normalized
+        or "what hour" in normalized
         or re.search(r"\b(when|how many|how much)\b", normalized)
     )
 

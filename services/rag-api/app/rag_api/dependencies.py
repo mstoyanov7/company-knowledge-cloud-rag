@@ -14,6 +14,7 @@ from rag_api.services import (
     KeywordOverlapReranker,
     OidcTokenValidator,
     PromptBuilder,
+    QueryPlanner,
     SecurityAuditLogger,
     SystemService,
     TokenValidationError,
@@ -45,8 +46,9 @@ def get_llm(settings: AppSettings) -> LlmPort:
 
 def get_answer_service(settings: AppSettings = Depends(get_runtime_settings)) -> AnswerService:
     reranker = KeywordOverlapReranker() if settings.rerank_enabled else None
+    llm = get_llm(settings)
     return AnswerService(
-        llm=get_llm(settings),
+        llm=llm,
         prompt_builder=PromptBuilder(),
         retriever=get_retriever(settings),
         access_scope_resolver=AccessScopeResolver(),
@@ -54,6 +56,7 @@ def get_answer_service(settings: AppSettings = Depends(get_runtime_settings)) ->
         retrieval_candidate_multiplier=settings.retrieval_candidate_multiplier,
         min_keyword_overlap=settings.retrieval_min_keyword_overlap,
         audit_logger=get_security_audit_logger(settings),
+        query_planner=QueryPlanner(llm=llm),
     )
 
 

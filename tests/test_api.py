@@ -3,6 +3,8 @@ from fastapi.testclient import TestClient
 from rag_api.main import create_app
 from shared_schemas import AppSettings
 
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+
 
 def create_test_client() -> TestClient:
     settings = AppSettings(
@@ -121,6 +123,31 @@ def test_openai_compatible_chat_completion_and_models() -> None:
     assert completion_response.json()["citations"]
 
 
+def test_openai_compatible_chat_uses_latest_user_message_only() -> None:
+    client = create_test_client()
+    headers = {"Authorization": "Bearer test-key"}
+
+    response = client.post(
+        "/v1/chat/completions",
+        headers=headers,
+        json={
+            "model": "mock-onboarding-assistant",
+            "messages": [
+                {"role": "user", "content": "What benefits should I review during onboarding?"},
+                {"role": "assistant", "content": "On day one, connect to the VPN."},
+                {"role": "user", "content": "What benefits should I review during onboarding?"},
+            ],
+        },
+    )
+
+    content = response.json()["choices"][0]["message"]["content"]
+
+    assert response.status_code == 200
+    assert "benefits" in content.lower() or "health coverage" in content.lower()
+    assert "day one" not in content.lower()
+    assert "vpn" not in content.lower()
+
+
 def test_openai_compatible_streaming_chat_completion() -> None:
     client = create_test_client()
     headers = {"Authorization": "Bearer test-key"}
@@ -160,5 +187,5 @@ def test_openai_compatible_chat_filters_to_onenote_sources() -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["choices"][0]["message"]["content"] == "No information"
+    assert response.json()["choices"][0]["message"]["content"] == NO_INFORMATION_ANSWER
     assert response.json()["citations"] == []

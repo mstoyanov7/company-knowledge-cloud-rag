@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from rag_api.adapters.llm.mock import MockLlmAdapter
 from rag_api.services import AccessScopeResolver, AnswerService, PromptBuilder
+from rag_api.services.query_understanding import analyze_question
 from shared_schemas import (
     AccessScope,
     AppSettings,
@@ -13,6 +15,8 @@ from shared_schemas import (
     RetrievalResult,
     UserContext,
 )
+
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
 
 
 class StaticRetriever:
@@ -44,6 +48,40 @@ class StaticRetriever:
         return True
 
 
+class QueryAwareRetriever:
+    name = "query-aware"
+
+    def __init__(self, chunk: ChunkDocument) -> None:
+        self.chunk = chunk
+        self.queries: list[str] = []
+
+    async def retrieve(self, request: RetrievalRequest) -> RetrievalResult:
+        self.queries.append(request.question)
+        access_scope = request.access_scope or AccessScope(
+            user_id=request.user_context.user_id,
+            email=request.user_context.email,
+            tenant_id=request.user_context.tenant_id,
+            allowed_acl_tags=request.user_context.acl_tags,
+        )
+        chunks = []
+        if "diploma work" in request.question or "research focus" in request.question:
+            chunks = [self.chunk.model_copy(update={"score": 10.0})]
+        return RetrievalResult(
+            chunks=chunks,
+            metadata=RetrievalMetadata(
+                strategy=self.name,
+                access_scope=access_scope,
+                requested_top_k=request.top_k,
+                candidate_count=len(chunks),
+                returned_count=len(chunks),
+                filtered_count=0,
+            ),
+        )
+
+    async def ready(self) -> bool:
+        return True
+
+
 class StaticLlm:
     provider_name = "static"
     model_name = "static"
@@ -65,6 +103,31 @@ class StaticLlm:
 
     async def list_models(self) -> list[str]:
         return [self.model_name]
+
+
+class StaticQueryPlanner:
+    def __init__(self, analysis) -> None:
+        self.analysis = analysis
+
+    async def plan(self, question: str):
+        return self.analysis
+
+
+def _planned_analysis(
+    question: str,
+    *,
+    semantic_queries: tuple[str, ...],
+    keyword_queries: tuple[str, ...] = (),
+    important_entities: tuple[str, ...] = (),
+):
+    base = analyze_question(question)
+    return replace(
+        base,
+        important_entities=important_entities or base.important_entities,
+        rewritten_question=semantic_queries[0] if semantic_queries else base.rewritten_question,
+        semantic_queries=semantic_queries,
+        keyword_queries=keyword_queries or base.keyword_queries,
+    )
 
 
 def _chunk(text: str, *, title: str = "Travel notes", chunk_id: str | None = None) -> ChunkDocument:
@@ -105,17 +168,24 @@ async def _answer_for(question: str, chunk: ChunkDocument):
     )
 
 
-async def _answer_with_static_llm(question: str, chunk: ChunkDocument, answer_text: str):
-    return await _answer_with_static_llm_for_chunks(question, [chunk], answer_text)
+async def _answer_with_static_llm(question: str, chunk: ChunkDocument, answer_text: str, *, query_planner=None):
+    return await _answer_with_static_llm_for_chunks(question, [chunk], answer_text, query_planner=query_planner)
 
 
-async def _answer_with_static_llm_for_chunks(question: str, chunks: list[ChunkDocument], answer_text: str):
+async def _answer_with_static_llm_for_chunks(
+    question: str,
+    chunks: list[ChunkDocument],
+    answer_text: str,
+    *,
+    query_planner=None,
+):
     service = AnswerService(
         llm=StaticLlm(answer_text),
         prompt_builder=PromptBuilder(),
         retriever=StaticRetriever(chunks),
         access_scope_resolver=AccessScopeResolver(),
         min_keyword_overlap=1,
+        query_planner=query_planner,
     )
     from shared_schemas import AnswerRequest
 
@@ -138,7 +208,7 @@ def test_answer_service_returns_no_information_for_irrelevant_retrieval_hit() ->
         )
     )
 
-    assert response.answer == "No information"
+    assert response.answer == NO_INFORMATION_ANSWER
     assert response.citations == []
     assert response.metadata.retrieved_chunk_count == 0
 
@@ -153,7 +223,7 @@ def test_answer_service_keeps_relevant_onenote_hit() -> None:
         )
     )
 
-    assert response.answer != "No information"
+    assert response.answer != NO_INFORMATION_ANSWER
     assert response.citations
     assert response.metadata.retrieved_chunk_count == 1
 
@@ -169,7 +239,11 @@ def test_answer_service_falls_back_to_extract_when_model_output_is_uncited() -> 
         )
     )
 
-    assert response.answer == "### Developer setup\n\n- Install Docker Desktop and configure Git credentials [1]"
+    assert response.answer == (
+        "### Developer setup\n\n"
+        "- Install Docker Desktop and configure Git credentials\n\n"
+        "_Source: Developer setup_"
+    )
     assert response.citations
 
 
@@ -194,7 +268,8 @@ def test_answer_service_repairs_uncited_grounded_descriptive_answer() -> None:
     assert response.answer == (
         "### Developer setup\n\n"
         "To configure Docker, install Docker Desktop from the onboarding package, "
-        "then sign in and configure Git credentials. [1]"
+        "then sign in and configure Git credentials.\n\n"
+        "_Source: Developer setup_"
     )
     assert response.citations
 
@@ -210,7 +285,11 @@ def test_answer_service_falls_back_to_extract_when_model_output_has_unsupported_
         )
     )
 
-    assert response.answer == "### Developer setup\n\n- Install Docker Desktop and configure Git credentials [1]"
+    assert response.answer == (
+        "### Developer setup\n\n"
+        "- Install Docker Desktop and configure Git credentials\n\n"
+        "_Source: Developer setup_"
+    )
     assert response.citations
 
 
@@ -229,7 +308,11 @@ def test_answer_service_extracts_question_matching_sentence_from_mixed_chunk() -
         )
     )
 
-    assert response.answer == "### Developer setup\n\n- Install Docker Desktop and configure Git credentials [1]"
+    assert response.answer == (
+        "### Developer setup\n\n"
+        "- Install Docker Desktop and configure Git credentials\n\n"
+        "_Source: Developer setup_"
+    )
     assert response.citations
 
 
@@ -251,8 +334,9 @@ def test_answer_service_replaces_title_only_model_answer_with_body_content() -> 
 
     assert response.answer == (
         "### Docker setup\n\n"
-        "- Run the Docker Desktop installer from the onboarding package [1]\n"
-        "- After installation, sign in and configure Git credentials [1]"
+        "- Run the Docker Desktop installer from the onboarding package\n"
+        "- After installation, sign in and configure Git credentials\n\n"
+        "_Source: Docker setup_"
     )
     assert response.citations
 
@@ -284,9 +368,9 @@ def test_answer_service_prefers_working_hours_values_over_topic_mention() -> Non
     )
 
     assert response.answer.startswith("### Working Hours")
-    assert "- **Standard working hours:** 09:00 - 18:00 (Monday-Friday) [1]" in response.answer
-    assert "- **Flexible start:** 08:00 - 10:00 (must complete 8 hours) [1]" in response.answer
-    assert "- **Lunch break:** 1 hour (unpaid) [1]" in response.answer
+    assert "- **Standard working hours:** 09:00 - 18:00 (Monday-Friday)" in response.answer
+    assert "- **Flexible start:** 08:00 - 10:00 (must complete 8 hours)" in response.answer
+    assert "- **Lunch break:** 1 hour (unpaid)" in response.answer
     assert "Overtime" not in response.answer
     assert "09:00" in response.answer
     assert "18:00" in response.answer
@@ -308,7 +392,7 @@ def test_answer_service_rejects_working_hours_reference_without_hours_definition
         )
     )
 
-    assert response.answer == "No information"
+    assert response.answer == NO_INFORMATION_ANSWER
     assert response.citations == []
 
 
@@ -331,9 +415,40 @@ def test_answer_service_expands_too_narrow_structured_model_answer() -> None:
     )
 
     assert response.answer.startswith("### Working Hours")
-    assert "- **Standard working hours:** 09:00 - 18:00 (Monday-Friday) [1]" in response.answer
-    assert "- **Flexible start:** 08:00 - 10:00 (must complete 8 hours) [1]" in response.answer
-    assert "- **Lunch break:** 1 hour (unpaid) [1]" in response.answer
+    assert "- **Standard working hours:** 09:00 - 18:00 (Monday-Friday)" in response.answer
+    assert "- **Flexible start:** 08:00 - 10:00 (must complete 8 hours)" in response.answer
+    assert "- **Lunch break:** 1 hour (unpaid)" in response.answer
+
+
+def test_answer_service_answers_specific_overtime_question_from_matching_line() -> None:
+    import asyncio
+
+    response = asyncio.run(
+        _answer_with_static_llm(
+            "Is there any info about overtime?",
+            _chunk(
+                "# Working Hours\n"
+                "Standard working hours: 09:00 - 18:00 (Monday-Friday)\n"
+                "Flexible start: 08:00 - 10:00 (must complete 8 hours)\n"
+                "Lunch break: 1 hour (unpaid)\n"
+                "Overtime requires manager approval",
+                title="Working Hours",
+            ),
+            (
+                "### Working Hours\n\n"
+                "- **Standard working hours:** 09:00 - 18:00 (Monday-Friday)\n"
+                "- **Flexible start:** 08:00 - 10:00 (must complete 8 hours)\n"
+                "- **Lunch break:** 1 hour (unpaid)"
+            ),
+        )
+    )
+
+    assert response.answer.startswith("### Working Hours")
+    assert "- Overtime requires manager approval" in response.answer
+    assert "09:00" not in response.answer
+    assert "Flexible start" not in response.answer
+    assert "Lunch break" not in response.answer
+    assert "_Source: Working Hours_" in response.answer
 
 
 def test_answer_service_answers_from_internal_page_heading_body() -> None:
@@ -363,11 +478,149 @@ def test_answer_service_answers_from_internal_page_heading_body() -> None:
     )
 
     assert response.answer.startswith("### Remote Work Policy")
-    assert "- **Allowed:** up to 3 days per week [1]" in response.answer
-    assert "- Must be approved by manager [1]" in response.answer
-    assert "- Employees must be available on Slack during working hours [1]" in response.answer
+    assert "- **Allowed:** up to 3 days per week" in response.answer
+    assert "- Must be approved by manager" in response.answer
+    assert "- Employees must be available on Slack during working hours" in response.answer
     assert "Paid Leave" not in response.answer
     assert "Working Hours" not in response.answer
+
+
+def test_answer_service_rejects_stale_answer_from_same_mixed_chunk() -> None:
+    import asyncio
+
+    response = asyncio.run(
+        _answer_with_static_llm(
+            "What is the paid leave policy?",
+            _chunk(
+                "Page: Working Hours\n"
+                "Standard working hours: 09:00 - 18:00 (Monday-Friday)\n\n"
+                "Page: Paid Leave\n"
+                "Annual leave: 20 days per year\n"
+                "Sick leave: up to 10 days (medical note required after 3 days)\n"
+                "Unpaid leave: requires HR approval\n\n"
+                "Page: Remote Work Policy\n"
+                "Allowed: up to 3 days per week\n"
+                "Must be approved by manager",
+                title="HR Policies",
+            ),
+            "### Remote Work Policy\n\n- **Allowed:** up to 3 days per week\n- Must be approved by manager [1]",
+        )
+    )
+
+    assert response.answer.startswith("### Paid Leave")
+    assert "- **Annual leave:** 20 days per year" in response.answer
+    assert "- **Sick leave:** up to 10 days (medical note required after 3 days)" in response.answer
+    assert "- **Unpaid leave:** requires HR approval" in response.answer
+    assert "Remote Work Policy" not in response.answer
+
+
+def test_answer_service_understands_home_office_question_without_exact_policy_words() -> None:
+    import asyncio
+
+    response = asyncio.run(
+        _answer_with_static_llm(
+            "Can I do my job from home?",
+            _chunk(
+                "# Remote Work Policy\n"
+                "Allowed: up to 3 days per week\n"
+                "Must be approved by manager\n"
+                "Employees must be available on Slack during working hours",
+                title="HR Policies",
+            ),
+            "No information",
+            query_planner=StaticQueryPlanner(
+                _planned_analysis(
+                    "Can I do my job from home?",
+                    semantic_queries=("remote work policy allowed manager approval",),
+                    keyword_queries=("work from home",),
+                    important_entities=("home", "remote work policy"),
+                )
+            ),
+        )
+    )
+
+    assert response.answer.startswith("### Remote Work Policy")
+    assert "- **Allowed:** up to 3 days per week" in response.answer
+    assert "- Must be approved by manager" in response.answer
+    assert "- Employees must be available on Slack during working hours" in response.answer
+    assert response.citations
+
+
+def test_answer_service_understands_start_time_question_without_working_hours_words() -> None:
+    import asyncio
+
+    response = asyncio.run(
+        _answer_with_static_llm(
+            "When can I begin my day?",
+            _chunk(
+                "# Working Hours\n"
+                "Standard working hours: 09:00 - 18:00 (Monday-Friday)\n"
+                "Flexible start: 08:00 - 10:00 (must complete 8 hours)\n"
+                "Lunch break: 1 hour (unpaid)\n"
+                "Overtime requires manager approval",
+                title="HR Policies",
+            ),
+            "No information",
+            query_planner=StaticQueryPlanner(
+                _planned_analysis(
+                    "When can I begin my day?",
+                    semantic_queries=("standard working hours flexible start",),
+                    keyword_queries=("begin day start time",),
+                    important_entities=("begin", "day"),
+                )
+            ),
+        )
+    )
+
+    assert response.answer.startswith("### Working Hours")
+    assert "- **Standard working hours:** 09:00 - 18:00 (Monday-Friday)" in response.answer
+    assert "- **Flexible start:** 08:00 - 10:00 (must complete 8 hours)" in response.answer
+    assert "- **Lunch break:** 1 hour (unpaid)" in response.answer
+    assert response.citations
+
+
+def test_answer_service_uses_multiple_queries_for_thesis_focus_question() -> None:
+    import asyncio
+    from shared_schemas import AnswerRequest
+
+    chunk = _chunk(
+        "# Diploma Work\n"
+        "The thesis focuses on building a OneNote RAG assistant for secure company knowledge retrieval.\n"
+        "The project objective is to answer user questions using indexed notes and citations.",
+        title="Diploma Work Overview",
+    )
+    retriever = QueryAwareRetriever(chunk)
+    service = AnswerService(
+        llm=StaticLlm("No information"),
+        prompt_builder=PromptBuilder(),
+        retriever=retriever,
+        access_scope_resolver=AccessScopeResolver(),
+        min_keyword_overlap=1,
+        query_planner=StaticQueryPlanner(
+            _planned_analysis(
+                "What was the main focus of the thesis?",
+                semantic_queries=("diploma work research focus project objective",),
+                keyword_queries=("thesis main focus",),
+                important_entities=("thesis", "main focus"),
+            )
+        ),
+    )
+
+    response = asyncio.run(
+        service.answer(
+            AnswerRequest(
+                question="What was the main focus of the thesis?",
+                user_context=UserContext(acl_tags=["employees"]),
+                source_filters=["onenote"],
+            )
+        )
+    )
+
+    assert len(retriever.queries) > 1
+    assert any("diploma work" in query for query in retriever.queries)
+    assert response.answer.startswith("### Diploma Work Overview")
+    assert "OneNote RAG assistant" in response.answer
+    assert "_Source: Diploma Work Overview_" in response.answer
 
 
 def test_answer_service_allows_supported_cited_model_output() -> None:
@@ -381,5 +634,9 @@ def test_answer_service_allows_supported_cited_model_output() -> None:
         )
     )
 
-    assert response.answer == "### Developer setup\n\nInstall Docker Desktop and configure Git credentials. [1]"
+    assert response.answer == (
+        "### Developer setup\n\n"
+        "Install Docker Desktop and configure Git credentials.\n\n"
+        "_Source: Developer setup_"
+    )
     assert response.citations

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from shared_schemas import Citation, ChunkDocument, RetrievalRequest, RetrievalResult
@@ -10,6 +10,8 @@ class PromptContext:
     user_question: str
     context_blocks: list[str]
     citations: list[Citation]
+    question_analysis: dict[str, object] | None = None
+    source_titles: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
