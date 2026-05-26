@@ -98,6 +98,8 @@ class RetrievalMetadata(BaseModel):
     query_variants: list[str] = Field(default_factory=list)
     question_intent: str | None = None
     answer_type: str | None = None
+    evidence_sufficiency: str | None = None
+    relevance_grades: list[dict[str, Any]] = Field(default_factory=list)
     duration_ms: int = 0
 
 

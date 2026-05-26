@@ -1,15 +1,28 @@
 import time
 from contextlib import nullcontext
 from datetime import UTC, datetime
+import json
+import logging
 import re
 from textwrap import shorten
 
 from rag_api.ports import LlmPort, RerankerPort, RetrievalPort
 from rag_api.services.access_scope import AccessScopeResolver
 from rag_api.services.context_builder import build_answer_context
+from rag_api.services.evidence_grading import (
+    DIRECT_ANSWER_FOUND,
+    EvidenceAssessment,
+    EvidenceGrade,
+    EvidenceGrader,
+    PARTIAL_ANSWER_FOUND,
+)
 from rag_api.services.prompt_builder import PromptBuilder
 from rag_api.services.query_understanding import QuestionAnalysis, QueryPlanner, canonical_key_phrase
-from rag_api.services.retrieval_ranking import analysis_relevance_score, rank_chunks_by_question_analysis
+from rag_api.services.retrieval_ranking import (
+    analysis_relevance_score,
+    chunk_relevance_breakdown,
+    rank_chunks_by_question_analysis,
+)
 from rag_api.services.security_audit import SecurityAuditLogger
 from shared_schemas import AnswerMetadata, AnswerRequest, AnswerResponse, Citation, RetrievalMetadata, RetrievalRequest, RetrievalResult
 
@@ -21,6 +34,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional runtime dependency
 
 
 NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+logger = logging.getLogger(__name__)
 _GENERIC_ENTITY_TERMS = {
     "any",
     "company",
@@ -52,6 +66,8 @@ class AnswerService:
         min_keyword_overlap: int = 1,
         audit_logger: SecurityAuditLogger | None = None,
         query_planner: QueryPlanner | None = None,
+        evidence_grader: EvidenceGrader | None = None,
+        debug_enabled: bool = False,
     ) -> None:
         self.llm = llm
         self.prompt_builder = prompt_builder
@@ -62,6 +78,8 @@ class AnswerService:
         self.min_keyword_overlap = max(0, min_keyword_overlap)
         self.audit_logger = audit_logger
         self.query_planner = query_planner or QueryPlanner()
+        self.evidence_grader = evidence_grader or EvidenceGrader(llm=llm)
+        self.debug_enabled = debug_enabled
         self.tracer = trace.get_tracer("rag_api.answer") if trace else None
         self.answer_latency_ms = (
             metrics.get_meter("rag_api.answer").create_histogram("rag_answer_latency_ms") if metrics else None
@@ -78,6 +96,11 @@ class AnswerService:
         with span:
             access_scope = self.access_scope_resolver.resolve(request.user_context, request.source_filters)
             question_analysis = await self.query_planner.plan(request.question)
+            self._debug_event(
+                "query_plan",
+                original_question=request.question,
+                plan=_question_analysis_debug_payload(question_analysis),
+            )
             candidate_top_k = request.top_k
             if self.reranker:
                 candidate_top_k = max(request.top_k, request.top_k * self.retrieval_candidate_multiplier)
@@ -90,16 +113,73 @@ class AnswerService:
             )
             retrieval_result.metadata.duration_ms = int((time.perf_counter() - retrieval_started) * 1000)
             chunks = retrieval_result.chunks
+            self._debug_event("retrieved_chunks", chunks=_chunk_debug_payload(chunks))
             if self.reranker:
                 chunks = self.reranker.rerank(question_analysis.search_text, chunks, top_k=candidate_top_k)
                 retrieval_result.metadata.reranker = self.reranker.name
                 retrieval_result.metadata.requested_top_k = request.top_k
             chunks = self._filter_relevant_chunks(question_analysis, chunks)
             chunks = rank_chunks_by_question_analysis(question_analysis, chunks, top_k=request.top_k)
+            self._debug_event(
+                "reranked_chunks",
+                chunks=_chunk_debug_payload(chunks),
+                scores=[
+                    {
+                        "chunk_id": chunk.chunk_id,
+                        "title": chunk.title,
+                        **chunk_relevance_breakdown(question_analysis, chunk),
+                    }
+                    for chunk in chunks
+                ],
+            )
+            evidence_assessment = await self.evidence_grader.grade(question_analysis, chunks)
+            self._debug_event(
+                "evidence_grades",
+                sufficiency=evidence_assessment.sufficiency,
+                grades=[_grade_debug_payload(grade) for grade in evidence_assessment.grades],
+            )
+            chunks = list(evidence_assessment.selected_chunks)
             retrieval_result.metadata.returned_count = len(chunks)
+            retrieval_result.metadata.evidence_sufficiency = evidence_assessment.sufficiency
+            retrieval_result.metadata.relevance_grades = [
+                {
+                    "chunk_id": grade.chunk_id,
+                    "relevance": grade.relevance,
+                    "answers_question": grade.answers_question,
+                    "confidence": grade.confidence,
+                }
+                for grade in evidence_assessment.grades
+            ]
+            if evidence_assessment.sufficiency not in {DIRECT_ANSWER_FOUND, PARTIAL_ANSWER_FOUND} or not chunks:
+                self._debug_event("evidence_rejected", sufficiency=evidence_assessment.sufficiency)
+                citations: list[Citation] = []
+                self._audit_retrieval(request, retrieval_result, citations)
+                duration_ms = int((time.perf_counter() - started) * 1000)
+                return AnswerResponse(
+                    answer=NO_INFORMATION_ANSWER,
+                    citations=[],
+                    retrieval_meta=retrieval_result.metadata,
+                    metadata=AnswerMetadata(
+                        provider=self.llm.provider_name,
+                        model=self.llm.model_name,
+                        retrieval_strategy=retrieval_result.metadata.strategy,
+                        retrieved_chunk_count=0,
+                        source_systems=[],
+                        duration_ms=duration_ms,
+                        retrieval_latency_ms=retrieval_result.metadata.duration_ms,
+                        completion_latency_ms=0,
+                        freshness_delay_ms=None,
+                        citation_count=0,
+                    ),
+                )
             citations = self._build_citations(chunks)
             self._audit_retrieval(request, retrieval_result, citations)
             answer_context = build_answer_context(question_analysis, chunks, citations)
+            self._debug_event(
+                "selected_context",
+                source_titles=list(answer_context.source_titles),
+                context_blocks=list(answer_context.context_blocks),
+            )
             prompt = self.prompt_builder.build(
                 request.question,
                 chunks,
@@ -115,10 +195,16 @@ class AnswerService:
                 answer_text=generation.answer_text,
                 chunks=chunks,
                 citations=citations,
+                evidence_assessment=evidence_assessment,
             )
             answer_text = _strip_inline_citation_markers(answer_text)
             answer_text = _normalize_no_information_text(answer_text)
             answer_text = _append_source_titles(answer_text, citations)
+            validation_passed = _final_answer_is_valid(answer_text, citations, evidence_assessment)
+            self._debug_event("final_answer_validation", passed=validation_passed, answer_preview=answer_text[:300])
+            if not validation_passed:
+                answer_text = NO_INFORMATION_ANSWER
+                citations = []
             completion_latency_ms = int((time.perf_counter() - completion_started) * 1000)
             duration_ms = int((time.perf_counter() - started) * 1000)
             freshness_delay_ms = _freshness_delay_ms(citations)
@@ -156,6 +242,11 @@ class AnswerService:
                     citation_count=len(citations),
                 ),
             )
+
+    def _debug_event(self, event: str, **fields) -> None:
+        if not self.debug_enabled:
+            return
+        logger.info("rag_debug %s", json.dumps({"event": event, **fields}, default=str, ensure_ascii=False))
 
     async def _retrieve_for_question_analysis(
         self,
@@ -201,6 +292,7 @@ class AnswerService:
         answer_text: str,
         chunks: list,
         citations: list[Citation],
+        evidence_assessment: EvidenceAssessment | None = None,
     ) -> tuple[str, list[Citation]]:
         normalized_answer = answer_text.strip()
         retrieval_question = question_analysis.search_text
@@ -318,6 +410,68 @@ def _safe_question_hash(question: str) -> str:
     import hashlib
 
     return hashlib.sha256(question.encode("utf-8")).hexdigest()
+
+
+def _question_analysis_debug_payload(question_analysis: QuestionAnalysis) -> dict[str, object]:
+    return {
+        "detected_language": question_analysis.detected_language,
+        "answer_type": question_analysis.answer_type,
+        "important_entities": list(question_analysis.important_entities),
+        "key_phrases": list(question_analysis.key_phrases),
+        "rewritten_question": question_analysis.rewritten_question,
+        "semantic_queries": list(question_analysis.semantic_queries),
+        "keyword_queries": list(question_analysis.keyword_queries),
+        "must_have_concepts": list(question_analysis.must_have_concepts),
+        "avoid_concepts": list(question_analysis.avoid_concepts),
+        "expected_evidence_type": question_analysis.expected_evidence_type,
+        "specificity": question_analysis.specificity,
+    }
+
+
+def _chunk_debug_payload(chunks: list) -> list[dict[str, object]]:
+    return [
+        {
+            "chunk_id": chunk.chunk_id,
+            "title": chunk.title,
+            "section_path": chunk.section_path,
+            "score": chunk.score,
+            "preview": shorten(chunk.chunk_text.replace("\n", " "), width=180, placeholder="..."),
+        }
+        for chunk in chunks
+    ]
+
+
+def _grade_debug_payload(grade: EvidenceGrade) -> dict[str, object]:
+    return {
+        "chunk_id": grade.chunk_id,
+        "relevance": grade.relevance,
+        "answers_question": grade.answers_question,
+        "confidence": grade.confidence,
+        "reason": grade.reason,
+    }
+
+
+def _final_answer_is_valid(
+    answer_text: str,
+    citations: list[Citation],
+    evidence_assessment: EvidenceAssessment,
+) -> bool:
+    if _is_no_information_text(answer_text):
+        return True
+    if not citations:
+        return False
+    allowed_chunk_ids = {
+        grade.chunk_id
+        for grade in evidence_assessment.grades
+        if grade.relevance == "direct" or (grade.relevance == "partial" and grade.answers_question)
+    }
+    if not allowed_chunk_ids:
+        return False
+    if any(citation.chunk_id not in allowed_chunk_ids for citation in citations):
+        return False
+    if not re.search(r"(?im)^_?sources?:", answer_text) and not re.search(r"\[\d+\]", answer_text):
+        return False
+    return True
 
 
 def _merge_retrieval_results(
@@ -469,7 +623,7 @@ _STOP_WORDS = {
 def _content_tokens(value: str) -> set[str]:
     return {
         _normalize_token(token)
-        for token in re.findall(r"[a-z0-9]+", value.lower())
+        for token in re.findall(r"[^\W_]+", value.lower())
         if len(token) > 2 and token not in _STOP_WORDS
     }
 
@@ -527,7 +681,7 @@ def _question_key_phrase(question: str) -> str:
     canonical_phrase = canonical_key_phrase(question)
     if canonical_phrase:
         return canonical_phrase
-    tokens = [token for token in re.findall(r"[a-z0-9]+", question.lower()) if token not in _STOP_WORDS]
+    tokens = [token for token in re.findall(r"[^\W_]+", question.lower()) if token not in _STOP_WORDS]
     if len(tokens) < 2:
         return ""
     return " ".join(tokens[-4:])
@@ -557,7 +711,7 @@ def _phrase_variants(phrase: str) -> list[str]:
 
 
 def _normalized_words(value: str) -> str:
-    return " ".join(_normalize_token(token) for token in re.findall(r"[a-z0-9]+", value.lower()))
+    return " ".join(_normalize_token(token) for token in re.findall(r"[^\W_]+", value.lower()))
 
 
 def _line_with_phrase_has_label(value: str, phrase: str) -> bool:
@@ -581,6 +735,8 @@ def _is_value_question(question: str) -> bool:
 def _value_signal_present(value: str) -> bool:
     return bool(
         re.search(r"\b\d{1,2}:\d{2}\b", value)
+        or re.search(r"\b\d{1,2}(st|nd|rd|th)\b", value, flags=re.IGNORECASE)
+        or re.search(r"\b\d{1,2}\s*[-–]?\s*[^\W_\d]{1,4}\b", value, flags=re.IGNORECASE)
         or re.search(r"\b\d+\s*(hours?|days?|minutes?)\b", value, flags=re.IGNORECASE)
         or re.search(r"\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b", value, flags=re.IGNORECASE)
     )

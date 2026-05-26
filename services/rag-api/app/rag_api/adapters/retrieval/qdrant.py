@@ -289,7 +289,7 @@ def lexical_relevance_score(question: str, chunk: ChunkDocument) -> float:
 def _content_tokens(value: str) -> set[str]:
     return {
         _normalize_token(token)
-        for token in re.findall(r"[a-z0-9]+", value.lower())
+        for token in re.findall(r"[^\W_]+", value.lower())
         if len(token) > 2 and token not in _STOP_WORDS
     }
 
@@ -310,7 +310,7 @@ def _question_key_phrase(question: str) -> str:
     canonical_phrase = canonical_key_phrase(question)
     if canonical_phrase:
         return canonical_phrase
-    tokens = [token for token in re.findall(r"[a-z0-9]+", question.lower()) if token not in _STOP_WORDS]
+    tokens = [token for token in re.findall(r"[^\W_]+", question.lower()) if token not in _STOP_WORDS]
     if len(tokens) < 2:
         return ""
     return " ".join(tokens[-4:])
@@ -340,7 +340,7 @@ def _phrase_variants(phrase: str) -> list[str]:
 
 
 def _normalized_words(value: str) -> str:
-    return " ".join(_normalize_token(token) for token in re.findall(r"[a-z0-9]+", value.lower()))
+    return " ".join(_normalize_token(token) for token in re.findall(r"[^\W_]+", value.lower()))
 
 
 def _line_with_phrase_has_label(value: str, phrase: str) -> bool:

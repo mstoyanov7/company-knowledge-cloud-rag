@@ -66,7 +66,10 @@ class OpenAICompatibleLlmAdapter:
         detected_language: str,
         answer_type: str,
         important_entities: list[str],
+        key_phrases: list[str],
         keyword_queries: list[str],
+        must_have_concepts: list[str],
+        avoid_concepts: list[str],
         expected_evidence_type: str,
     ) -> dict:
         response = await self._request(
@@ -91,23 +94,32 @@ class OpenAICompatibleLlmAdapter:
                                 "task": "Create search queries for retrieval, not an answer.",
                                 "required_json_keys": [
                                     "original_question",
-                                    "detected_language",
-                                    "answer_type",
-                                    "important_entities",
                                     "rewritten_question",
+                                    "answer_type",
+                                    "key_entities",
+                                    "key_phrases",
                                     "semantic_queries",
                                     "keyword_queries",
-                                    "expected_evidence_type",
+                                    "must_have_concepts",
+                                    "avoid_concepts",
                                 ],
                                 "question": question,
                                 "detected_language": detected_language,
                                 "answer_type": answer_type,
-                                "important_entities": important_entities,
+                                "key_entities": important_entities,
+                                "key_phrases": key_phrases,
                                 "keyword_queries": keyword_queries,
+                                "must_have_concepts": must_have_concepts,
+                                "avoid_concepts": avoid_concepts,
                                 "expected_evidence_type": expected_evidence_type,
                                 "rules": [
                                     "Base every query only on the user question.",
-                                    "Include exact keywords and reasonable paraphrases.",
+                                    "Preserve the user's main entity or concept in most generated queries.",
+                                    "Preserve multi-word noun or verb phrases. Do not reduce strong phrases to one weak word.",
+                                    "Include exact keywords and reasonable semantic paraphrases.",
+                                    "Avoid over-broad one-word queries such as paid, date, policy, information, details, or notes.",
+                                    "Put required concepts that retrieved evidence should contain in must_have_concepts.",
+                                    "Put concepts that would indicate a different topic in avoid_concepts only when the user question implies them.",
                                     "Do not assume the answer.",
                                     "Do not include explanations outside JSON.",
                                 ],
@@ -117,6 +129,64 @@ class OpenAICompatibleLlmAdapter:
                 ],
                 "temperature": 0.0,
                 "max_tokens": 500,
+                "stream": False,
+            },
+        )
+        content = response.json()["choices"][0]["message"]["content"]
+        return _parse_json_object(content)
+
+    async def grade_relevance(
+        self,
+        *,
+        question: str,
+        question_analysis: dict[str, object],
+        chunks: list[dict[str, object]],
+    ) -> dict:
+        response = await self._request(
+            "POST",
+            "/chat/completions",
+            json={
+                "model": self.model_name,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You grade whether retrieved OneNote chunks answer the user's question. "
+                            "Return only valid JSON. Do not answer the question. Do not reveal chain-of-thought."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "question": question,
+                                "question_analysis": question_analysis,
+                                "chunks": chunks,
+                                "required_json_schema": {
+                                    "chunks": [
+                                        {
+                                            "chunk_id": "string",
+                                            "relevance": "direct | partial | related | irrelevant",
+                                            "answers_question": True,
+                                            "reason": "short reason, no chain of thought",
+                                            "confidence": 0.0,
+                                        }
+                                    ]
+                                },
+                                "rules": [
+                                    "direct means the chunk answers the specific question.",
+                                    "partial means the chunk contains useful evidence but misses part of the requested answer.",
+                                    "related means it shares topic words but does not answer.",
+                                    "irrelevant means it is a different topic.",
+                                    "A shared weak keyword alone is not direct evidence.",
+                                    "Prefer title plus content together when deciding relevance.",
+                                ],
+                            }
+                        ),
+                    },
+                ],
+                "temperature": 0.0,
+                "max_tokens": 700,
                 "stream": False,
             },
         )
@@ -185,8 +255,11 @@ def _format_question_analysis(question_analysis: dict[str, object] | None) -> st
         "detected_language",
         "answer_type",
         "important_entities",
+        "key_phrases",
         "rewritten_question",
         "expected_evidence_type",
+        "must_have_concepts",
+        "avoid_concepts",
         "specificity",
     ):
         value = question_analysis.get(key)

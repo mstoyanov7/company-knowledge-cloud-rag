@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 from shared_schemas import ChunkDocument, Citation
 
@@ -12,6 +13,7 @@ class AnswerContextBlock:
     citation_index: int
     title: str
     section_path: str | None
+    heading: str | None
     content: str
     source_url: str
 
@@ -41,6 +43,7 @@ def build_answer_context(
             citation_index=citation.index,
             title=chunk.title,
             section_path=chunk.section_path,
+            heading=_first_heading(chunk.chunk_text),
             content=content,
             source_url=chunk.source_url,
         )
@@ -65,6 +68,7 @@ def _render_block(question_analysis: QuestionAnalysis, block: AnswerContextBlock
         [
             f"Source title: {block.title}",
             f"Section: {block.section_path or 'N/A'}",
+            f"Heading: {block.heading or 'N/A'}",
             f"Answer type needed: {question_analysis.required_answer_type}",
             "Content:",
             block.content,
@@ -77,3 +81,13 @@ def _trim_chunk_text(value: str, *, max_chars: int) -> str:
     if len(cleaned) <= max_chars:
         return cleaned
     return cleaned[:max_chars].rsplit(" ", maxsplit=1)[0].rstrip() + "..."
+
+
+def _first_heading(value: str) -> str | None:
+    for line in value.splitlines():
+        cleaned = line.strip()
+        if cleaned.startswith("#"):
+            return cleaned.lstrip("#").strip() or None
+        if re.match(r"^page\s*:", cleaned, flags=re.IGNORECASE):
+            return re.sub(r"^page\s*:\s*", "", cleaned, flags=re.IGNORECASE).strip() or None
+    return None

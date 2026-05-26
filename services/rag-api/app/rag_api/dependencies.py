@@ -57,6 +57,7 @@ def get_answer_service(settings: AppSettings = Depends(get_runtime_settings)) ->
         min_keyword_overlap=settings.retrieval_min_keyword_overlap,
         audit_logger=get_security_audit_logger(settings),
         query_planner=QueryPlanner(llm=llm),
+        debug_enabled=settings.rag_debug_enabled,
     )
 
 

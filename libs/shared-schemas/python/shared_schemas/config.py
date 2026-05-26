@@ -111,6 +111,7 @@ class AppSettings(BaseSettings):
     retrieval_min_keyword_overlap: int = 1
     retrieval_lexical_scan_limit: int = 1000
     rerank_enabled: bool = True
+    rag_debug_enabled: bool = False
 
     auth_enabled: bool = False
     auth_required: bool = False

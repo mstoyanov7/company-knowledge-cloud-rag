@@ -62,6 +62,39 @@ def rank_chunks_by_question_analysis(
     return [chunk for _score, chunk in ranked[:top_k]]
 
 
+def chunk_relevance_breakdown(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> dict[str, float | bool]:
+    semantic_similarity = float(chunk.score)
+    title_relevance = _title_relevance_score(question_analysis, chunk)
+    key_phrase_match = _key_phrase_score(question_analysis, chunk)
+    direct_answer_likelihood = _answer_type_score(question_analysis, chunk)
+    entity_relevance = _entity_overlap_score(question_analysis, chunk)
+    weak_keyword_only_penalty = _weak_keyword_only_penalty(question_analysis, chunk)
+    wrong_topic_penalty = _wrong_topic_penalty(question_analysis, chunk)
+    avoid_concept_penalty = _avoid_concept_penalty(question_analysis, chunk)
+    score = (
+        semantic_similarity
+        + title_relevance
+        + key_phrase_match
+        + direct_answer_likelihood
+        + entity_relevance
+        - weak_keyword_only_penalty
+        - wrong_topic_penalty
+        - avoid_concept_penalty
+    )
+    return {
+        "semantic_similarity": semantic_similarity,
+        "title_relevance": title_relevance,
+        "key_phrase_match": key_phrase_match,
+        "direct_answer_likelihood": direct_answer_likelihood,
+        "entity_relevance": entity_relevance,
+        "weak_keyword_only_penalty": weak_keyword_only_penalty,
+        "wrong_topic_penalty": wrong_topic_penalty,
+        "avoid_concept_penalty": avoid_concept_penalty,
+        "score": max(score, 0.0),
+        "has_must_have_concept": _has_must_have_concept(question_analysis, chunk),
+    }
+
+
 def analysis_relevance_score(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> float:
     query_tokens = _analysis_tokens(question_analysis)
     if not query_tokens:
@@ -75,22 +108,28 @@ def analysis_relevance_score(question_analysis: QuestionAnalysis, chunk: ChunkDo
     all_tokens = title_tokens | section_tokens | body_tokens | tag_tokens | heading_tokens
     overlap = query_tokens.intersection(all_tokens)
     if not overlap:
-        return 0.0
+        phrase_score = _key_phrase_score(question_analysis, chunk)
+        if phrase_score <= 0:
+            return 0.0
 
     score = 0.0
     score += len(overlap) * 1.5
     score += (len(overlap) / len(query_tokens)) * 3.0
-    score += len(query_tokens.intersection(title_tokens)) * 4.0
+    score += _title_relevance_score(question_analysis, chunk)
     score += len(query_tokens.intersection(heading_tokens)) * 3.0
     score += len(query_tokens.intersection(section_tokens)) * 1.0
     score += _entity_overlap_score(question_analysis, chunk)
     score += _canonical_topic_score(question_analysis, chunk)
+    score += _key_phrase_score(question_analysis, chunk)
     score += _answer_type_score(question_analysis, chunk)
 
     if _is_value_reference_only(question_analysis.search_text, chunk.chunk_text):
         score -= 8.0
     if _only_mentions_related_terms(question_analysis, chunk):
         score -= 4.0
+    score -= _weak_keyword_only_penalty(question_analysis, chunk)
+    score -= _wrong_topic_penalty(question_analysis, chunk)
+    score -= _avoid_concept_penalty(question_analysis, chunk)
     return max(score, 0.0)
 
 
@@ -127,6 +166,45 @@ def _entity_overlap_score(question_analysis: QuestionAnalysis, chunk: ChunkDocum
     return score
 
 
+def _title_relevance_score(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> float:
+    query_tokens = _analysis_tokens(question_analysis)
+    title_tokens = _content_tokens(" ".join([chunk.title, chunk.section_path or "", _heading_text(chunk.chunk_text)]))
+    overlap = query_tokens.intersection(title_tokens)
+    score = len(overlap) * 4.0
+    must_tokens = _concept_tokens(question_analysis.must_have_concepts)
+    if must_tokens:
+        score += len(must_tokens.intersection(title_tokens)) * 5.0
+    return score
+
+
+def _key_phrase_score(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> float:
+    haystack = _chunk_haystack(chunk)
+    title_haystack = _normalized_words(" ".join([chunk.title, chunk.section_path or "", _heading_text(chunk.chunk_text)]))
+    score = 0.0
+    for phrase in _question_phrases(question_analysis):
+        normalized_phrase = _normalized_words(phrase)
+        if not normalized_phrase or len(normalized_phrase.split()) < 2:
+            continue
+        if normalized_phrase in title_haystack:
+            score += 14.0
+        elif normalized_phrase in haystack:
+            score += 7.0
+        else:
+            phrase_tokens = set(normalized_phrase.split())
+            title_tokens = _content_tokens(title_haystack)
+            body_tokens = _content_tokens(haystack)
+            if phrase_tokens and phrase_tokens.issubset(title_tokens | body_tokens):
+                score += 5.0
+            elif phrase_tokens:
+                title_overlap = phrase_tokens.intersection(title_tokens)
+                all_overlap = phrase_tokens.intersection(title_tokens | body_tokens)
+                if len(title_overlap) >= min(2, len(phrase_tokens)):
+                    score += 6.0
+                elif len(all_overlap) >= 2 and len(all_overlap) / len(phrase_tokens) >= 0.6:
+                    score += 4.0
+    return score
+
+
 def _canonical_topic_score(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> float:
     phrase = canonical_key_phrase(question_analysis.search_text)
     if not phrase:
@@ -145,6 +223,8 @@ def _answer_type_score(question_analysis: QuestionAnalysis, chunk: ChunkDocument
     text = chunk.chunk_text
     answer_type = question_analysis.required_answer_type
     score = 0.0
+    if answer_type == "date_or_time" and _date_or_time_signal_present(text):
+        score += 8.0
     if answer_type == "yes_no" and re.search(r"\b(allowed|requires?|must|can|cannot|approved?)\b", text, re.IGNORECASE):
         score += 5.0
     if answer_type == "steps" and re.search(r"\b(step|install|configure|run|open|click|sign in|set up)\b", text, re.IGNORECASE):
@@ -158,6 +238,100 @@ def _answer_type_score(question_analysis: QuestionAnalysis, chunk: ChunkDocument
     if question_analysis.specificity == "broad_explanation" and len(_split_content_segments(text)) >= 2:
         score += 2.0
     return score
+
+
+def _weak_keyword_only_penalty(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> float:
+    query_tokens = _analysis_tokens(question_analysis)
+    if not query_tokens:
+        return 0.0
+    haystack_tokens = _content_tokens(_chunk_haystack(chunk))
+    overlap = query_tokens.intersection(haystack_tokens)
+    if not overlap:
+        return 0.0
+    if _has_must_have_concept(question_analysis, chunk):
+        return 0.0
+    if _key_phrase_score(question_analysis, chunk) >= 5.0:
+        return 0.0
+    strong_tokens = _strong_query_tokens(question_analysis)
+    if overlap.intersection(strong_tokens):
+        return 0.0
+    return 8.0
+
+
+def _wrong_topic_penalty(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> float:
+    must_tokens = _concept_tokens(question_analysis.must_have_concepts)
+    if not must_tokens:
+        return 0.0
+    if _key_phrase_score(question_analysis, chunk) >= 5.0:
+        return 0.0
+    haystack_tokens = _content_tokens(_chunk_haystack(chunk))
+    missing_ratio = 1.0 - (len(must_tokens.intersection(haystack_tokens)) / len(must_tokens))
+    if missing_ratio <= 0:
+        return 0.0
+    penalty = 12.0 * missing_ratio
+    if _answer_type_score(question_analysis, chunk) <= 0:
+        penalty += 4.0
+    return penalty
+
+
+def _avoid_concept_penalty(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> float:
+    avoid_tokens = _concept_tokens(question_analysis.avoid_concepts)
+    if not avoid_tokens:
+        return 0.0
+    title_tokens = _content_tokens(" ".join([chunk.title, chunk.section_path or "", _heading_text(chunk.chunk_text)]))
+    body_tokens = _content_tokens(_body_text_without_headings(chunk.chunk_text))
+    return (len(avoid_tokens.intersection(title_tokens)) * 8.0) + (
+        len(avoid_tokens.intersection(body_tokens)) * 3.0
+    )
+
+
+def _has_must_have_concept(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> bool:
+    must_tokens = _concept_tokens(question_analysis.must_have_concepts)
+    if not must_tokens:
+        return True
+    haystack_tokens = _content_tokens(_chunk_haystack(chunk))
+    if must_tokens.intersection(haystack_tokens):
+        return True
+    return _key_phrase_score(question_analysis, chunk) >= 5.0
+
+
+def _strong_query_tokens(question_analysis: QuestionAnalysis) -> set[str]:
+    tokens = _concept_tokens(question_analysis.must_have_concepts)
+    for phrase in _question_phrases(question_analysis):
+        phrase_tokens = _content_tokens(phrase)
+        if len(phrase_tokens) > 1:
+            tokens.update(phrase_tokens)
+    return tokens
+
+
+def _question_phrases(question_analysis: QuestionAnalysis) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            [
+                *question_analysis.key_phrases,
+                *question_analysis.semantic_queries,
+                *question_analysis.keyword_queries,
+            ]
+        )
+    )
+
+
+def _concept_tokens(values: tuple[str, ...]) -> set[str]:
+    return _content_tokens(" ".join(values))
+
+
+def _chunk_haystack(chunk: ChunkDocument) -> str:
+    return _normalized_words(
+        " ".join(
+            [
+                chunk.title,
+                chunk.section_path or "",
+                _heading_text(chunk.chunk_text),
+                chunk.chunk_text,
+                " ".join(chunk.tags),
+            ]
+        )
+    )
 
 
 def _only_mentions_related_terms(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> bool:
@@ -202,6 +376,20 @@ def _value_signal_present(value: str) -> bool:
     )
 
 
+def _date_or_time_signal_present(value: str) -> bool:
+    return bool(
+        _value_signal_present(value)
+        or re.search(r"\b\d{1,2}(st|nd|rd|th)\b", value, flags=re.IGNORECASE)
+        or re.search(r"\b\d{1,2}\s*[-–]?\s*[^\W_\d]{1,4}\b", value, flags=re.IGNORECASE)
+        or re.search(r"\b(monthly|weekly|daily|yearly|annually|quarterly)\b", value, flags=re.IGNORECASE)
+        or re.search(
+            r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\b",
+            value,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
 def _split_content_segments(value: str) -> list[tuple[str, bool]]:
     segments: list[tuple[str, bool]] = []
     for raw_segment in re.split(r"(?<=[.!?])\s+|\n+", value):
@@ -225,7 +413,7 @@ def _body_text_without_headings(value: str) -> str:
 def _content_tokens(value: str) -> set[str]:
     return {
         _normalize_token(token)
-        for token in re.findall(r"[a-z0-9]+", value.lower())
+        for token in re.findall(r"[^\W_]+", value.lower())
         if len(token) > 2 and token not in _STOP_WORDS
     }
 
@@ -243,4 +431,4 @@ def _normalize_token(token: str) -> str:
 
 
 def _normalized_words(value: str) -> str:
-    return " ".join(_normalize_token(token) for token in re.findall(r"[a-z0-9]+", value.lower()))
+    return " ".join(_normalize_token(token) for token in re.findall(r"[^\W_]+", value.lower()))
