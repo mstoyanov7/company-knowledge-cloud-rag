@@ -1,6 +1,6 @@
 # Architecture
 
-## High-level components
+## High-Level Components
 
 ```text
 [User]
@@ -16,28 +16,25 @@
 [Retriever]                  [LLM Provider Adapter]
    |                              |
    v                              v
-[Vector DB]                  [OpenAI / Azure / Ollama / other]
+[Qdrant Vector DB]           [Ollama / OpenAI-compatible model]
    |
    v
-[Metadata DB + Object Storage]
+[PostgreSQL Metadata DB]
 
 Separate pipeline:
 
-[Graph Sync Scheduler]
+[OneNote Poller / Ops Worker]
    |
    v
-[SharePoint Connector] ----\
-                            --> [Normalizer] --> [Chunker] --> [Embedder] --> [Indexer]
-[OneNote Connector] -------/
+[OneNote Graph Connector] --> [Normalizer] --> [Chunker] --> [Embedder] --> [Indexer]
 ```
 
-## Component responsibilities
+## Component Responsibilities
 
 ### Open WebUI
 
 - chat interface
 - model selection
-- API key based provider usage
 - optional auth integration
 - optional custom pipe / function integration
 
@@ -49,65 +46,24 @@ Separate pipeline:
 - applies source and ACL filters
 - calls retriever and reranker
 - builds the final LLM prompt
-- formats answer with citations
+- formats answers with source citations
 
-### Graph Connectors
+### OneNote Connector
 
-- fetch source content from Microsoft Graph
-- store raw source snapshots and metadata
-- support incremental sync
-- emit indexing jobs
+- fetch notebook, section, and page content from Microsoft Graph
+- support delegated auth
+- support personal and site-hosted notebook scopes
+- expose source metadata without owning indexing logic
 
-### Normalizer
+### Sync Worker
 
-Convert all source types to a common internal schema.
+- normalize OneNote HTML
+- compute content hashes
+- chunk changed pages
+- write metadata to PostgreSQL
+- write vectors and payloads to Qdrant
+- reconcile removed or moved pages
 
-### Chunker
-
-Split content into retrieval-friendly units while preserving source traceability.
-
-### Embedder
-
-Generate embeddings with a configurable model.
-
-### Indexer
-
-Write vectors, metadata, hashes, and source references.
-
-### Retriever
-
-Support hybrid search:
-
-- semantic search
-- keyword / metadata search
-- source filtering
-- ACL filtering
-
-### Reranker
-
-Improve top-k relevance before prompt construction.
-
-### Metadata DB
-
-Store:
-
-- source inventory
-- sync checkpoints
-- chunk metadata
-- access tags
-- content hashes
-- job states
-- citations
-
-### Object Storage
-
-Store:
-
-- normalized text snapshots
-- extracted file content
-- optional previews
-- optional chunk debug artifacts
-
-## Design principle
+## Design Principle
 
 Never couple retrieval logic to the chosen LLM provider.

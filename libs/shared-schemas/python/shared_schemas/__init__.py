@@ -14,18 +14,11 @@ from shared_schemas.documents import (
 from shared_schemas.evaluation import EvaluationCase, EvaluationCaseResult, EvaluationReport, EvaluationSummary
 from shared_schemas.ops import (
     DeadLetterRecord,
-    GraphChangeNotification,
-    GraphLifecycleEvent,
-    GraphNotificationEnvelope,
-    GraphResourceData,
-    GraphSubscriptionRecord,
-    GraphSubscriptionStatus,
-    GraphWebhookAccepted,
     OpsJobRecord,
     OpsJobStatus,
     OpsJobType,
 )
-from shared_schemas.sync import JobStatus, OneNoteCheckpoint, SharePointCheckpoint, SyncJob, SyncMode, SyncReport
+from shared_schemas.sync import JobStatus, OneNoteCheckpoint, SyncJob, SyncMode, SyncReport
 
 __all__ = [
     "AnswerMetadata",
@@ -42,13 +35,6 @@ __all__ = [
     "EvaluationCaseResult",
     "EvaluationReport",
     "EvaluationSummary",
-    "GraphChangeNotification",
-    "GraphLifecycleEvent",
-    "GraphNotificationEnvelope",
-    "GraphResourceData",
-    "GraphSubscriptionRecord",
-    "GraphSubscriptionStatus",
-    "GraphWebhookAccepted",
     "JobStatus",
     "OneNoteCheckpoint",
     "OpsJobRecord",
@@ -57,7 +43,6 @@ __all__ = [
     "RetrievalMetadata",
     "RetrievalRequest",
     "RetrievalResult",
-    "SharePointCheckpoint",
     "SecurityAuditEvent",
     "SourceDocument",
     "SyncJob",

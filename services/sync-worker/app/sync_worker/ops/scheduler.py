@@ -15,8 +15,6 @@ class OpsScheduler:
     def enqueue_periodic_jobs(self) -> int:
         enqueued = 0
         for job_type, interval in [
-            (OpsJobType.graph_subscription_renewal.value, self.settings.graph_subscription_renewal_interval_seconds),
-            (OpsJobType.sharepoint_reconciliation.value, self.settings.sharepoint_reconciliation_interval_seconds),
             (OpsJobType.onenote_reconciliation.value, self.settings.onenote_reconciliation_interval_seconds),
         ]:
             if interval <= 0:

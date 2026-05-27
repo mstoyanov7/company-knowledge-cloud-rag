@@ -38,14 +38,9 @@ perf = [
 [project.scripts]
 rag-api = "rag_api.main:run"
 sync-worker = "sync_worker.main:run"
-sharepoint_bootstrap = "sync_worker.jobs.sharepoint_bootstrap:run"
-sharepoint_incremental = "sync_worker.jobs.sharepoint_incremental:run"
 onenote_bootstrap = "sync_worker.jobs.onenote_bootstrap:run"
 onenote_incremental = "sync_worker.jobs.onenote_incremental:run"
 ops_worker = "sync_worker.jobs.ops_worker:run"
-subscription_renewal = "sync_worker.jobs.subscription_renewal:run"
-sharepoint_delta_catchup = "sync_worker.jobs.sharepoint_delta_catchup:run"
-sharepoint_reconciliation = "sync_worker.jobs.sharepoint_reconciliation:run"
 onenote_reconciliation = "sync_worker.jobs.onenote_reconciliation:run"
 rag_evaluate = "rag_api.evaluation.cli:run"
 

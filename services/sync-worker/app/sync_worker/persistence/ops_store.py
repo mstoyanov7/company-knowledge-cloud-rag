@@ -9,8 +9,6 @@ import psycopg
 from shared_schemas import (
     AppSettings,
     EvaluationReport,
-    GraphSubscriptionRecord,
-    GraphSubscriptionStatus,
     OpsJobRecord,
     OpsJobStatus,
     SecurityAuditEvent,
@@ -62,40 +60,6 @@ class PostgresOpsStore:
 
                         CREATE INDEX IF NOT EXISTS idx_dead_letters_job_id
                             ON dead_letters(job_id);
-
-                        CREATE TABLE IF NOT EXISTS graph_subscriptions (
-                            subscription_id TEXT PRIMARY KEY,
-                            resource TEXT NOT NULL,
-                            change_type TEXT NOT NULL,
-                            notification_url TEXT NOT NULL,
-                            lifecycle_notification_url TEXT,
-                            client_state TEXT NOT NULL,
-                            expiration_datetime_utc TIMESTAMPTZ NOT NULL,
-                            status TEXT NOT NULL,
-                            reauthorization_required BOOLEAN NOT NULL DEFAULT FALSE,
-                            last_renewal_attempt_utc TIMESTAMPTZ,
-                            last_successful_renewal_utc TIMESTAMPTZ,
-                            metadata_json TEXT NOT NULL DEFAULT '{}',
-                            updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                        );
-
-                        CREATE INDEX IF NOT EXISTS idx_graph_subscriptions_expiration
-                            ON graph_subscriptions(status, expiration_datetime_utc);
-                        CREATE INDEX IF NOT EXISTS idx_graph_subscriptions_resource
-                            ON graph_subscriptions(resource);
-
-                        CREATE TABLE IF NOT EXISTS graph_webhook_events (
-                            event_id TEXT PRIMARY KEY,
-                            dedupe_key TEXT NOT NULL UNIQUE,
-                            subscription_id TEXT,
-                            event_type TEXT NOT NULL,
-                            resource TEXT,
-                            payload_json TEXT NOT NULL,
-                            received_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                        );
-
-                        CREATE INDEX IF NOT EXISTS idx_graph_webhook_events_subscription
-                            ON graph_webhook_events(subscription_id, received_at_utc);
 
                         CREATE TABLE IF NOT EXISTS ops_metrics (
                             metric_id TEXT PRIMARY KEY,
@@ -328,182 +292,6 @@ class PostgresOpsStore:
                 )
             connection.commit()
 
-    def record_webhook_event(
-        self,
-        *,
-        dedupe_key: str,
-        subscription_id: str | None,
-        event_type: str,
-        resource: str | None,
-        payload: dict[str, Any],
-    ) -> bool:
-        self.ensure_schema()
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO graph_webhook_events (
-                        event_id, dedupe_key, subscription_id, event_type, resource, payload_json, received_at_utc
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (dedupe_key) DO NOTHING
-                    """,
-                    (
-                        str(uuid4()),
-                        dedupe_key,
-                        subscription_id,
-                        event_type,
-                        resource,
-                        _json_dump(payload),
-                        datetime.now(UTC),
-                    ),
-                )
-                created = cursor.rowcount > 0
-            connection.commit()
-        return created
-
-    def upsert_subscription(self, record: GraphSubscriptionRecord) -> GraphSubscriptionRecord:
-        self.ensure_schema()
-        now = datetime.now(UTC)
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO graph_subscriptions (
-                        subscription_id, resource, change_type, notification_url, lifecycle_notification_url,
-                        client_state, expiration_datetime_utc, status, reauthorization_required,
-                        last_renewal_attempt_utc, last_successful_renewal_utc, metadata_json, updated_at_utc
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (subscription_id) DO UPDATE SET
-                        resource = EXCLUDED.resource,
-                        change_type = EXCLUDED.change_type,
-                        notification_url = EXCLUDED.notification_url,
-                        lifecycle_notification_url = EXCLUDED.lifecycle_notification_url,
-                        client_state = EXCLUDED.client_state,
-                        expiration_datetime_utc = EXCLUDED.expiration_datetime_utc,
-                        status = EXCLUDED.status,
-                        reauthorization_required = EXCLUDED.reauthorization_required,
-                        last_renewal_attempt_utc = EXCLUDED.last_renewal_attempt_utc,
-                        last_successful_renewal_utc = EXCLUDED.last_successful_renewal_utc,
-                        metadata_json = EXCLUDED.metadata_json,
-                        updated_at_utc = EXCLUDED.updated_at_utc
-                    """,
-                    (
-                        record.subscription_id,
-                        record.resource,
-                        record.change_type,
-                        record.notification_url,
-                        record.lifecycle_notification_url,
-                        record.client_state,
-                        record.expiration_datetime_utc,
-                        record.status.value,
-                        record.reauthorization_required,
-                        record.last_renewal_attempt_utc,
-                        record.last_successful_renewal_utc,
-                        _json_dump(record.metadata),
-                        now,
-                    ),
-                )
-            connection.commit()
-        return record.model_copy(update={"updated_at_utc": now})
-
-    def list_subscriptions_due_for_renewal(self, renewal_window_minutes: int) -> list[GraphSubscriptionRecord]:
-        self.ensure_schema()
-        due_before = datetime.now(UTC) + timedelta(minutes=renewal_window_minutes)
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT subscription_id, resource, change_type, notification_url, lifecycle_notification_url,
-                           client_state, expiration_datetime_utc, status, reauthorization_required,
-                           last_renewal_attempt_utc, last_successful_renewal_utc, metadata_json, updated_at_utc
-                    FROM graph_subscriptions
-                    WHERE status = %s
-                      AND expiration_datetime_utc <= %s
-                      AND (
-                          last_renewal_attempt_utc IS NULL
-                          OR last_renewal_attempt_utc <= NOW() - INTERVAL '10 minutes'
-                      )
-                    ORDER BY expiration_datetime_utc ASC
-                    """,
-                    (GraphSubscriptionStatus.active.value, due_before),
-                )
-                rows = cursor.fetchall()
-        return [_subscription_from_row(row) for row in rows]
-
-    def mark_subscription_reauthorization_required(self, subscription_id: str) -> None:
-        now = datetime.now(UTC)
-        self.ensure_schema()
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE graph_subscriptions
-                    SET status = %s,
-                        reauthorization_required = TRUE,
-                        updated_at_utc = %s
-                    WHERE subscription_id = %s
-                    """,
-                    (GraphSubscriptionStatus.reauthorization_required.value, now, subscription_id),
-                )
-            connection.commit()
-
-    def mark_subscription_removed(self, subscription_id: str) -> None:
-        now = datetime.now(UTC)
-        self.ensure_schema()
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE graph_subscriptions
-                    SET status = %s,
-                        updated_at_utc = %s
-                    WHERE subscription_id = %s
-                    """,
-                    (GraphSubscriptionStatus.removed.value, now, subscription_id),
-                )
-            connection.commit()
-
-    def mark_subscription_active(self, subscription_id: str) -> None:
-        now = datetime.now(UTC)
-        self.ensure_schema()
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE graph_subscriptions
-                    SET status = %s,
-                        reauthorization_required = FALSE,
-                        last_renewal_attempt_utc = %s,
-                        last_successful_renewal_utc = COALESCE(last_successful_renewal_utc, %s),
-                        updated_at_utc = %s
-                    WHERE subscription_id = %s
-                    """,
-                    (GraphSubscriptionStatus.active.value, now, now, now, subscription_id),
-                )
-            connection.commit()
-
-    def mark_subscription_renewal_attempt(self, subscription_id: str, error: str | None = None) -> None:
-        now = datetime.now(UTC)
-        status = GraphSubscriptionStatus.failed.value if error else GraphSubscriptionStatus.active.value
-        metadata = {"last_error": error} if error else {}
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE graph_subscriptions
-                    SET status = %s,
-                        last_renewal_attempt_utc = %s,
-                        metadata_json = CASE
-                            WHEN %s = '{}' THEN metadata_json
-                            ELSE %s
-                        END,
-                        updated_at_utc = %s
-                    WHERE subscription_id = %s
-                    """,
-                    (status, now, _json_dump(metadata), _json_dump(metadata), now, subscription_id),
-                )
-            connection.commit()
-
     def record_metric(self, metric_name: str, value: float, labels: dict[str, Any] | None = None) -> None:
         self.ensure_schema()
         with psycopg.connect(self.settings.postgres_dsn) as connection:
@@ -591,24 +379,6 @@ def _job_from_row(row) -> OpsJobRecord:
         created_at_utc=row[11],
         updated_at_utc=row[12],
         completed_at_utc=row[13],
-    )
-
-
-def _subscription_from_row(row) -> GraphSubscriptionRecord:
-    return GraphSubscriptionRecord(
-        subscription_id=row[0],
-        resource=row[1],
-        change_type=row[2],
-        notification_url=row[3],
-        lifecycle_notification_url=row[4],
-        client_state=row[5],
-        expiration_datetime_utc=row[6],
-        status=row[7],
-        reauthorization_required=row[8],
-        last_renewal_attempt_utc=row[9],
-        last_successful_renewal_utc=row[10],
-        metadata=json.loads(row[11]),
-        updated_at_utc=row[12],
     )
 
 

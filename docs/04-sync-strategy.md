@@ -2,60 +2,44 @@
 
 ## Objective
 
-Keep the cloud RAG index fresh without reprocessing everything every time.
+Keep the OneNote RAG index fresh without reprocessing everything every time.
 
-## SharePoint strategy
+## OneNote Strategy
 
-Use three layers:
-
-### 1. Initial full crawl
-Used once for bootstrap.
-
-### 2. Incremental sync
-Use source-native change tracking where possible.
-Store delta checkpoints per site / drive / library.
-
-### 3. Nightly reconciliation
-Re-scan scope boundaries to repair drift, missed events, or failed jobs.
-
-## OneNote strategy
-
-Use notebook / section / page level scheduled polling with checkpoints.
+Use notebook / section / page scheduled polling with checkpoints.
 
 Recommended approach:
 
-- store per-notebook checkpoint
-- list changed pages by modification time or equivalent change marker
-- fetch only changed pages
+- store the latest processed page modification cursor
+- list changed pages by modification time
+- use a configurable lookback window to re-check recent pages by content hash
+- fetch only relevant page HTML
 - re-chunk and reindex only when content hash changes
+- run reconciliation to catch deleted or moved pages
 
-## Scheduler model
+## Scheduler Model
 
-Have at least these jobs:
+Jobs:
 
-- `bootstrap_job`
-- `sharepoint_incremental_job`
-- `onenote_incremental_job`
-- `subscription_renewal_job`
-- `nightly_reconciliation_job`
-- `failed_job_retry_worker`
-- `orphan_cleanup_job`
+- `onenote_bootstrap`
+- `onenote_incremental`
+- `onenote_reconciliation`
+- `ops_worker`
+- failed-job retry worker
 
-## Failure handling
+## Failure Handling
 
 For every connector job:
 
 - use exponential backoff
 - mark terminal failures after retry limit
 - send failed items to dead-letter storage
-- keep per-source health metrics
+- keep health metrics
 
-## Freshness SLA proposal
+## Freshness SLA Proposal
 
-For the diploma prototype, define a target such as:
+For the diploma prototype:
 
-- SharePoint updates visible in index within 1 to 5 minutes
-- OneNote updates visible in index within 5 to 15 minutes
-- full reconciliation once per day
-
-Adjust after measurement.
+- OneNote edits visible in the index after the next polling cycle when Microsoft Graph exposes the updated page
+- deleted or moved pages cleaned by reconciliation
+- full reconciliation once per day, or faster for small notebooks

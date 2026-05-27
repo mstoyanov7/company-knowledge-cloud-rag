@@ -82,10 +82,9 @@ sources.
 
 ## 3. Required `.env` Values
 
-For OneNote-only testing, keep SharePoint mocked:
+Use live OneNote with delegated device-code auth:
 
 ```env
-SHAREPOINT_GRAPH_MODE=mock
 ONENOTE_GRAPH_MODE=live
 ONENOTE_AUTH_MODE=device_code
 ```
@@ -101,7 +100,7 @@ GRAPH_ONENOTE_SCOPES=Notes.Read
 Do not include `openid`, `offline_access`, or `profile` in `GRAPH_ONENOTE_SCOPES`.
 MSAL reserves those values and will add OIDC scopes itself for device-code auth.
 
-For personal OneNote notebooks, use `/me/onenote` mode and leave the SharePoint site fields empty:
+For personal OneNote notebooks, use `/me/onenote` mode and leave the site fields empty:
 
 ```env
 GRAPH_ONENOTE_SCOPE_MODE=me
@@ -112,12 +111,12 @@ GRAPH_ONENOTE_NOTEBOOK_SCOPE=
 
 Leave `GRAPH_ONENOTE_NOTEBOOK_SCOPE` empty to index all notebooks available to your signed-in user.
 
-Only use site mode if your notebooks are hosted in a SharePoint team site:
+Only use site mode if your notebooks are hosted in a Microsoft 365 team site:
 
 ```env
 GRAPH_ONENOTE_SCOPE_MODE=site
 GRAPH_ONENOTE_SCOPES=Notes.Read.All Sites.Read.All
-GRAPH_ONENOTE_SITE_HOSTNAME=<yourtenant>.sharepoint.com
+GRAPH_ONENOTE_SITE_HOSTNAME=<your-microsoft-365-site-host>
 GRAPH_ONENOTE_SITE_SCOPE=sites/<your-site-name>
 GRAPH_ONENOTE_NOTEBOOK_SCOPE=
 ```
@@ -418,7 +417,7 @@ OIDC scopes from `GRAPH_ONENOTE_SCOPES`:
 GRAPH_ONENOTE_SCOPES=Notes.Read
 ```
 
-If the OneNote job calls `contoso.sharepoint.com`, you are still in site mode or still have placeholder site values. For personal notebooks, set:
+If the OneNote job calls a placeholder site hostname, you are still in site mode or still have placeholder site values. For personal notebooks, set:
 
 ```env
 GRAPH_ONENOTE_SCOPE_MODE=me

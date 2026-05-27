@@ -9,27 +9,13 @@ Deliverables:
 - repository scaffold
 - Docker Compose
 - FastAPI service
-- PostgreSQL + vector DB + Redis
+- PostgreSQL + Qdrant + Redis
 - config loader
 - provider-agnostic LLM interface
 - health endpoints
 - basic Open WebUI integration contract
 
-## Phase 2 - SharePoint connector
-
-Build full crawl plus incremental sync.
-
-Deliverables:
-
-- Microsoft Graph auth
-- site / drive / library discovery
-- item fetch
-- file extraction pipeline
-- delta checkpointing
-- content hashing
-- indexing pipeline
-
-## Phase 3 - OneNote connector
+## Phase 2 - OneNote Connector
 
 Build notebook-page ingestion with incremental polling.
 
@@ -40,8 +26,9 @@ Deliverables:
 - page content fetch
 - modification checkpointing
 - normalization and indexing
+- reconciliation for removed or moved pages
 
-## Phase 4 - Answer engine
+## Phase 3 - Answer Engine
 
 Build secure retrieval and response generation.
 
@@ -54,14 +41,14 @@ Deliverables:
 - citation builder
 - answer API
 
-## Phase 5 - Operations and evaluation
+## Phase 4 - Operations and Evaluation
 
 Make it production-like and measurable.
 
 Deliverables:
 
+- polling and reconciliation
 - retries and dead-letter queue
-- metrics dashboard
 - logs and tracing
 - benchmark scripts
 - evaluation dataset

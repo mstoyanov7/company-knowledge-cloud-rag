@@ -44,7 +44,6 @@ When Open WebUI calls your RAG API, pass identity context such as:
 
 For the diploma, start with a restricted onboarding knowledge scope:
 
-- dedicated SharePoint onboarding sites
 - dedicated onboarding notebooks
 - limited employee audience
 

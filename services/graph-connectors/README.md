@@ -1,18 +1,8 @@
 # Graph Connectors
 
-This package defines the source-specific boundary for Microsoft Graph ingestion.
+This package defines the Microsoft Graph boundary for OneNote ingestion.
 
-Phase 2 adds the SharePoint Graph integration boundary:
-
-- `graph_connectors.sharepoint.auth.ClientCredentialsTokenProvider`
-- `graph_connectors.sharepoint.client.MicrosoftGraphSharePointClient`
-- `graph_connectors.sharepoint.client.MockSharePointGraphClient`
-- `graph_connectors.sharepoint.connector.SharePointConnector`
-
-The connector resolves the configured site and document library scope, while the
-worker owns extraction, normalization, hashing, chunking, and indexing.
-
-Phase 3 adds a separate OneNote boundary:
+The OneNote connector exposes:
 
 - `graph_connectors.onenote.auth.DelegatedAuthProvider`
 - `graph_connectors.onenote.auth.MsalDeviceCodeAuthProvider`
@@ -20,13 +10,7 @@ Phase 3 adds a separate OneNote boundary:
 - `graph_connectors.onenote.client.MockOneNoteGraphClient`
 - `graph_connectors.onenote.connector.OneNoteConnector`
 
-OneNote authentication is delegated-only in this repository. The connector targets
-site-hosted team notebooks via `/sites/{site-id}/onenote` endpoints.
-
-Phase 5 adds a Graph subscription boundary:
-
-- `graph_connectors.subscriptions.MicrosoftGraphSubscriptionClient`
-- `graph_connectors.subscriptions.MockGraphSubscriptionClient`
-
-Subscription creation and renewal are isolated from indexing logic. The sync
-worker uses this client only for webhook subscription lifecycle operations.
+OneNote authentication is delegated-only in this repository. The connector can
+target personal notebooks through `/me/onenote` or site-hosted team notebooks
+through `/sites/{site-id}/onenote`. Indexing, normalization, hashing, chunking,
+and vector writes stay in `sync-worker`.

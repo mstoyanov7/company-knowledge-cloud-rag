@@ -92,9 +92,9 @@ def test_answer_endpoint_allows_authorized_content_and_maps_citations() -> None:
 
     assert response.status_code == 200
     assert payload["metadata"]["retrieved_chunk_count"] == 1
-    assert citation["source_item_id"] == "sp-002"
+    assert citation["source_item_id"] == "on-003"
     assert citation["chunk_index"] == 0
-    assert citation["source_system"] == "sharepoint"
+    assert citation["source_system"] == "onenote"
     assert citation["source_url"].endswith("/remote-work")
     assert citation["title"] == "Engineering remote work guide"
 
@@ -133,9 +133,9 @@ def test_openai_compatible_chat_uses_latest_user_message_only() -> None:
         json={
             "model": "mock-onboarding-assistant",
             "messages": [
-                {"role": "user", "content": "What benefits should I review during onboarding?"},
+                {"role": "user", "content": "Which health coverage and wellness portal should I review?"},
                 {"role": "assistant", "content": "On day one, connect to the VPN."},
-                {"role": "user", "content": "What benefits should I review during onboarding?"},
+                {"role": "user", "content": "Which health coverage and wellness portal should I review?"},
             ],
         },
     )

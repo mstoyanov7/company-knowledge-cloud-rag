@@ -142,8 +142,6 @@ class QdrantAclRetriever:
 
         filtered: list[str] = []
         for collection_name in collection_names:
-            if "sharepoint" in source_filters and collection_name == self.settings.sharepoint_vector_collection:
-                filtered.append(collection_name)
             if "onenote" in source_filters and collection_name == self.settings.onenote_vector_collection:
                 filtered.append(collection_name)
         return filtered or collection_names

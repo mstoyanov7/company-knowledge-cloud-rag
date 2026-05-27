@@ -8,7 +8,7 @@ Use these figures in the diploma text and keep captions consistent.
 | Local deployment | `docs/diagrams/deployment.md` | Shows Docker Compose and Microsoft cloud dependencies | Draft |
 | Ingestion sequence | `docs/diagrams/ingestion-sequence.md` | Explains normalization, hashing, chunking, checkpointing, indexing | Draft |
 | Query sequence | `docs/diagrams/query-sequence.md` | Explains ACL-aware retrieval and cited answer construction | Draft |
-| Operations freshness sequence | `docs/diagrams/operations-sequence.md` | Explains webhook acceptance, durable queue, delta catch-up | Draft |
+| Operations freshness sequence | `docs/diagrams/operations-sequence.md` | Explains polling, lookback checks, reconciliation, and indexing | Draft |
 | Benchmark workflow | `docs/experiments/phase7-benchmark-workflow.md` | Explains experiment procedure and acceptance gates | Draft |
 | Latency result table | `docs/experiments/result-table-templates.md` | Provides thesis table format for p50/p95/p99 | Draft |
 | Citation/freshness result table | `docs/experiments/result-table-templates.md` | Provides thesis table format for RAG-specific metrics | Draft |

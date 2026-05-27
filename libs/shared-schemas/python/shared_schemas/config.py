@@ -1,7 +1,7 @@
 from functools import lru_cache
 import json
 
-from pydantic import AliasChoices, Field, SecretStr, computed_field
+from pydantic import SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,18 +32,9 @@ class AppSettings(BaseSettings):
     qdrant_host: str = "qdrant"
     qdrant_port: int = 6333
 
-    sharepoint_graph_mode: str = "mock"
     graph_api_base_url: str = "https://graph.microsoft.com/v1.0"
-    graph_token_scope: str = "https://graph.microsoft.com/.default"
     graph_tenant_id: str = ""
     graph_client_id: str = ""
-    graph_client_secret: SecretStr = SecretStr("")
-    graph_sharepoint_hostname: str = "contoso.sharepoint.com"
-    graph_sharepoint_site_scope: str = Field(
-        default="sites/onboarding",
-        validation_alias=AliasChoices("GRAPH_SHAREPOINT_SITE_SCOPE", "GRAPH_SHAREPOINT_SCOPE"),
-    )
-    graph_sharepoint_drive_scope: str = "Documents"
     onenote_graph_mode: str = "mock"
     onenote_auth_mode: str = "device_code"
     graph_onenote_tenant_id: str = ""
@@ -63,21 +54,10 @@ class AppSettings(BaseSettings):
     onenote_retry_backoff_seconds: float = 1.0
     onenote_incremental_lookback_seconds: int = 0
 
-    graph_notification_base_url: str = ""
-    graph_notification_path: str = "/api/v1/graph/notifications"
-    graph_lifecycle_notification_path: str = "/api/v1/graph/lifecycle"
-    graph_subscription_client_state: SecretStr = SecretStr("cloudrag-graph-client-state")
-    graph_sharepoint_subscription_resource: str = ""
-    graph_sharepoint_subscription_change_type: str = "updated"
-    graph_subscription_max_expiration_minutes: int = 4200
-    graph_subscription_renewal_window_minutes: int = 720
-    graph_subscription_renewal_interval_seconds: int = 3600
-
     ops_job_max_attempts: int = 5
     ops_job_base_backoff_seconds: int = 30
     ops_job_max_backoff_seconds: int = 1800
     ops_worker_batch_size: int = 10
-    sharepoint_reconciliation_interval_seconds: int = 86400
     onenote_reconciliation_interval_seconds: int = 86400
 
     otel_enabled: bool = False
@@ -85,13 +65,8 @@ class AppSettings(BaseSettings):
     otel_exporter_otlp_endpoint: str = ""
     otel_console_exporter: bool = False
 
-    sharepoint_sync_interval_seconds: int = 300
     onenote_sync_interval_seconds: int = 900
     worker_poll_interval_seconds: int = 30
-    sharepoint_delta_page_size: int = 100
-    sharepoint_chunk_size_chars: int = 800
-    sharepoint_chunk_overlap_chars: int = 120
-    sharepoint_vector_collection: str = "sharepoint_chunks"
     embedding_vector_size: int = 32
 
     default_llm_provider: str = "mock"
@@ -154,28 +129,6 @@ class AppSettings(BaseSettings):
 
     @computed_field
     @property
-    def graph_notification_url(self) -> str:
-        return _join_public_url(self.graph_notification_base_url, self.graph_notification_path)
-
-    @computed_field
-    @property
-    def graph_lifecycle_notification_url(self) -> str:
-        return _join_public_url(self.graph_notification_base_url, self.graph_lifecycle_notification_path)
-
-    @computed_field
-    @property
-    def graph_sharepoint_scope(self) -> str:
-        return self.graph_sharepoint_site_scope
-
-    @computed_field
-    @property
-    def sharepoint_scope_key(self) -> str:
-        site_scope = self.graph_sharepoint_site_scope.replace("/", "_")
-        drive_scope = self.graph_sharepoint_drive_scope.replace("/", "_")
-        return f"sharepoint::{self.graph_sharepoint_hostname}::{site_scope}::{drive_scope}"
-
-    @computed_field
-    @property
     def resolved_onenote_tenant_id(self) -> str:
         return self.graph_onenote_tenant_id or self.graph_tenant_id
 
@@ -189,14 +142,14 @@ class AppSettings(BaseSettings):
     def resolved_onenote_site_hostname(self) -> str:
         if self.resolved_onenote_scope_mode == "me":
             return "me"
-        return self.graph_onenote_site_hostname or self.graph_sharepoint_hostname
+        return self.graph_onenote_site_hostname
 
     @computed_field
     @property
     def resolved_onenote_site_scope(self) -> str:
         if self.resolved_onenote_scope_mode == "me":
             return "onenote"
-        return self.graph_onenote_site_scope or self.graph_sharepoint_site_scope
+        return self.graph_onenote_site_scope
 
     @computed_field
     @property
@@ -221,7 +174,7 @@ class AppSettings(BaseSettings):
                 for collection in self.retrieval_vector_collections.split(",")
                 if collection.strip()
             ]
-        return list(dict.fromkeys([self.sharepoint_vector_collection, self.onenote_vector_collection]))
+        return [self.onenote_vector_collection]
 
     @computed_field
     @property
@@ -283,12 +236,6 @@ class AppSettings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> AppSettings:
     return AppSettings()
-
-
-def _join_public_url(base_url: str, path: str) -> str:
-    if not base_url:
-        return ""
-    return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
 
 def _parse_scope_map(value: str) -> dict[str, list[str]]:

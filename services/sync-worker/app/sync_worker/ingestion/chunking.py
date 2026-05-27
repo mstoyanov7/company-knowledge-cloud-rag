@@ -12,8 +12,8 @@ class TextChunker:
         chunk_overlap_chars: int | None = None,
     ) -> None:
         self.settings = settings
-        self.chunk_size_chars = chunk_size_chars or settings.sharepoint_chunk_size_chars
-        self.chunk_overlap_chars = chunk_overlap_chars or settings.sharepoint_chunk_overlap_chars
+        self.chunk_size_chars = chunk_size_chars or settings.onenote_chunk_size_chars
+        self.chunk_overlap_chars = chunk_overlap_chars or settings.onenote_chunk_overlap_chars
 
     def chunk(self, document: SourceDocument) -> list[ChunkDocument]:
         content = document.content_text.strip()

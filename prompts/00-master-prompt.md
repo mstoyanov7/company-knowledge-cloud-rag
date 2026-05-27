@@ -3,7 +3,7 @@
 Read all files under `docs/` and `prompts/` before editing code.
 
 Objective:
-Build a production-leaning proof of concept for a cloud-hosted enterprise RAG chatbot that uses Open WebUI as the interface, supports model-agnostic LLM providers, ingests SharePoint and OneNote through Microsoft Graph, maintains an incrementally updated retrieval index, and answers with secure citations.
+Build a production-leaning proof of concept for a cloud-hosted enterprise RAG chatbot that uses Open WebUI as the interface, supports model-agnostic LLM providers, ingests OneNote through Microsoft Graph, maintains an incrementally updated retrieval index, and answers with secure citations.
 
 Non-negotiable constraints:
 - Open WebUI must remain the frontend and model-selection layer
@@ -23,10 +23,9 @@ Implementation order:
 2. implement shared schemas and config
 3. implement RAG API skeleton
 4. implement sync worker skeleton
-5. implement SharePoint connector
-6. implement OneNote connector
-7. implement retrieval, reranking, and citations
-8. add observability, retries, and tests
+5. implement OneNote connector
+6. implement retrieval, reranking, and citations
+7. add observability, retries, and tests
 
 Output rules:
 - create code, configs, and README files directly in the repository

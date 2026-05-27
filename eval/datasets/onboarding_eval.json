@@ -4,7 +4,7 @@
     {
       "case_id": "day-one-setup",
       "question": "What should I do on day one?",
-      "expected_source_item_ids": ["sp-001"],
+      "expected_source_item_ids": ["on-001"],
       "expected_answer_terms": ["VPN", "payroll", "laptop"],
       "user_context": {
         "user_id": "eval-employee",
@@ -17,7 +17,7 @@
     {
       "case_id": "benefits-enrollment",
       "question": "What benefits should I review during onboarding?",
-      "expected_source_item_ids": ["on-001"],
+      "expected_source_item_ids": ["on-002"],
       "expected_answer_terms": ["Benefits", "health", "wellness"],
       "user_context": {
         "user_id": "eval-employee",
@@ -30,7 +30,7 @@
     {
       "case_id": "engineering-access",
       "question": "What repository access should engineering teammates request?",
-      "expected_source_item_ids": ["sp-002"],
+      "expected_source_item_ids": ["on-003"],
       "expected_answer_terms": ["repository", "on-call", "incident"],
       "user_context": {
         "user_id": "eval-engineer",

@@ -18,7 +18,6 @@ flowchart TB
     subgraph MicrosoftCloud[Microsoft Cloud]
         Entra[Microsoft Entra ID]
         Graph[Microsoft Graph]
-        SharePoint[SharePoint Sites]
         OneNote[OneNote Notebooks]
     end
 
@@ -32,7 +31,5 @@ flowchart TB
     SyncWorker --> Redis
     SyncWorker --> Qdrant
     SyncWorker --> Graph
-    Graph --> SharePoint
     Graph --> OneNote
-    Graph -->|HTTPS notifications| RagApi
 ```

@@ -8,7 +8,7 @@ This is too generic.
 
 ## Stronger novelty statement
 
-"A model-agnostic enterprise Cloud-RAG architecture for onboarding assistance that combines incremental synchronization from SharePoint and OneNote, ACL-aware retrieval, and freshness-aware citation generation through a unified Open WebUI interface."
+"A model-agnostic enterprise Cloud-RAG architecture for onboarding assistance that combines incremental OneNote synchronization, ACL-aware retrieval, and freshness-aware citation generation through a unified Open WebUI interface."
 
 ## Practical research focus options
 

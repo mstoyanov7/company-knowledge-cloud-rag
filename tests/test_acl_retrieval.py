@@ -15,7 +15,7 @@ def test_qdrant_acl_filter_includes_tenant_acl_and_source_scope() -> None:
         email="u1@example.com",
         tenant_id="tenant-1",
         allowed_acl_tags=["public", "engineering"],
-        source_filters=["sharepoint"],
+        source_filters=["onenote"],
     )
 
     payload_filter = QdrantAclRetriever.build_payload_filter(access_scope).model_dump(
@@ -26,7 +26,7 @@ def test_qdrant_acl_filter_includes_tenant_acl_and_source_scope() -> None:
 
     assert payload_filter["must"][0] == {"key": "tenant_id", "match": {"value": "tenant-1"}}
     assert payload_filter["must"][1] == {"key": "acl_tags", "match": {"any": ["public", "engineering"]}}
-    assert payload_filter["must"][2] == {"key": "source_system", "match": {"any": ["sharepoint"]}}
+    assert payload_filter["must"][2] == {"key": "source_system", "match": {"any": ["onenote"]}}
 
 
 def _chunk(title: str, text: str) -> ChunkDocument:

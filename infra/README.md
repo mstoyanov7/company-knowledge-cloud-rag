@@ -12,16 +12,16 @@ Services started locally:
 - Qdrant
 - `rag-api`
 - `sync-worker`
+- `onenote-poller`
 - Open WebUI
 
 Operational tables are created lazily by the services in PostgreSQL:
 
-- `ops_jobs` for durable webhook, renewal, and reconciliation work
-- `graph_subscriptions` for Microsoft Graph subscription state
-- `graph_webhook_events` for notification idempotency
+- `ops_jobs` for durable reconciliation and retry work
 - `dead_letters` for exhausted jobs
 - `ops_metrics` for lightweight local metric snapshots
+- `security_audit_events`
+- `evaluation_runs`
 
-Microsoft Graph webhooks require a public HTTPS URL. For local development, use
-a tunnel such as ngrok or Cloudflare Tunnel and set `GRAPH_NOTIFICATION_BASE_URL`
-to that HTTPS origin.
+OneNote freshness is handled by scheduled polling and reconciliation, not by
+Microsoft Graph notifications.

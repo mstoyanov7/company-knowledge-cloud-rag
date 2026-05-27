@@ -9,7 +9,7 @@ from shared_schemas import AppSettings, ChunkDocument
 class QdrantChunkStore:
     def __init__(self, settings: AppSettings, *, collection_name: str | None = None) -> None:
         self.settings = settings
-        self.collection_name = collection_name or settings.sharepoint_vector_collection
+        self.collection_name = collection_name or settings.onenote_vector_collection
         self.client = QdrantClient(url=settings.qdrant_url)
 
     def ensure_collection(self) -> None:

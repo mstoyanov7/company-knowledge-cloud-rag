@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 
 import psycopg
-from shared_schemas import AppSettings, ChunkDocument, OneNoteCheckpoint, SharePointCheckpoint, SourceDocument
+from shared_schemas import AppSettings, ChunkDocument, OneNoteCheckpoint, SourceDocument
 
 
 class PostgresMetadataStore:
@@ -18,18 +18,6 @@ class PostgresMetadataStore:
                 try:
                     cursor.execute(
                         """
-                        CREATE TABLE IF NOT EXISTS sharepoint_checkpoints (
-                            scope_key TEXT PRIMARY KEY,
-                            sync_mode TEXT NOT NULL,
-                            site_id TEXT,
-                            drive_id TEXT,
-                            cursor_url TEXT,
-                            delta_link TEXT,
-                            page_count INTEGER NOT NULL DEFAULT 0,
-                            item_count INTEGER NOT NULL DEFAULT 0,
-                            updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                        );
-
                         CREATE TABLE IF NOT EXISTS onenote_checkpoints (
                             scope_key TEXT PRIMARY KEY,
                             sync_mode TEXT NOT NULL,
@@ -95,77 +83,22 @@ class PostgresMetadataStore:
                     cursor.execute("SELECT pg_advisory_unlock(hashtext('cloud_rag_metadata_schema'))")
             connection.commit()
 
-    def get_checkpoint(self, scope_key: str) -> SharePointCheckpoint | None:
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT scope_key, sync_mode, site_id, drive_id, cursor_url, delta_link, page_count, item_count, updated_at_utc
-                    FROM sharepoint_checkpoints
-                    WHERE scope_key = %s
-                    """,
-                    (scope_key,),
-                )
-                row = cursor.fetchone()
-        if not row:
-            return None
-        return SharePointCheckpoint(
-            scope_key=row[0],
-            sync_mode=row[1],
-            site_id=row[2],
-            drive_id=row[3],
-            cursor_url=row[4],
-            delta_link=row[5],
-            page_count=row[6],
-            item_count=row[7],
-            updated_at_utc=row[8],
-        )
-
-    def upsert_checkpoint(self, checkpoint: SharePointCheckpoint) -> SharePointCheckpoint:
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO sharepoint_checkpoints (
-                        scope_key, sync_mode, site_id, drive_id, cursor_url, delta_link, page_count, item_count, updated_at_utc
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (scope_key) DO UPDATE SET
-                        sync_mode = EXCLUDED.sync_mode,
-                        site_id = EXCLUDED.site_id,
-                        drive_id = EXCLUDED.drive_id,
-                        cursor_url = EXCLUDED.cursor_url,
-                        delta_link = EXCLUDED.delta_link,
-                        page_count = EXCLUDED.page_count,
-                        item_count = EXCLUDED.item_count,
-                        updated_at_utc = EXCLUDED.updated_at_utc
-                    """,
-                    (
-                        checkpoint.scope_key,
-                        checkpoint.sync_mode,
-                        checkpoint.site_id,
-                        checkpoint.drive_id,
-                        checkpoint.cursor_url,
-                        checkpoint.delta_link,
-                        checkpoint.page_count,
-                        checkpoint.item_count,
-                        checkpoint.updated_at_utc,
-                    ),
-                )
-            connection.commit()
-        return checkpoint
-
     def get_onenote_checkpoint(self, scope_key: str) -> OneNoteCheckpoint | None:
-        with psycopg.connect(self.settings.postgres_dsn) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT scope_key, sync_mode, site_id, notebook_scope, last_modified_cursor_utc, page_count, item_count, updated_at_utc
-                    FROM onenote_checkpoints
-                    WHERE scope_key = %s
-                    """,
-                    (scope_key,),
-                )
-                row = cursor.fetchone()
+        try:
+            with psycopg.connect(self.settings.postgres_dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT scope_key, sync_mode, site_id, notebook_scope, last_modified_cursor_utc, page_count, item_count, updated_at_utc
+                        FROM onenote_checkpoints
+                        WHERE scope_key = %s
+                        """,
+                        (scope_key,),
+                    )
+                    row = cursor.fetchone()
+        except psycopg.errors.UndefinedTable:
+            self.ensure_schema()
+            return None
         if not row:
             return None
         return OneNoteCheckpoint(

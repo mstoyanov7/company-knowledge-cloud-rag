@@ -2,17 +2,11 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from shared_schemas import ChunkDocument, OneNoteCheckpoint, SharePointCheckpoint, SourceDocument
+from shared_schemas import ChunkDocument, OneNoteCheckpoint, SourceDocument
 
 
 class MetadataStorePort(Protocol):
     def ensure_schema(self) -> None:
-        ...
-
-    def get_checkpoint(self, scope_key: str) -> SharePointCheckpoint | None:
-        ...
-
-    def upsert_checkpoint(self, checkpoint: SharePointCheckpoint) -> SharePointCheckpoint:
         ...
 
     def get_onenote_checkpoint(self, scope_key: str) -> OneNoteCheckpoint | None:

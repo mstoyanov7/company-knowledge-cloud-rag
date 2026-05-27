@@ -159,7 +159,6 @@ try {
     if (-not $NoEnvUpdate) {
         Write-Step "Applying OneNote-only local defaults to .env"
         Set-DotEnvValues -Path $EnvPath -Updates @{
-            SHAREPOINT_GRAPH_MODE          = "mock"
             ONENOTE_GRAPH_MODE             = "live"
             ONENOTE_AUTH_MODE              = "device_code"
             GRAPH_ONENOTE_SCOPES           = "Notes.Read"
@@ -207,10 +206,7 @@ try {
         $syncJob = if ($Bootstrap) { "onenote_bootstrap" } else { "onenote_incremental" }
         Write-Step "Running OneNote $syncJob"
 
-        $syncArgs = @("compose", "run", "--rm")
-        if ($Build) {
-            $syncArgs += "--build"
-        }
+        $syncArgs = @("compose", "run", "--rm", "--build")
         $syncArgs += @("sync-worker", "python", "-m", "sync_worker.jobs.$syncJob")
 
         Invoke-Checked docker @syncArgs
@@ -221,27 +217,18 @@ try {
 
     if (-not $SkipOpsWorker) {
         Write-Step "Starting background sync worker"
-        $workerArgs = @("compose", "up", "-d", "--force-recreate")
-        if ($Build) {
-            $workerArgs += "--build"
-        }
+        $workerArgs = @("compose", "up", "-d", "--force-recreate", "--build")
         $workerArgs += "sync-worker"
         Invoke-Checked docker @workerArgs
 
         Write-Step "Starting OneNote 60-second poller"
-        $pollerArgs = @("compose", "up", "-d", "--force-recreate")
-        if ($Build) {
-            $pollerArgs += "--build"
-        }
+        $pollerArgs = @("compose", "up", "-d", "--force-recreate", "--build")
         $pollerArgs += "onenote-poller"
         Invoke-Checked docker @pollerArgs
     }
 
     Write-Step "Starting RAG API"
-    $apiArgs = @("compose", "up", "-d", "--force-recreate")
-    if ($Build) {
-        $apiArgs += "--build"
-    }
+    $apiArgs = @("compose", "up", "-d", "--force-recreate", "--build")
     $apiArgs += "rag-api"
     Invoke-Checked docker @apiArgs
 

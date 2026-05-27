@@ -10,9 +10,7 @@ from shared_schemas import AppSettings, OpsJobRecord, OpsJobType
 from sync_worker.observability import configure_observability
 from sync_worker.onenote import build_onenote_sync_service
 from sync_worker.ops.scheduler import OpsScheduler
-from sync_worker.ops.subscriptions import GraphSubscriptionMaintenanceService
 from sync_worker.persistence import PostgresOpsStore
-from sync_worker.sharepoint import build_sharepoint_sync_service
 
 try:
     from opentelemetry import metrics, trace
@@ -90,31 +88,8 @@ class OpsJobRunner:
             time.sleep(self.settings.worker_poll_interval_seconds)
 
     def _execute(self, job: OpsJobRecord) -> None:
-        if job.job_type == OpsJobType.sharepoint_delta_catchup.value:
-            build_sharepoint_sync_service(self.settings).incremental()
-            return
-
-        if job.job_type == OpsJobType.sharepoint_reconciliation.value:
-            build_sharepoint_sync_service(self.settings).incremental()
-            return
-
         if job.job_type == OpsJobType.onenote_reconciliation.value:
             build_onenote_sync_service(self.settings).reconciliation()
-            return
-
-        if job.job_type == OpsJobType.graph_subscription_renewal.value:
-            GraphSubscriptionMaintenanceService(self.settings, store=self.store).renew_due_subscriptions()
-            return
-
-        if job.job_type == OpsJobType.graph_subscription_reauthorize.value:
-            subscription_id = job.payload.get("subscription_id")
-            if not subscription_id:
-                raise ValueError("graph_subscription_reauthorize job missing subscription_id")
-            GraphSubscriptionMaintenanceService(self.settings, store=self.store).reauthorize_subscription(subscription_id)
-            return
-
-        if job.job_type == OpsJobType.sharepoint_subscription_ensure.value:
-            GraphSubscriptionMaintenanceService(self.settings, store=self.store).ensure_sharepoint_subscription()
             return
 
         raise ValueError(f"Unsupported ops job_type={job.job_type}")

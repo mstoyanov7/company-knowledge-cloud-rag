@@ -10,7 +10,6 @@ from rag_api.services import (
     AnswerService,
     AuthenticationService,
     ClaimsToScopeMapper,
-    GraphWebhookService,
     KeywordOverlapReranker,
     OidcTokenValidator,
     PromptBuilder,
@@ -19,7 +18,6 @@ from rag_api.services import (
     SystemService,
     TokenValidationError,
 )
-from sync_worker.persistence import PostgresOpsStore
 
 
 @dataclass(slots=True)
@@ -69,14 +67,9 @@ def get_system_service(settings: AppSettings = Depends(get_runtime_settings)) ->
     )
 
 
-def get_graph_webhook_service(settings: AppSettings = Depends(get_runtime_settings)) -> GraphWebhookService:
-    return GraphWebhookService(
-        settings=settings,
-        store=PostgresOpsStore(settings),
-    )
-
-
 def get_security_audit_logger(settings: AppSettings = Depends(get_runtime_settings)) -> SecurityAuditLogger:
+    from sync_worker.persistence import PostgresOpsStore
+
     return SecurityAuditLogger(settings, store=PostgresOpsStore(settings))
 
 

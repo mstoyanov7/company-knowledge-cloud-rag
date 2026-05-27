@@ -17,7 +17,7 @@ def test_evaluation_harness_records_retrieval_and_citation_metrics() -> None:
         EvaluationCase(
             case_id="engineering-access",
             question="What repository access should engineering teammates request?",
-            expected_source_item_ids=["sp-002"],
+            expected_source_item_ids=["on-003"],
             expected_answer_terms=["repository", "on-call"],
             user_context=UserContext(
                 user_id="eval-engineer",
@@ -34,4 +34,4 @@ def test_evaluation_harness_records_retrieval_and_citation_metrics() -> None:
     assert report.summary.retrieval_hit_rate == 1.0
     assert report.summary.mean_document_recall == 1.0
     assert report.summary.mean_citation_correctness == 1.0
-    assert report.cases[0].retrieved_source_item_ids == ["sp-002"]
+    assert report.cases[0].retrieved_source_item_ids == ["on-003"]

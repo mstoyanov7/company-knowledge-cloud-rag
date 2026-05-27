@@ -86,10 +86,10 @@ class MockRetriever:
     def _build_corpus(self) -> tuple[ChunkDocument, ...]:
         documents = (
             self._document(
-                source_system="sharepoint",
-                source_container="sites/onboarding",
-                source_item_id="sp-001",
-                source_url="https://contoso.sharepoint.com/sites/onboarding/day-1",
+                source_system="onenote",
+                source_container="notebooks/onboarding",
+                source_item_id="on-001",
+                source_url="onenote://notebooks/onboarding/day-1",
                 title="Day 1 onboarding checklist",
                 section_path="HR / First day",
                 acl_tags=["public", "employees"],
@@ -103,8 +103,8 @@ class MockRetriever:
             self._document(
                 source_system="onenote",
                 source_container="notebooks/onboarding",
-                source_item_id="on-001",
-                source_url="https://contoso.sharepoint.com/notebooks/onboarding/benefits",
+                source_item_id="on-002",
+                source_url="onenote://notebooks/onboarding/benefits",
                 title="Benefits orientation notes",
                 section_path="People Ops / Benefits",
                 acl_tags=["public", "employees"],
@@ -116,10 +116,10 @@ class MockRetriever:
                 tags=["benefits", "people-ops"],
             ),
             self._document(
-                source_system="sharepoint",
-                source_container="sites/engineering",
-                source_item_id="sp-002",
-                source_url="https://contoso.sharepoint.com/sites/engineering/remote-work",
+                source_system="onenote",
+                source_container="notebooks/engineering",
+                source_item_id="on-003",
+                source_url="onenote://notebooks/engineering/remote-work",
                 title="Engineering remote work guide",
                 section_path="Engineering / Handbook",
                 acl_tags=["engineering"],

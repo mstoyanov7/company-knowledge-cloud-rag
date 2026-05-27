@@ -27,18 +27,6 @@ class SyncMode(StrEnum):
     incremental = "incremental"
 
 
-class SharePointCheckpoint(BaseModel):
-    scope_key: str
-    sync_mode: SyncMode
-    site_id: str | None = None
-    drive_id: str | None = None
-    cursor_url: str | None = None
-    delta_link: str | None = None
-    page_count: int = 0
-    item_count: int = 0
-    updated_at_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-
 class OneNoteCheckpoint(BaseModel):
     scope_key: str
     sync_mode: SyncMode
@@ -59,4 +47,4 @@ class SyncReport(BaseModel):
     items_skipped: int = 0
     items_deleted: int = 0
     chunks_written: int = 0
-    checkpoint: SharePointCheckpoint | OneNoteCheckpoint | None = None
+    checkpoint: OneNoteCheckpoint | None = None

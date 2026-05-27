@@ -40,13 +40,7 @@ Invoke-RestMethod -Method Post http://localhost:8080/api/v1/answer `
 
 4. Ask an engineering-only question as an employee and show zero citations.
 5. Ask the same question as engineering and show the citation.
-6. Run a webhook validation check:
-
-```powershell
-Invoke-WebRequest -Method Post "http://localhost:8080/api/v1/graph/notifications?validationToken=demo%3Atoken"
-```
-
-7. Run k6 smoke:
+6. Run k6 smoke:
 
 ```powershell
 $env:BASE_URL='http://localhost:8080'
@@ -55,13 +49,12 @@ $env:BENCHMARK_RUN_ID='demo-smoke'
 k6 run benchmarks/k6/smoke.js
 ```
 
-8. Show result template: `benchmarks/results/templates/benchmark-summary.md`.
+7. Show result template: `benchmarks/results/templates/benchmark-summary.md`.
 
 ## Talking Points
 
 - Open WebUI remains only the frontend.
 - Retrieval, ACL filtering, citations, and sync are backend-owned.
 - Unauthorized chunks are filtered before prompt construction.
-- SharePoint freshness uses Graph notifications plus delta catch-up.
-- OneNote uses delegated auth and scheduled reconciliation.
+- OneNote uses delegated auth, scheduled polling, lookback hash checks, and reconciliation.
 - Benchmarks capture total latency, retrieval latency, completion latency, freshness delay, citations, throughput, and failures.

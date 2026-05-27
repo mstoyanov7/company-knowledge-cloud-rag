@@ -52,6 +52,7 @@ class OneNoteSyncService:
         return self._sync(SyncMode.bootstrap, reconcile_inventory=True)
 
     def incremental(self) -> SyncReport:
+        self._ensure_storage()
         checkpoint = self.metadata_store.get_onenote_checkpoint(self.settings.onenote_scope_key)
         if checkpoint is None or checkpoint.last_modified_cursor_utc is None:
             self.logger.warning(
@@ -62,6 +63,7 @@ class OneNoteSyncService:
         return self._sync(SyncMode.incremental, reconcile_inventory=False)
 
     def reconciliation(self) -> SyncReport:
+        self._ensure_storage()
         checkpoint = self.metadata_store.get_onenote_checkpoint(self.settings.onenote_scope_key)
         if checkpoint is None or checkpoint.last_modified_cursor_utc is None:
             self.logger.warning(
@@ -73,8 +75,7 @@ class OneNoteSyncService:
 
     def _sync(self, mode: SyncMode, *, reconcile_inventory: bool) -> SyncReport:
         started = time.perf_counter()
-        self.metadata_store.ensure_schema()
-        self.vector_store.ensure_collection()
+        self._ensure_storage()
 
         site, notebooks, _sections = self.connector.resolve_scope()
         allowed_notebook_ids = {notebook.id for notebook in notebooks}
@@ -284,6 +285,10 @@ class OneNoteSyncService:
         if lookback_seconds <= 0:
             return checkpoint_cursor
         return checkpoint_cursor - timedelta(seconds=lookback_seconds)
+
+    def _ensure_storage(self) -> None:
+        self.metadata_store.ensure_schema()
+        self.vector_store.ensure_collection()
 
 
 def max_timestamp(current: datetime | None, candidate: datetime | None) -> datetime | None:

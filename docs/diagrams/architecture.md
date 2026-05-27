@@ -15,18 +15,14 @@ flowchart LR
     Retriever --> Qdrant[(Qdrant Vector DB)]
     Retriever --> Postgres[(PostgreSQL Metadata)]
 
-    SyncWorker[Sync Worker] --> SharePoint[SharePoint Graph Connector]
     SyncWorker --> OneNote[OneNote Graph Connector]
-    SharePoint --> Normalizer[Normalizer]
     OneNote --> Normalizer
     Normalizer --> Chunker[Chunker]
     Chunker --> Embedder[Embedder]
     Embedder --> Qdrant
     Chunker --> Postgres
 
-    GraphWebhook[Graph Webhook] --> RagApi
-    RagApi --> OpsQueue[(PostgreSQL Ops Queue)]
-    OpsQueue --> SyncWorker
+    OpsQueue[(PostgreSQL Ops Queue)] --> SyncWorker
 
     RagApi --> OTel[OpenTelemetry]
     SyncWorker --> OTel

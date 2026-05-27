@@ -6,7 +6,6 @@ from rag_api.services.auth import (
     OidcTokenValidator,
     TokenValidationError,
 )
-from rag_api.services.graph_webhook_service import GraphWebhookService, InvalidGraphNotificationError
 from rag_api.services.evidence_grading import EvidenceAssessment, EvidenceGrade, EvidenceGrader
 from rag_api.services.prompt_builder import PromptBuilder
 from rag_api.services.query_understanding import (
@@ -28,8 +27,6 @@ __all__ = [
     "EvidenceAssessment",
     "EvidenceGrade",
     "EvidenceGrader",
-    "GraphWebhookService",
-    "InvalidGraphNotificationError",
     "KeywordOverlapReranker",
     "OidcTokenValidator",
     "PromptBuilder",

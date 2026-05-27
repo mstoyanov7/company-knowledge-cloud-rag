@@ -5,7 +5,7 @@
     {
       "case_id": "day-one-setup",
       "question": "What should I do on day one?",
-      "expected_source_item_ids": ["sp-001"],
+      "expected_source_item_ids": ["on-001"],
       "user_context": {
         "user_id": "bench-employee-001",
         "email": "employee001@example.com",
@@ -17,7 +17,7 @@
     {
       "case_id": "benefits-enrollment",
       "question": "Which benefits should I review during onboarding?",
-      "expected_source_item_ids": ["on-001"],
+      "expected_source_item_ids": ["on-002"],
       "user_context": {
         "user_id": "bench-employee-002",
         "email": "employee002@example.com",
@@ -29,7 +29,7 @@
     {
       "case_id": "remote-work-engineering",
       "question": "What repository access should engineering teammates request?",
-      "expected_source_item_ids": ["sp-002"],
+      "expected_source_item_ids": ["on-003"],
       "user_context": {
         "user_id": "bench-engineer-001",
         "email": "engineer001@example.com",
@@ -41,7 +41,7 @@
     {
       "case_id": "first-week-plan",
       "question": "What should a new hire complete during the first week?",
-      "expected_source_item_ids": ["sp-001", "on-001"],
+      "expected_source_item_ids": ["on-001", "on-002"],
       "user_context": {
         "user_id": "bench-employee-003",
         "email": "employee003@example.com",

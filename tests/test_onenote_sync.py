@@ -27,15 +27,15 @@ class FakeOneNoteGraphClient:
         self.site = OneNoteSite(
             id="site-1",
             name="Onboarding",
-            web_url="https://contoso.sharepoint.com/sites/onboarding",
-            hostname="contoso.sharepoint.com",
+            web_url="https://contoso.example.test/sites/onboarding",
+            hostname="contoso.example.test",
             relative_path="sites/onboarding",
         )
         self.notebooks = [
             OneNoteNotebook(
                 id="notebook-1",
                 display_name="Team Notebook",
-                web_url="https://contoso.sharepoint.com/sites/onboarding/TeamNotebook",
+                web_url="https://contoso.example.test/sites/onboarding/TeamNotebook",
             )
         ]
         self.sections = [
@@ -44,7 +44,7 @@ class FakeOneNoteGraphClient:
                 display_name="Orientation",
                 notebook_id="notebook-1",
                 notebook_name="Team Notebook",
-                web_url="https://contoso.sharepoint.com/sites/onboarding/Orientation",
+                web_url="https://contoso.example.test/sites/onboarding/Orientation",
             )
         ]
 
@@ -108,6 +108,20 @@ class InMemoryMetadataStore:
         return [document for document in self.documents.values() if document.source_system == source_system]
 
 
+class SchemaRequiredMetadataStore(InMemoryMetadataStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.schema_ready = False
+
+    def ensure_schema(self) -> None:
+        self.schema_ready = True
+
+    def get_onenote_checkpoint(self, scope_key: str) -> OneNoteCheckpoint | None:
+        if not self.schema_ready:
+            raise RuntimeError("schema was not initialized before checkpoint read")
+        return super().get_onenote_checkpoint(scope_key)
+
+
 class InMemoryVectorStore:
     def __init__(self) -> None:
         self.upserts: dict[str, list[list[float]]] = {}
@@ -135,7 +149,7 @@ def make_page(
         id=page_id,
         title=title,
         content_url=f"mock://onenote/{page_id}",
-        web_url=f"https://contoso.sharepoint.com/sites/onboarding/{page_id}",
+        web_url=f"https://contoso.example.test/sites/onboarding/{page_id}",
         created_utc=datetime(2026, 4, 24, 8, 0, tzinfo=UTC),
         last_modified_utc=last_modified or datetime(2026, 4, 24, 9, 0, tzinfo=UTC),
         notebook_id="notebook-1",
@@ -151,7 +165,7 @@ def build_service(fake_client: FakeOneNoteGraphClient) -> tuple[OneNoteSyncServi
     settings = AppSettings(
         app_env="test",
         onenote_graph_mode="mock",
-        graph_onenote_site_hostname="contoso.sharepoint.com",
+        graph_onenote_site_hostname="contoso.example.test",
         graph_onenote_site_scope="sites/onboarding",
         graph_onenote_notebook_scope="Team Notebook",
         onenote_chunk_size_chars=80,
@@ -215,7 +229,7 @@ def test_mock_onenote_client_uses_all_notebooks_when_scope_is_blank() -> None:
     settings = AppSettings(
         app_env="test",
         onenote_graph_mode="mock",
-        graph_onenote_site_hostname="contoso.sharepoint.com",
+        graph_onenote_site_hostname="contoso.example.test",
         graph_onenote_site_scope="sites/onboarding",
         graph_onenote_notebook_scope="",
     )
@@ -231,7 +245,7 @@ def test_mock_onenote_client_uses_all_notebooks_when_scope_is_blank() -> None:
     assert {page.notebook_name for page in pages} == {"Team Notebook", "Engineering Notebook"}
 
 
-def test_onenote_personal_scope_does_not_require_sharepoint_site() -> None:
+def test_onenote_personal_scope_does_not_require_site_configuration() -> None:
     settings = AppSettings(
         app_env="test",
         onenote_graph_mode="mock",
@@ -325,6 +339,24 @@ def test_onenote_incremental_lookback_reindexes_content_when_graph_timestamp_doe
     assert report.items_changed == 1
     assert "Updated content that Graph did not timestamp." in metadata_store.documents["onenote:page-1"].content_text
     assert "onenote:page-1" in vector_store.upserts
+
+
+def test_onenote_incremental_initializes_schema_before_checkpoint_lookup() -> None:
+    page = make_page("page-1")
+    service, _metadata_store, vector_store = build_service(
+        FakeOneNoteGraphClient(
+            inventory_pages=[page],
+            content_by_url={page.content_url: "<html><body><p>Initial content.</p></body></html>"},
+        )
+    )
+    metadata_store = SchemaRequiredMetadataStore()
+    service.metadata_store = metadata_store
+
+    report = service.incremental()
+
+    assert metadata_store.schema_ready is True
+    assert report.job_name == "onenote_bootstrap"
+    assert vector_store.upserts
 
 
 def test_onenote_reconciliation_marks_deleted_pages_and_updates_moved_pages() -> None:
