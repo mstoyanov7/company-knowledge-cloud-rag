@@ -99,7 +99,7 @@ class OpsJobRunner:
             return
 
         if job.job_type == OpsJobType.onenote_reconciliation.value:
-            build_onenote_sync_service(self.settings).incremental()
+            build_onenote_sync_service(self.settings).reconciliation()
             return
 
         if job.job_type == OpsJobType.graph_subscription_renewal.value:

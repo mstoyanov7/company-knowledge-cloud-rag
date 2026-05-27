@@ -61,6 +61,7 @@ class AppSettings(BaseSettings):
     onenote_token_cache_path: str = ".cache/onenote_token_cache.json"
     onenote_retry_attempts: int = 3
     onenote_retry_backoff_seconds: float = 1.0
+    onenote_incremental_lookback_seconds: int = 0
 
     graph_notification_base_url: str = ""
     graph_notification_path: str = "/api/v1/graph/notifications"

@@ -84,6 +84,32 @@ services:
       REDIS_PORT: 6379
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
+    volumes:
+      - ../.cache:/workspace/.cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  onenote-poller:
+    build:
+      context: ..
+      dockerfile: services/sync-worker/Dockerfile
+    command: ["onenote_incremental", "--run-loop"]
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+    volumes:
+      - ../.cache:/workspace/.cache
     depends_on:
       postgres:
         condition: service_healthy

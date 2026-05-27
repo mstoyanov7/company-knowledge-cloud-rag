@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from shared_schemas import AppSettings, OneNoteCheckpoint, SourceDocument
 
@@ -178,6 +178,15 @@ def build_service(fake_client: FakeOneNoteGraphClient) -> tuple[OneNoteSyncServi
     return service, metadata_store, vector_store
 
 
+def build_service_with_settings(
+    fake_client: FakeOneNoteGraphClient,
+    **settings_overrides,
+) -> tuple[OneNoteSyncService, InMemoryMetadataStore, InMemoryVectorStore]:
+    service, metadata_store, vector_store = build_service(fake_client)
+    service.settings = service.settings.model_copy(update=settings_overrides)
+    return service, metadata_store, vector_store
+
+
 def test_onenote_parser_preserves_headings_lists_tables_and_resources() -> None:
     parser = OneNoteHtmlParser()
     parsed = parser.parse(
@@ -287,6 +296,37 @@ def test_onenote_incremental_skips_unchanged_and_updates_cursor() -> None:
     assert metadata_store.get_onenote_checkpoint(service.settings.onenote_scope_key).last_modified_cursor_utc == updated_page.last_modified_utc
 
 
+def test_onenote_incremental_lookback_reindexes_content_when_graph_timestamp_does_not_advance() -> None:
+    older_page = make_page("page-1", last_modified=datetime(2026, 4, 24, 9, 0, tzinfo=UTC))
+    newer_page = make_page("page-2", last_modified=datetime(2026, 4, 24, 10, 0, tzinfo=UTC))
+    service, metadata_store, vector_store = build_service_with_settings(
+        FakeOneNoteGraphClient(
+            inventory_pages=[older_page, newer_page],
+            content_by_url={
+                older_page.content_url: "<html><body><p>Original content.</p></body></html>",
+                newer_page.content_url: "<html><body><p>Newer page content.</p></body></html>",
+            },
+        ),
+        onenote_incremental_lookback_seconds=int(timedelta(hours=2).total_seconds()),
+    )
+    service.bootstrap()
+
+    service.connector.client = FakeOneNoteGraphClient(
+        inventory_pages=[older_page, newer_page],
+        incremental_pages=[older_page, newer_page],
+        content_by_url={
+            older_page.content_url: "<html><body><p>Updated content that Graph did not timestamp.</p></body></html>",
+            newer_page.content_url: "<html><body><p>Newer page content.</p></body></html>",
+        },
+    )
+
+    report = service.incremental()
+
+    assert report.items_changed == 1
+    assert "Updated content that Graph did not timestamp." in metadata_store.documents["onenote:page-1"].content_text
+    assert "onenote:page-1" in vector_store.upserts
+
+
 def test_onenote_reconciliation_marks_deleted_pages_and_updates_moved_pages() -> None:
     original_page = make_page("page-1")
     service, metadata_store, vector_store = build_service(
@@ -323,7 +363,7 @@ def test_onenote_reconciliation_marks_deleted_pages_and_updates_moved_pages() ->
         content_by_url={moved_page.content_url: "<html><body><p>Original content.</p></body></html>"},
     )
 
-    report = service.incremental()
+    report = service.reconciliation()
 
     assert report.items_deleted == 1
     assert "onenote:page-2" in metadata_store.deleted_items

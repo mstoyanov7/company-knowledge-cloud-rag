@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from shared_schemas import AppSettings, OneNoteCheckpoint, SyncMode, SyncReport
 
@@ -49,7 +49,7 @@ class OneNoteSyncService:
         self.items_counter = meter.create_counter("onenote_sync_items_total") if meter else None
 
     def bootstrap(self) -> SyncReport:
-        return self._sync(SyncMode.bootstrap)
+        return self._sync(SyncMode.bootstrap, reconcile_inventory=True)
 
     def incremental(self) -> SyncReport:
         checkpoint = self.metadata_store.get_onenote_checkpoint(self.settings.onenote_scope_key)
@@ -58,10 +58,20 @@ class OneNoteSyncService:
                 "event=onenote_incremental_missing_checkpoint scope=%s action=bootstrap_fallback",
                 self.settings.onenote_scope_key,
             )
-            return self._sync(SyncMode.bootstrap)
-        return self._sync(SyncMode.incremental)
+            return self._sync(SyncMode.bootstrap, reconcile_inventory=True)
+        return self._sync(SyncMode.incremental, reconcile_inventory=False)
 
-    def _sync(self, mode: SyncMode) -> SyncReport:
+    def reconciliation(self) -> SyncReport:
+        checkpoint = self.metadata_store.get_onenote_checkpoint(self.settings.onenote_scope_key)
+        if checkpoint is None or checkpoint.last_modified_cursor_utc is None:
+            self.logger.warning(
+                "event=onenote_reconciliation_missing_checkpoint scope=%s action=bootstrap_fallback",
+                self.settings.onenote_scope_key,
+            )
+            return self._sync(SyncMode.bootstrap, reconcile_inventory=True)
+        return self._sync(SyncMode.incremental, reconcile_inventory=True)
+
+    def _sync(self, mode: SyncMode, *, reconcile_inventory: bool) -> SyncReport:
         started = time.perf_counter()
         self.metadata_store.ensure_schema()
         self.vector_store.ensure_collection()
@@ -69,8 +79,9 @@ class OneNoteSyncService:
         site, notebooks, _sections = self.connector.resolve_scope()
         allowed_notebook_ids = {notebook.id for notebook in notebooks}
         checkpoint = self.metadata_store.get_onenote_checkpoint(self.settings.onenote_scope_key)
-        modified_since = checkpoint.last_modified_cursor_utc if checkpoint and mode == SyncMode.incremental else None
-        last_cursor = modified_since
+        checkpoint_cursor = checkpoint.last_modified_cursor_utc if checkpoint else None
+        modified_since = self._modified_since_for_mode(mode, checkpoint_cursor)
+        last_cursor = checkpoint_cursor if mode == SyncMode.incremental else None
         next_url: str | None = None
         processed_source_ids: set[str] = set()
 
@@ -105,12 +116,13 @@ class OneNoteSyncService:
             if not next_url:
                 break
 
-        self._reconcile_inventory(
-            site=site,
-            allowed_notebook_ids=allowed_notebook_ids,
-            processed_source_ids=processed_source_ids,
-            report=report,
-        )
+        if reconcile_inventory:
+            self._reconcile_inventory(
+                site=site,
+                allowed_notebook_ids=allowed_notebook_ids,
+                processed_source_ids=processed_source_ids,
+                report=report,
+            )
 
         checkpoint = OneNoteCheckpoint(
             scope_key=self.settings.onenote_scope_key,
@@ -264,6 +276,14 @@ class OneNoteSyncService:
 
     def _source_item_id(self, page: OneNotePage) -> str:
         return f"onenote:{page.id}"
+
+    def _modified_since_for_mode(self, mode: SyncMode, checkpoint_cursor: datetime | None) -> datetime | None:
+        if mode != SyncMode.incremental or checkpoint_cursor is None:
+            return None
+        lookback_seconds = max(0, self.settings.onenote_incremental_lookback_seconds)
+        if lookback_seconds <= 0:
+            return checkpoint_cursor
+        return checkpoint_cursor - timedelta(seconds=lookback_seconds)
 
 
 def max_timestamp(current: datetime | None, candidate: datetime | None) -> datetime | None:

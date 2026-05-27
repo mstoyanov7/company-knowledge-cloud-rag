@@ -13,7 +13,7 @@ def run() -> None:
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    report = build_onenote_sync_service(settings).incremental()
+    report = build_onenote_sync_service(settings).reconciliation()
     logging.getLogger("sync_worker.jobs.onenote_reconciliation").info(
         "event=onenote_reconciliation_report items_seen=%s changed=%s skipped=%s deleted=%s chunks=%s",
         report.items_seen,

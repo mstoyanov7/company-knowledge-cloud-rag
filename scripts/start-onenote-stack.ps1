@@ -227,6 +227,14 @@ try {
         }
         $workerArgs += "sync-worker"
         Invoke-Checked docker @workerArgs
+
+        Write-Step "Starting OneNote 60-second poller"
+        $pollerArgs = @("compose", "up", "-d", "--force-recreate")
+        if ($Build) {
+            $pollerArgs += "--build"
+        }
+        $pollerArgs += "onenote-poller"
+        Invoke-Checked docker @pollerArgs
     }
 
     Write-Step "Starting RAG API"
