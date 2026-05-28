@@ -31,14 +31,14 @@ def build_answer_context(
     retrieved_chunks: list[ChunkDocument],
     citations: list[Citation],
     *,
-    max_chars: int = 6000,
+    max_chars: int = 9000,
 ) -> AnswerContext:
     blocks: list[AnswerContextBlock] = []
     rendered_blocks: list[str] = []
     total_chars = 0
 
     for chunk, citation in zip(retrieved_chunks, citations, strict=False):
-        content = _trim_chunk_text(chunk.chunk_text, max_chars=max(800, min(1800, max_chars // 2)))
+        content = _trim_chunk_text(chunk.chunk_text, max_chars=max(400, min(2800, max_chars // 2)))
         block = AnswerContextBlock(
             citation_index=citation.index,
             title=chunk.title,
@@ -80,7 +80,40 @@ def _trim_chunk_text(value: str, *, max_chars: int) -> str:
     cleaned = value.strip()
     if len(cleaned) <= max_chars:
         return cleaned
-    return cleaned[:max_chars].rsplit(" ", maxsplit=1)[0].rstrip() + "..."
+
+    paragraphs = _paragraphs(cleaned)
+    if not paragraphs:
+        return _trim_at_sentence_boundary(cleaned, max_chars=max_chars)
+
+    selected: list[str] = []
+    total_chars = 0
+    for paragraph in paragraphs:
+        projected = total_chars + len(paragraph) + (2 if selected else 0)
+        if projected > max_chars:
+            break
+        selected.append(paragraph)
+        total_chars = projected
+
+    if selected:
+        return "\n\n".join(selected).rstrip()
+
+    return _trim_at_sentence_boundary(paragraphs[0], max_chars=max_chars)
+
+
+def _paragraphs(value: str) -> list[str]:
+    return [
+        re.sub(r"[ \t]+", " ", paragraph.strip())
+        for paragraph in re.split(r"\n\s*\n+", value)
+        if paragraph.strip()
+    ]
+
+
+def _trim_at_sentence_boundary(value: str, *, max_chars: int) -> str:
+    window = value[:max_chars].strip()
+    sentence_match = re.search(r"^(.+[.!?])(?:\s+|$)", window, flags=re.DOTALL)
+    if sentence_match and len(sentence_match.group(1)) >= max(120, max_chars // 3):
+        return sentence_match.group(1).strip()
+    return window.rsplit(" ", maxsplit=1)[0].rstrip() + "..."
 
 
 def _first_heading(value: str) -> str | None:

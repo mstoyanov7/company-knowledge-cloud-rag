@@ -6,6 +6,8 @@ __pycache__/
 *.pyo
 *.pyd
 *.egg-info/
+node_modules/
+apps/company-knowledge-ui/dist/
 htmlcov/
 eval/results/
 benchmarks/results/*

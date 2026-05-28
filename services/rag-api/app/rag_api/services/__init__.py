@@ -18,6 +18,8 @@ from rag_api.services.query_understanding import (
 from rag_api.services.reranker import KeywordOverlapReranker
 from rag_api.services.security_audit import SecurityAuditLogger
 from rag_api.services.system_service import SystemService
+from rag_api.services.topic_loader import TopicLoader
+from rag_api.services.topic_service import AnswerTopicScope, TopicNotFoundError, TopicService
 
 __all__ = [
     "AccessScopeResolver",
@@ -36,6 +38,10 @@ __all__ = [
     "SecurityAuditLogger",
     "SystemService",
     "TokenValidationError",
+    "TopicLoader",
+    "TopicNotFoundError",
+    "TopicService",
+    "AnswerTopicScope",
     "analyze_question",
     "understand_query",
 ]

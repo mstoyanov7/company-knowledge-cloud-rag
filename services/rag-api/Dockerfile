@@ -6,6 +6,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /workspace
 
 COPY pyproject.toml README.md ./
+COPY config ./config
 COPY libs ./libs
 COPY services ./services
 

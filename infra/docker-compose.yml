@@ -70,6 +70,19 @@ services:
       timeout: 5s
       retries: 5
 
+  company-knowledge-ui:
+    build:
+      context: ../apps/company-knowledge-ui
+      dockerfile: Dockerfile
+    environment:
+      VITE_RAG_API_PROXY_TARGET: http://rag-api:8080
+      VITE_RAG_API_KEY: ${RAG_API_KEY}
+    ports:
+      - "${COMPANY_KNOWLEDGE_UI_PORT:-5173}:5173"
+    depends_on:
+      rag-api:
+        condition: service_healthy
+
   sync-worker:
     build:
       context: ..
@@ -119,6 +132,8 @@ services:
         condition: service_started
 
   openwebui:
+    profiles:
+      - legacy-openwebui
     image: ghcr.io/open-webui/open-webui:main
     ports:
       - "${OPENWEBUI_PORT}:8080"

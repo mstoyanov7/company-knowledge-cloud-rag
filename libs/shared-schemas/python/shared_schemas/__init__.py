@@ -19,6 +19,7 @@ from shared_schemas.ops import (
     OpsJobType,
 )
 from shared_schemas.sync import JobStatus, OneNoteCheckpoint, SyncJob, SyncMode, SyncReport
+from shared_schemas.topics import Topic, TopicConfig
 
 __all__ = [
     "AnswerMetadata",
@@ -49,6 +50,8 @@ __all__ = [
     "SyncMode",
     "SyncReport",
     "TokenValidationResult",
+    "Topic",
+    "TopicConfig",
     "UserContext",
     "get_settings",
 ]

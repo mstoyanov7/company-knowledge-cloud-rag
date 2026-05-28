@@ -76,10 +76,11 @@ class AppSettings(BaseSettings):
     llm_openai_api_key: SecretStr = SecretStr("ollama")
     llm_request_timeout_seconds: float = 120.0
     llm_temperature: float = 0.2
-    llm_max_tokens: int = 800
+    llm_max_tokens: int = 1400
     mock_api_key: SecretStr = SecretStr("cloudrag-local-key")
     mock_top_k: int = 3
     rag_api_key: SecretStr = SecretStr("")
+    topics_config_path: str = "config/topics.json"
     retrieval_provider: str = "mock"
     retrieval_vector_collections: str = ""
     retrieval_candidate_multiplier: int = 3

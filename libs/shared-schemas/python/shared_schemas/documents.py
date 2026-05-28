@@ -81,6 +81,8 @@ class RetrievalRequest(BaseModel):
     top_k: int = 3
     source_filters: list[str] = Field(default_factory=list)
     access_scope: AccessScope | None = None
+    topic_id: str | None = None
+    topic_tags: list[str] = Field(default_factory=list)
 
 
 class RetrievalMetadata(BaseModel):
@@ -101,6 +103,8 @@ class RetrievalMetadata(BaseModel):
     evidence_sufficiency: str | None = None
     relevance_grades: list[dict[str, Any]] = Field(default_factory=list)
     duration_ms: int = 0
+    topic_id: str | None = None
+    topic_tags: list[str] = Field(default_factory=list)
 
 
 class RetrievalResult(BaseModel):

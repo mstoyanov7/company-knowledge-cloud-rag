@@ -87,6 +87,8 @@ class QdrantAclRetriever:
                 collections_queried=collections_queried,
                 payload_filter=payload_filter.model_dump(mode="json", by_alias=True, exclude_none=True),
                 duration_ms=duration_ms,
+                topic_id=request.topic_id,
+                topic_tags=request.topic_tags,
             ),
         )
 
@@ -144,7 +146,7 @@ class QdrantAclRetriever:
         for collection_name in collection_names:
             if "onenote" in source_filters and collection_name == self.settings.onenote_vector_collection:
                 filtered.append(collection_name)
-        return filtered or collection_names
+        return filtered
 
     @staticmethod
     def build_payload_filter(access_scope: AccessScope) -> models.Filter:

@@ -5,7 +5,8 @@
 Implemented surfaces include:
 
 - `/health`, `/ready`, and `/version`
-- `/api/v1/answer` for ACL-aware structured answers with citations and retrieval metadata
+- `/api/v1/topics` for configured company knowledge topics
+- `/api/v1/answer` for topic-aware, ACL-aware structured answers with citations and retrieval metadata
 - `/api/v1/graph/notifications` for Microsoft Graph change notification delivery
 - `/api/v1/graph/lifecycle` for Microsoft Graph lifecycle notifications
 - `/v1/models` and `/v1/chat/completions` for Open WebUI compatibility
@@ -25,7 +26,11 @@ Important boundary:
 - route handlers call services
 - services call interfaces
 - retrieval and LLM adapters stay replaceable
+- user ACL is resolved before topic scope, retrieval, rerank, and answer construction
 - unauthorized chunks are filtered before prompt construction
+- `topic_id` narrows source filters, ACL tags, retrieval context, and follow-up questions
+- `answer_depth` supports `concise`, `normal`, and `detailed`; the custom frontend sends `detailed`
+- detailed answers ask the LLM for a summary, relevant details, steps or bullets when applicable, and sources
 
 Webhook behavior:
 

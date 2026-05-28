@@ -3,10 +3,13 @@ param(
     [switch]$Bootstrap,
     [switch]$SkipSync,
     [switch]$SkipOpsWorker,
+    [switch]$SkipCompanyKnowledgeUI,
+    [switch]$IncludeOpenWebUI,
     [switch]$SkipOpenWebUI,
     [switch]$NoBrowser,
     [switch]$NoEnvUpdate,
     [int]$HealthTimeoutSeconds = 120,
+    [int]$CompanyKnowledgeUITimeoutSeconds = 180,
     [int]$OpenWebUITimeoutSeconds = 300
 )
 
@@ -170,11 +173,14 @@ try {
             DEFAULT_EMBEDDING_PROVIDER     = "token-hash-v1"
             LLM_OPENAI_BASE_URL            = "http://host.docker.internal:11434/v1"
             LLM_OPENAI_API_KEY             = "ollama"
+            LLM_MAX_TOKENS                 = "1400"
             RETRIEVAL_PROVIDER             = "qdrant"
             RETRIEVAL_VECTOR_COLLECTIONS   = "onenote_chunks"
             RETRIEVAL_MIN_KEYWORD_OVERLAP  = "1"
             RETRIEVAL_LEXICAL_SCAN_LIMIT   = "1000"
             AUTH_DEFAULT_ACL_TAGS          = "public,employees"
+            TOPICS_CONFIG_PATH             = "config/topics.json"
+            COMPANY_KNOWLEDGE_UI_PORT      = "5173"
             ENABLE_PERSISTENT_CONFIG       = "false"
             ENABLE_OLLAMA_API              = "false"
         }
@@ -192,8 +198,10 @@ try {
     }
 
     $ragApiPort = Get-Setting $envValues "RAG_API_PORT" "8080"
+    $companyKnowledgeUiPort = Get-Setting $envValues "COMPANY_KNOWLEDGE_UI_PORT" "5173"
     $openWebUiPort = Get-Setting $envValues "OPENWEBUI_PORT" "3000"
     $ragApiUrl = "http://localhost:$ragApiPort"
+    $companyKnowledgeUiUrl = "http://localhost:$companyKnowledgeUiPort"
     $openWebUiUrl = "http://localhost:$openWebUiPort"
 
     Write-Step "Starting PostgreSQL, Redis, and Qdrant"
@@ -235,9 +243,28 @@ try {
     Wait-Http -Url "$ragApiUrl/health" -TimeoutSeconds $HealthTimeoutSeconds
     Wait-Http -Url "$ragApiUrl/ready" -TimeoutSeconds $HealthTimeoutSeconds
 
-    if (-not $SkipOpenWebUI) {
-        Write-Step "Starting Open WebUI"
-        Invoke-Checked docker compose up -d --force-recreate openwebui
+    if (-not $SkipCompanyKnowledgeUI) {
+        Write-Step "Starting Company Knowledge UI"
+        $uiArgs = @("compose", "up", "-d", "--force-recreate", "--build")
+        $uiArgs += "company-knowledge-ui"
+        Invoke-Checked docker @uiArgs
+
+        Write-Step "Waiting for Company Knowledge UI at $companyKnowledgeUiUrl"
+        try {
+            Wait-Http -Url $companyKnowledgeUiUrl -TimeoutSeconds $CompanyKnowledgeUITimeoutSeconds
+        } catch {
+            Show-ComposeDiagnostics -Services @("rag-api", "company-knowledge-ui")
+            throw
+        }
+
+        if (-not $NoBrowser) {
+            Start-Process $companyKnowledgeUiUrl
+        }
+    }
+
+    if ($IncludeOpenWebUI -and -not $SkipOpenWebUI) {
+        Write-Step "Starting legacy Open WebUI"
+        Invoke-Checked docker compose --profile legacy-openwebui up -d --force-recreate openwebui
 
         Write-Step "Waiting for Open WebUI at $openWebUiUrl"
         try {
@@ -253,10 +280,13 @@ try {
     }
 
     Write-Step "Ready"
-    Write-Host "RAG API:    $ragApiUrl"
-    Write-Host "API docs:   $ragApiUrl/docs"
-    if (-not $SkipOpenWebUI) {
-        Write-Host "Open WebUI: $openWebUiUrl"
+    Write-Host "RAG API:              $ragApiUrl"
+    Write-Host "API docs:             $ragApiUrl/docs"
+    if (-not $SkipCompanyKnowledgeUI) {
+        Write-Host "Company Knowledge UI: $companyKnowledgeUiUrl"
+    }
+    if ($IncludeOpenWebUI -and -not $SkipOpenWebUI) {
+        Write-Host "Legacy Open WebUI:    $openWebUiUrl"
     }
     Write-Host ""
     Write-Host "Default run uses incremental sync. For the first real OneNote import, run:"

@@ -24,6 +24,7 @@ from rag_api.services.retrieval_ranking import (
     rank_chunks_by_question_analysis,
 )
 from rag_api.services.security_audit import SecurityAuditLogger
+from rag_api.services.topic_service import AnswerTopicScope, TopicService
 from shared_schemas import AnswerMetadata, AnswerRequest, AnswerResponse, Citation, RetrievalMetadata, RetrievalRequest, RetrievalResult
 
 try:
@@ -67,6 +68,7 @@ class AnswerService:
         audit_logger: SecurityAuditLogger | None = None,
         query_planner: QueryPlanner | None = None,
         evidence_grader: EvidenceGrader | None = None,
+        topic_service: TopicService | None = None,
         debug_enabled: bool = False,
     ) -> None:
         self.llm = llm
@@ -79,6 +81,7 @@ class AnswerService:
         self.audit_logger = audit_logger
         self.query_planner = query_planner or QueryPlanner()
         self.evidence_grader = evidence_grader or EvidenceGrader(llm=llm)
+        self.topic_service = topic_service
         self.debug_enabled = debug_enabled
         self.tracer = trace.get_tracer("rag_api.answer") if trace else None
         self.answer_latency_ms = (
@@ -94,11 +97,18 @@ class AnswerService:
         started = time.perf_counter()
         span = self.tracer.start_as_current_span("rag.answer") if self.tracer else nullcontext()
         with span:
-            access_scope = self.access_scope_resolver.resolve(request.user_context, request.source_filters)
+            topic_scope = self.topic_service.scope_answer_request(request) if self.topic_service else None
+            effective_request = _request_with_topic_scope(request, topic_scope)
+            suggested_questions = list(topic_scope.topic.suggested_questions) if topic_scope else []
+            access_scope = self.access_scope_resolver.resolve(
+                effective_request.user_context,
+                effective_request.source_filters,
+            )
             question_analysis = await self.query_planner.plan(request.question)
             self._debug_event(
                 "query_plan",
                 original_question=request.question,
+                topic_id=topic_scope.topic.id if topic_scope else None,
                 plan=_question_analysis_debug_payload(question_analysis),
             )
             candidate_top_k = request.top_k
@@ -107,18 +117,26 @@ class AnswerService:
             retrieval_started = time.perf_counter()
             retrieval_result = await self._retrieve_for_question_analysis(
                 question_analysis=question_analysis,
-                request=request,
+                request=effective_request,
                 top_k=candidate_top_k,
                 access_scope=access_scope,
+                topic_scope=topic_scope,
             )
             retrieval_result.metadata.duration_ms = int((time.perf_counter() - retrieval_started) * 1000)
+            retrieval_result.metadata.topic_id = topic_scope.topic.id if topic_scope else None
+            retrieval_result.metadata.topic_tags = list(topic_scope.retrieval_terms) if topic_scope else []
             chunks = retrieval_result.chunks
             self._debug_event("retrieved_chunks", chunks=_chunk_debug_payload(chunks))
             if self.reranker:
-                chunks = self.reranker.rerank(question_analysis.search_text, chunks, top_k=candidate_top_k)
+                chunks = self.reranker.rerank(
+                    _topic_aware_query(question_analysis.search_text, topic_scope),
+                    chunks,
+                    top_k=candidate_top_k,
+                )
                 retrieval_result.metadata.reranker = self.reranker.name
                 retrieval_result.metadata.requested_top_k = request.top_k
             chunks = self._filter_relevant_chunks(question_analysis, chunks)
+            chunks = _prioritize_topic_chunks(chunks, topic_scope)
             chunks = rank_chunks_by_question_analysis(question_analysis, chunks, top_k=request.top_k)
             self._debug_event(
                 "reranked_chunks",
@@ -153,7 +171,7 @@ class AnswerService:
             if evidence_assessment.sufficiency not in {DIRECT_ANSWER_FOUND, PARTIAL_ANSWER_FOUND} or not chunks:
                 self._debug_event("evidence_rejected", sufficiency=evidence_assessment.sufficiency)
                 citations: list[Citation] = []
-                self._audit_retrieval(request, retrieval_result, citations)
+                self._audit_retrieval(effective_request, retrieval_result, citations)
                 duration_ms = int((time.perf_counter() - started) * 1000)
                 return AnswerResponse(
                     answer=NO_INFORMATION_ANSWER,
@@ -171,10 +189,16 @@ class AnswerService:
                         freshness_delay_ms=None,
                         citation_count=0,
                     ),
+                    suggested_questions=suggested_questions,
                 )
             citations = self._build_citations(chunks)
-            self._audit_retrieval(request, retrieval_result, citations)
-            answer_context = build_answer_context(question_analysis, chunks, citations)
+            self._audit_retrieval(effective_request, retrieval_result, citations)
+            answer_context = build_answer_context(
+                question_analysis,
+                chunks,
+                citations,
+                max_chars=_context_budget_for_depth(request.answer_depth),
+            )
             self._debug_event(
                 "selected_context",
                 source_titles=list(answer_context.source_titles),
@@ -186,6 +210,10 @@ class AnswerService:
                 citations,
                 question_analysis=question_analysis,
                 answer_context=answer_context,
+                topic_name=topic_scope.topic.name if topic_scope else None,
+                topic_description=topic_scope.topic.description if topic_scope else None,
+                answer_depth=request.answer_depth,
+                answer_style=request.answer_style,
             )
             completion_started = time.perf_counter()
             generation = await self.llm.generate(prompt)
@@ -241,6 +269,7 @@ class AnswerService:
                     freshness_delay_ms=freshness_delay_ms,
                     citation_count=len(citations),
                 ),
+                suggested_questions=suggested_questions,
             )
 
     def _debug_event(self, event: str, **fields) -> None:
@@ -255,18 +284,26 @@ class AnswerService:
         request: AnswerRequest,
         top_k: int,
         access_scope,
+        topic_scope: AnswerTopicScope | None = None,
     ) -> RetrievalResult:
         results: list[RetrievalResult] = []
+        retrieval_queries: list[str] = []
         for query in question_analysis.search_queries:
+            topic_query = _topic_aware_query(query, topic_scope)
+            retrieval_queries.append(topic_query)
             retrieval_request = RetrievalRequest(
-                question=query,
+                question=topic_query,
                 user_context=request.user_context,
                 top_k=top_k,
                 source_filters=request.source_filters,
                 access_scope=access_scope,
+                topic_id=topic_scope.topic.id if topic_scope else None,
+                topic_tags=list(topic_scope.retrieval_terms) if topic_scope else [],
             )
             results.append(await self.retriever.retrieve(retrieval_request))
-        return _merge_retrieval_results(question_analysis, results, top_k=top_k)
+        merged = _merge_retrieval_results(question_analysis, results, top_k=top_k)
+        merged.metadata.query_variants = retrieval_queries
+        return merged
 
     def _filter_relevant_chunks(self, question_analysis: QuestionAnalysis, chunks: list) -> list:
         if self.min_keyword_overlap <= 0:
@@ -523,6 +560,53 @@ def _merge_retrieval_results(
         duration_ms=sum(result.metadata.duration_ms for result in results),
     )
     return RetrievalResult(chunks=chunks[:top_k], metadata=metadata)
+
+
+def _request_with_topic_scope(request: AnswerRequest, topic_scope: AnswerTopicScope | None) -> AnswerRequest:
+    if topic_scope is None:
+        return request
+    return request.model_copy(
+        update={
+            "user_context": topic_scope.user_context,
+            "source_filters": topic_scope.source_filters,
+        }
+    )
+
+
+def _topic_aware_query(query: str, topic_scope: AnswerTopicScope | None) -> str:
+    if topic_scope is None or not topic_scope.retrieval_terms:
+        return query
+    values = [query, *topic_scope.retrieval_terms]
+    return " ".join(dict.fromkeys(value.strip() for value in values if value.strip()))
+
+
+def _prioritize_topic_chunks(chunks: list, topic_scope: AnswerTopicScope | None) -> list:
+    if topic_scope is None or not topic_scope.retrieval_terms:
+        return chunks
+
+    topic_tokens = _content_tokens(" ".join(topic_scope.retrieval_terms))
+    if not topic_tokens:
+        return chunks
+
+    prioritized = []
+    for chunk in chunks:
+        chunk_tokens = _content_tokens(
+            " ".join([chunk.title, chunk.section_path or "", chunk.chunk_text, " ".join(chunk.tags)])
+        )
+        overlap = topic_tokens.intersection(chunk_tokens)
+        if overlap:
+            prioritized.append(chunk.model_copy(update={"score": chunk.score + len(overlap)}))
+        else:
+            prioritized.append(chunk)
+    return prioritized
+
+
+def _context_budget_for_depth(answer_depth: str) -> int:
+    if answer_depth == "concise":
+        return 5000
+    if answer_depth == "detailed":
+        return 10000
+    return 7000
 
 
 def _strip_inline_citation_markers(answer_text: str) -> str:
@@ -1001,7 +1085,7 @@ def _select_fallback_citations(question: str, chunks: list, citations: list[Cita
     if not candidates:
         return citations[:1]
     candidates.sort(key=lambda item: (-item[0], item[1].index))
-    limit = 1 if value_question else 3
+    limit = 2 if value_question else 3
     return [citation for _score, citation in candidates[:limit]]
 
 
@@ -1071,8 +1155,8 @@ def _segment_window_segments(
                 break
 
     selected: list[str] = []
-    max_segments = 5 if include_following else 1
-    max_chars = 900 if include_following else 450
+    max_segments = 6 if include_following else 3
+    max_chars = 1200 if include_following else 900
     for segment, is_heading in segments[start_index:]:
         if is_heading:
             if selected:

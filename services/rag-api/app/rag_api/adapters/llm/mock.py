@@ -1,3 +1,5 @@
+import re
+
 from rag_api.ports import GenerationResult, PromptContext
 
 
@@ -16,12 +18,12 @@ class MockLlmAdapter:
             )
 
         highlights = []
-        for citation in prompt.citations[:2]:
-            sentence = citation.snippet.rstrip(".")
-            highlights.append(f"{sentence}.")
+        for block, citation in zip(prompt.context_blocks, prompt.citations[:2], strict=False):
+            content = _content_from_block(block) or citation.snippet
+            highlights.append(_trim_sentences(content, max_sentences=4))
 
         sources = "; ".join(dict.fromkeys(citation.title for citation in prompt.citations[:2] if citation.title))
-        answer = " ".join(highlights)
+        answer = "### Answer\n\n" + "\n\n".join(f"- {highlight}" for highlight in highlights if highlight)
         if sources:
             answer = f"{answer}\n\n_Source: {sources}_"
         return GenerationResult(
@@ -35,3 +37,22 @@ class MockLlmAdapter:
 
     async def list_models(self) -> list[str]:
         return [self.model_name]
+
+
+def _content_from_block(block: str) -> str:
+    marker = "Content:"
+    if marker not in block:
+        return ""
+    return block.split(marker, maxsplit=1)[1].strip()
+
+
+def _trim_sentences(value: str, *, max_sentences: int) -> str:
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", value.strip())
+        if sentence.strip()
+    ]
+    if not sentences:
+        return value.strip().rstrip(".") + "."
+    selected = sentences[:max_sentences]
+    return " ".join(sentence.rstrip(".") + "." for sentence in selected)

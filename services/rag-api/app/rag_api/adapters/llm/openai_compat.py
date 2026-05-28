@@ -213,8 +213,10 @@ class OpenAICompatibleLlmAdapter:
             "Think silently about what the user means, but do not show hidden reasoning or chain-of-thought. "
             "Do not answer by copying only the first keyword-matching sentence. "
             "Use the context to create a clear, descriptive answer that explains the relevant details. "
+            "If the context contains multiple directly relevant facts, include all important details rather than only the first sentence. "
             "Answer naturally and politely, like a helpful human assistant. "
-            "Return clean Markdown. Use a short heading and bullets for structured facts. "
+            "Return clean Markdown. Start with a brief summary, then details, then steps or bullets when applicable. "
+            "Use a short heading and bullets, numbered steps, or tables for structured facts. "
             "For key-value lines, preserve source labels as bold bullet labels. "
             "Do not add facts from loosely related chunks. "
             "Do not include numeric citation markers like [1], [2], or source IDs. "
@@ -261,6 +263,9 @@ def _format_question_analysis(question_analysis: dict[str, object] | None) -> st
         "must_have_concepts",
         "avoid_concepts",
         "specificity",
+        "selected_topic",
+        "answer_depth",
+        "answer_style",
     ):
         value = question_analysis.get(key)
         if value in (None, "", []):

@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -38,6 +38,10 @@ class AnswerMetadata(BaseModel):
 
 
 class AnswerRequest(BaseModel):
+    topic_id: str | None = Field(default=None, min_length=1, max_length=120)
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=120)
+    answer_style: str | None = Field(default=None, max_length=120)
+    answer_depth: Literal["concise", "normal", "detailed"] = "detailed"
     question: str = Field(min_length=3, max_length=1000)
     user_context: UserContext = Field(default_factory=UserContext)
     source_filters: list[str] = Field(default_factory=list)
@@ -50,3 +54,4 @@ class AnswerResponse(BaseModel):
     citations: list[Citation]
     retrieval_meta: RetrievalMetadata
     metadata: AnswerMetadata
+    suggested_questions: list[str] = Field(default_factory=list)

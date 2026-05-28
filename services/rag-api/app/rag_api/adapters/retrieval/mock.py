@@ -50,11 +50,20 @@ class MockRetriever:
                 filtered_count += 1
                 continue
 
-            overlap = question_tokens.intersection(_tokenize(document.chunk_text))
+            document_text = " ".join(
+                [
+                    document.title,
+                    document.section_path or "",
+                    document.chunk_text,
+                    " ".join(document.tags),
+                ]
+            )
+            overlap = question_tokens.intersection(_tokenize(document_text))
             if not overlap:
                 continue
 
-            scored.append(document.model_copy(update={"score": float(len(overlap))}))
+            topic_overlap = set(request.topic_tags).intersection(set(document.tags))
+            scored.append(document.model_copy(update={"score": float(len(overlap) + len(topic_overlap))}))
 
         scored.sort(key=lambda item: (-item.score, item.title, item.chunk_index))
         top_k = min(request.top_k, self.settings.mock_top_k)
@@ -76,7 +85,11 @@ class MockRetriever:
                     "tenant_id": access_scope.tenant_id,
                     "acl_tags": access_scope.allowed_acl_tags,
                     "source_system": access_scope.source_filters,
+                    "topic_id": request.topic_id,
+                    "topic_tags": request.topic_tags,
                 },
+                topic_id=request.topic_id,
+                topic_tags=request.topic_tags,
             ),
         )
 

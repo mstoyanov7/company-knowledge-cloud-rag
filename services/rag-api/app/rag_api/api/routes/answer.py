@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 
-from rag_api.dependencies import RequestAuthContext, get_answer_service, get_request_auth_context
-from rag_api.services import AnswerService
-from shared_schemas import AnswerRequest, AnswerResponse
+from rag_api.dependencies import RequestAuthContext, get_answer_service, get_request_auth_context, get_runtime_settings
+from rag_api.services import AnswerService, TopicNotFoundError
+from shared_schemas import AnswerRequest, AnswerResponse, AppSettings
 
 router = APIRouter(prefix="/api/v1", tags=["answer"])
 
@@ -15,6 +15,7 @@ async def answer(
     x_tenant_id: str | None = Header(default=None),
     x_acl_tags: str | None = Header(default=None),
     auth_context: RequestAuthContext = Depends(get_request_auth_context),
+    settings: AppSettings = Depends(get_runtime_settings),
     service: AnswerService = Depends(get_answer_service),
 ) -> AnswerResponse:
     if auth_context.user_context is not None:
@@ -33,7 +34,18 @@ async def answer(
             }
         )
         request = request.model_copy(update={"user_context": user_context})
-    return await service.answer(request)
+    elif "user_context" not in request.model_fields_set and settings.auth_default_acl_tag_list:
+        request = request.model_copy(
+            update={
+                "user_context": request.user_context.model_copy(
+                    update={"acl_tags": settings.auth_default_acl_tag_list}
+                )
+            }
+        )
+    try:
+        return await service.answer(request)
+    except TopicNotFoundError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 def _parse_header_list(value: str | None) -> list[str]:

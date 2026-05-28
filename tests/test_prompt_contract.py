@@ -14,6 +14,17 @@ def test_prompt_builder_enforces_onenote_only_no_information_contract() -> None:
     assert "Do not include numeric source markers" in prompt.system_instruction
 
 
+def test_prompt_builder_detailed_depth_requests_fuller_structured_answers() -> None:
+    prompt = PromptBuilder().build("How do I deploy?", [], [], answer_depth="detailed")
+
+    assert "Answer depth: detailed" in prompt.system_instruction
+    assert "all directly relevant details" in prompt.system_instruction
+    assert "multiple relevant sentences or paragraphs" in prompt.system_instruction
+    assert "summary" in prompt.system_instruction.lower()
+    assert prompt.question_analysis is not None
+    assert prompt.question_analysis["answer_depth"] == "detailed"
+
+
 async def _mock_no_context_answer() -> str:
     result = await MockLlmAdapter("mock").generate(
         PromptContext(

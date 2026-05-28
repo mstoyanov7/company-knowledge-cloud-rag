@@ -1,8 +1,11 @@
-# Open WebUI
+# Open WebUI Legacy Reference
 
-Open WebUI stays frontend-only in this repository.
+Open WebUI is no longer the primary user-facing product. The custom frontend in
+`apps/company-knowledge-ui` is the default interface for the diploma demo.
 
-The local Docker Compose stack wires Open WebUI to the FastAPI backend through the
+Open WebUI remains frontend-only in this repository as a legacy/reference option.
+
+The legacy Docker Compose profile wires Open WebUI to the FastAPI backend through the
 OpenAI-compatible endpoints exposed by `rag-api`:
 
 - `OPENAI_API_BASE_URL=http://rag-api:8080/v1`

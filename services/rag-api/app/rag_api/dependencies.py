@@ -16,6 +16,8 @@ from rag_api.services import (
     QueryPlanner,
     SecurityAuditLogger,
     SystemService,
+    TopicLoader,
+    TopicService,
     TokenValidationError,
 )
 
@@ -55,6 +57,7 @@ def get_answer_service(settings: AppSettings = Depends(get_runtime_settings)) ->
         min_keyword_overlap=settings.retrieval_min_keyword_overlap,
         audit_logger=get_security_audit_logger(settings),
         query_planner=QueryPlanner(llm=llm),
+        topic_service=get_topic_service(settings),
         debug_enabled=settings.rag_debug_enabled,
     )
 
@@ -65,6 +68,10 @@ def get_system_service(settings: AppSettings = Depends(get_runtime_settings)) ->
         retriever=get_retriever(settings),
         settings=settings,
     )
+
+
+def get_topic_service(settings: AppSettings = Depends(get_runtime_settings)) -> TopicService:
+    return TopicService(TopicLoader(settings.topics_config_path))
 
 
 def get_security_audit_logger(settings: AppSettings = Depends(get_runtime_settings)) -> SecurityAuditLogger:
