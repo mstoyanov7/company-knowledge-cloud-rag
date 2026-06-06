@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from shared_schemas.documents import RetrievalMetadata, UserContext
+from shared_schemas.documents import DownloadLink, RetrievalMetadata, UserContext
 
 
 class Citation(BaseModel):
@@ -19,6 +19,8 @@ class Citation(BaseModel):
     section_path: str | None = None
     snippet: str
     last_modified_utc: datetime
+    last_edited_by: str | None = None
+    client_url: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -37,21 +39,52 @@ class AnswerMetadata(BaseModel):
     citation_count: int = 0
 
 
+class ConversationTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=8000)
+
+
 class AnswerRequest(BaseModel):
     topic_id: str | None = Field(default=None, min_length=1, max_length=120)
     conversation_id: str | None = Field(default=None, min_length=1, max_length=120)
     answer_style: str | None = Field(default=None, max_length=120)
     answer_depth: Literal["concise", "normal", "detailed"] = "detailed"
     question: str = Field(min_length=3, max_length=1000)
+    history: list[ConversationTurn] = Field(default_factory=list, max_length=40)
     user_context: UserContext = Field(default_factory=UserContext)
     source_filters: list[str] = Field(default_factory=list)
     top_k: int = Field(default=3, ge=1, le=10)
     provider: str | None = None
+    # When set (after the user answers a clarifying question), retrieval and
+    # ranking are restricted to these OneNote pages so the answer comes from the
+    # page the user chose.
+    focus_source_item_ids: list[str] = Field(default_factory=list, max_length=10)
+
+
+class ClarificationOption(BaseModel):
+    """One candidate page the user can pick when a question is ambiguous."""
+
+    source_item_id: str
+    title: str
+    section_path: str | None = None
+    hint: str = ""
+
+
+class Clarification(BaseModel):
+    """A quiz-style follow-up asking the user which page they mean."""
+
+    prompt: str
+    options: list[ClarificationOption]
+    original_question: str
 
 
 class AnswerResponse(BaseModel):
     answer: str
     citations: list[Citation]
+    downloads: list[DownloadLink] = Field(default_factory=list)
     retrieval_meta: RetrievalMetadata
     metadata: AnswerMetadata
     suggested_questions: list[str] = Field(default_factory=list)
+    # Present only when the backend needs the user to disambiguate between
+    # several equally-plausible pages before it can answer.
+    clarification: Clarification | None = None

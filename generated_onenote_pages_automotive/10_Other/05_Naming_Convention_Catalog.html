@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Naming Convention Catalog</title>
+  <style>body {
+  font-family: Aptos, Arial, sans-serif;
+  color: #1f2933;
+  line-height: 1.45;
+  max-width: 900px;
+  margin: 32px auto;
+  padding: 0 24px;
+}
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.muted { color: #52606d; }</style>
+</head>
+<body>
+  <article>
+    <h1>Naming Convention Catalog</h1>
+    <p class="summary">Lists naming rules for repositories, branches, services, feature flags, test benches, and artifacts.</p>
+    <h2>Reference Note</h2>
+    <p>Naming Convention Catalog is a shared reference for teams that need the same wording, decision, or convention. This page lists naming rules for repositories, branches, services, feature flags, test benches, and artifacts.</p>
+    <p>It should be short enough to stay readable but specific enough that two teams do not interpret the same term or rule differently. The owner should keep examples current because examples are usually what people copy.</p>
+
+    <h2>Maintained By</h2>
+    <table>
+      <tr><th>Owner team</th><td>Architecture Office</td></tr>
+      <tr><th>Audience</th><td>all technical employees</td></tr>
+      <tr><th>Review rhythm</th><td>Review quarterly or when the owner team changes process.</td></tr>
+      <tr><th>Primary systems</th><td>Architecture Wiki, GitHub Enterprise, Artifact Registry</td></tr>
+    </table>
+
+    <h2>How Teams Use It</h2>
+    <p>Teams usually open this page while preparing a review, naming something new, writing a decision record, or checking an audit detail. The useful material is naming rule, prefix, example.</p>
+    <p>When the reference affects repositories, artifacts, or architecture records, update Architecture Wiki, GitHub Enterprise, and Artifact Registry in the same change window.</p>
+
+    <h2>Useful Material</h2>
+    <ul>
+      <li>Naming rule maintained by Architecture Office.</li>
+      <li>Prefix available before work starts.</li>
+      <li>Example linked from the ticket, request, or workspace.</li>
+      <li>Current owner, review date, linked decision, and affected teams.</li>
+    </ul>
+
+    <h2>Review Habit</h2>
+    <p>When this reference changes, link the decision or review note in Architecture Wiki and tell the teams that depend on GitHub Enterprise. If the change affects artifacts, also update Artifact Registry.</p>
+
+    <h2>Checks</h2>
+    <ul>
+      <li>Owner team is Architecture Office and has accepted the request or review.</li>
+      <li>Required artifacts are available: naming rule, prefix, example.</li>
+      <li>Relevant systems are checked: Architecture Wiki, GitHub Enterprise, Artifact Registry.</li>
+      <li>The final decision or completion note is attached to the ticket, request, or record.</li>
+    </ul>
+  </article>
+</body>
+</html>

@@ -1,17 +1,47 @@
-from shared_schemas.answer import AnswerMetadata, AnswerRequest, AnswerResponse, Citation
-from shared_schemas.auth import AuthenticatedPrincipal, SecurityAuditEvent, TokenValidationResult
+from shared_schemas.answer import (
+    AnswerMetadata,
+    AnswerRequest,
+    AnswerResponse,
+    Citation,
+    Clarification,
+    ClarificationOption,
+    ConversationTurn,
+)
+from shared_schemas.auth import (
+    AccountStatus,
+    AdminUserUpdate,
+    AppRole,
+    AuthResponse,
+    AuthenticatedPrincipal,
+    LoginRequest,
+    LogoutResponse,
+    RegistrationResponse,
+    RegisterRequest,
+    SecurityAuditEvent,
+    TokenValidationResult,
+    UserProfile,
+    UserProfileUpdate,
+)
 from shared_schemas.config import AppSettings, get_settings
 from shared_schemas.documents import (
     AccessScope,
     AclBinding,
     ChunkDocument,
+    DocumentDetail,
+    DocumentSummary,
+    DownloadLink,
+    Notebook,
+    NotebookPage,
+    NotebookSection,
     RetrievalMetadata,
     RetrievalRequest,
     RetrievalResult,
+    SourceAttachment,
     SourceDocument,
     UserContext,
 )
 from shared_schemas.evaluation import EvaluationCase, EvaluationCaseResult, EvaluationReport, EvaluationSummary
+from shared_schemas.feedback import FeedbackRequest, FeedbackResponse
 from shared_schemas.ops import (
     DeadLetterRecord,
     OpsJobRecord,
@@ -19,7 +49,16 @@ from shared_schemas.ops import (
     OpsJobType,
 )
 from shared_schemas.sync import JobStatus, OneNoteCheckpoint, SyncJob, SyncMode, SyncReport
-from shared_schemas.topics import Topic, TopicConfig
+from shared_schemas.topics import (
+    Topic,
+    TopicAdmin,
+    TopicConfig,
+    TopicCreateRequest,
+    TopicUpdateRequest,
+    UiSettings,
+    UiSettingsUpdate,
+)
+from shared_schemas.trending import TrendingQuestion
 
 __all__ = [
     "AnswerMetadata",
@@ -27,16 +66,33 @@ __all__ = [
     "AnswerResponse",
     "AppSettings",
     "AccessScope",
+    "AccountStatus",
+    "AdminUserUpdate",
     "AclBinding",
+    "AppRole",
+    "AuthResponse",
     "ChunkDocument",
     "Citation",
+    "Clarification",
+    "ClarificationOption",
+    "ConversationTurn",
     "DeadLetterRecord",
+    "DocumentDetail",
+    "DocumentSummary",
+    "DownloadLink",
     "AuthenticatedPrincipal",
     "EvaluationCase",
     "EvaluationCaseResult",
     "EvaluationReport",
     "EvaluationSummary",
+    "FeedbackRequest",
+    "FeedbackResponse",
     "JobStatus",
+    "LoginRequest",
+    "LogoutResponse",
+    "Notebook",
+    "NotebookPage",
+    "NotebookSection",
     "OneNoteCheckpoint",
     "OpsJobRecord",
     "OpsJobStatus",
@@ -44,14 +100,25 @@ __all__ = [
     "RetrievalMetadata",
     "RetrievalRequest",
     "RetrievalResult",
+    "RegistrationResponse",
     "SecurityAuditEvent",
+    "SourceAttachment",
     "SourceDocument",
     "SyncJob",
     "SyncMode",
     "SyncReport",
     "TokenValidationResult",
     "Topic",
+    "TopicAdmin",
     "TopicConfig",
+    "TopicCreateRequest",
+    "TopicUpdateRequest",
+    "TrendingQuestion",
+    "UiSettings",
+    "UiSettingsUpdate",
     "UserContext",
+    "UserProfile",
+    "UserProfileUpdate",
+    "RegisterRequest",
     "get_settings",
 ]

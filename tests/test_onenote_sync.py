@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+from io import BytesIO
+from zipfile import ZipFile
 from datetime import UTC, datetime, timedelta
 
-from shared_schemas import AppSettings, OneNoteCheckpoint, SourceDocument
+import httpx
+import pytest
+from pypdf import PdfWriter
+
+from shared_schemas import AppSettings, OneNoteCheckpoint, SourceAttachment, SourceDocument, SyncMode
 
 from graph_connectors.onenote.connector import OneNoteConnector
-from graph_connectors.onenote.client import MockOneNoteGraphClient
+from graph_connectors.onenote.auth import MockOneNoteDelegatedAuthProvider
+from graph_connectors.onenote.client import MicrosoftGraphOneNoteClient, MockOneNoteGraphClient
 from graph_connectors.onenote.models import OneNoteNotebook, OneNotePage, OneNoteSection, OneNoteSite
-from sync_worker.ingestion import DeterministicEmbedder, TextChunker
+from sync_worker.ingestion import CompositeFileExtractor, DeterministicEmbedder, TextChunker, UnsupportedFileTypeError
 from sync_worker.onenote.normalization import OneNoteDocumentNormalizer
 from sync_worker.onenote.parser import NullOneNoteResourceHook, OneNoteHtmlParser
 from sync_worker.onenote.service import OneNoteSyncService
+from sync_worker.onenote.topic_classifier import OneNoteTopicClassifier
 
 
 class FakeOneNoteGraphClient:
@@ -20,10 +28,13 @@ class FakeOneNoteGraphClient:
         inventory_pages: list[OneNotePage],
         incremental_pages: list[OneNotePage] | None = None,
         content_by_url: dict[str, str],
+        resource_by_url: dict[str, bytes] | None = None,
     ) -> None:
         self.inventory_pages = inventory_pages
         self.incremental_pages = incremental_pages if incremental_pages is not None else inventory_pages
         self.content_by_url = content_by_url
+        self.resource_by_url = resource_by_url or {}
+        self.page_calls: list[dict[str, object]] = []
         self.site = OneNoteSite(
             id="site-1",
             name="Onboarding",
@@ -38,15 +49,30 @@ class FakeOneNoteGraphClient:
                 web_url="https://contoso.example.test/sites/onboarding/TeamNotebook",
             )
         ]
-        self.sections = [
-            OneNoteSection(
-                id="section-1",
-                display_name="Orientation",
-                notebook_id="notebook-1",
-                notebook_name="Team Notebook",
-                web_url="https://contoso.example.test/sites/onboarding/Orientation",
-            )
-        ]
+        section_specs: dict[str, OneNotePage] = {}
+        for page in [*self.inventory_pages, *self.incremental_pages]:
+            section_specs.setdefault(page.section_id, page)
+        self.sections = (
+            [
+                OneNoteSection(
+                    id=page.section_id,
+                    display_name=page.section_name,
+                    notebook_id=page.notebook_id,
+                    notebook_name=page.notebook_name,
+                    web_url=f"https://contoso.example.test/sites/onboarding/{page.section_name.replace(' ', '%20')}",
+                )
+                for page in section_specs.values()
+            ]
+            or [
+                OneNoteSection(
+                    id="section-1",
+                    display_name="Orientation",
+                    notebook_id="notebook-1",
+                    notebook_name="Team Notebook",
+                    web_url="https://contoso.example.test/sites/onboarding/Orientation",
+                )
+            ]
+        )
 
     def resolve_site(self) -> OneNoteSite:
         return self.site
@@ -57,14 +83,34 @@ class FakeOneNoteGraphClient:
     def list_sections(self, site_id: str) -> list[OneNoteSection]:
         return list(self.sections)
 
-    def list_pages(self, site_id: str, *, modified_since=None, next_url=None) -> tuple[list[OneNotePage], str | None]:
+    def list_pages(
+        self,
+        site_id: str,
+        *,
+        section_id=None,
+        modified_since=None,
+        next_url=None,
+    ) -> tuple[list[OneNotePage], str | None]:
+        self.page_calls.append(
+            {
+                "site_id": site_id,
+                "section_id": section_id,
+                "modified_since": modified_since,
+                "next_url": next_url,
+            }
+        )
         if next_url is not None:
             return [], None
         pages = self.incremental_pages if modified_since is not None else self.inventory_pages
+        if section_id is not None:
+            pages = [page for page in pages if page.section_id == section_id]
         return list(pages), None
 
     def get_page_content(self, content_url: str) -> str:
         return self.content_by_url[content_url]
+
+    def get_resource_content(self, resource_url: str) -> bytes:
+        return self.resource_by_url[resource_url]
 
 
 class InMemoryMetadataStore:
@@ -73,6 +119,7 @@ class InMemoryMetadataStore:
         self.documents: dict[str, SourceDocument] = {}
         self.deleted_items: list[str] = []
         self.chunks: dict[str, list] = {}
+        self.attachments: dict[str, SourceAttachment] = {}
 
     def ensure_schema(self) -> None:
         return None
@@ -96,10 +143,45 @@ class InMemoryMetadataStore:
     def upsert_source_document(self, scope_key: str, document: SourceDocument) -> None:
         self.documents[document.source_item_id] = document
 
+    def upsert_source_attachment(self, scope_key: str, attachment: SourceAttachment) -> None:
+        self.attachments[attachment.download_id] = attachment
+
+    def get_source_attachment(self, download_id: str) -> SourceAttachment | None:
+        return self.attachments.get(download_id)
+
+    def list_active_source_attachments(
+        self,
+        scope_key: str,
+        parent_source_item_ids: list[str] | None = None,
+    ) -> list[SourceAttachment]:
+        attachments = list(self.attachments.values())
+        if parent_source_item_ids:
+            parents = set(parent_source_item_ids)
+            attachments = [attachment for attachment in attachments if attachment.parent_source_item_id in parents]
+        return attachments
+
+    def mark_stale_attachments_deleted(
+        self,
+        scope_key: str,
+        parent_source_item_id: str,
+        active_download_ids: set[str],
+    ) -> list[SourceAttachment]:
+        stale = [
+            attachment
+            for attachment in self.attachments.values()
+            if attachment.parent_source_item_id == parent_source_item_id and attachment.download_id not in active_download_ids
+        ]
+        for attachment in stale:
+            self.attachments.pop(attachment.download_id, None)
+        return stale
+
     def mark_source_deleted(self, scope_key: str, source_item_id: str, deleted_at_utc=None) -> None:
         self.deleted_items.append(source_item_id)
         self.documents.pop(source_item_id, None)
         self.chunks.pop(source_item_id, None)
+        for download_id, attachment in list(self.attachments.items()):
+            if attachment.parent_source_item_id == source_item_id or attachment.indexed_source_item_id == source_item_id:
+                self.attachments.pop(download_id, None)
 
     def replace_chunks(self, scope_key: str, source_item_id: str, chunks: list) -> None:
         self.chunks[source_item_id] = chunks
@@ -225,6 +307,104 @@ def test_onenote_parser_preserves_headings_lists_tables_and_resources() -> None:
     assert parsed.metadata["heading_count"] == 1
 
 
+def test_onenote_parser_removes_placeholder_artifacts_but_keeps_labeled_resources() -> None:
+    parser = OneNoteHtmlParser()
+    parsed = parser.parse(
+        """
+        <html><body>
+        <p>OBJ Project setup uses Docker Desktop. \ufffc</p>
+        <p>Run docker compose up after cloning.</p>
+        <img src="https://graph.microsoft.com/v1.0/resources/image-1/$value" alt="OBJ" />
+        <object data="https://graph.microsoft.com/v1.0/resources/file-1/$value" type="application/octet-stream"></object>
+        <object data="https://graph.microsoft.com/v1.0/resources/file-2/$value" data-attachment="setup.ps1" type="text/plain"></object>
+        </body></html>
+        """
+    )
+
+    assert "OBJ" not in parsed.text
+    assert "\ufffc" not in parsed.text
+    assert "Project setup uses Docker Desktop." in parsed.text
+    assert "Run docker compose up after cloning." in parsed.text
+    assert "[Image:" not in parsed.text
+    assert "[Attachment: setup.ps1]" in parsed.text
+    assert len(parsed.resources) == 3
+
+
+def test_onenote_parser_collects_file_like_links_as_attachments() -> None:
+    parser = OneNoteHtmlParser()
+    parsed = parser.parse(
+        """
+        <html><body>
+        <p>Download the <a href="https://downloads.example.test/tools/setup.zip">Windows tools bundle</a>.</p>
+        <p>Read <a href="https://docs.example.test/setup">the setup page</a>.</p>
+        </body></html>
+        """
+    )
+
+    assert len(parsed.resources) == 1
+    assert parsed.resources[0].resource_origin == "link"
+    assert parsed.resources[0].name == "Windows tools bundle"
+    assert parsed.resources[0].resource_url.endswith("setup.zip")
+
+
+def test_file_extractor_supports_readable_formats_and_rejects_legacy_or_binary_formats() -> None:
+    extractor = CompositeFileExtractor()
+
+    assert "Markdown guide" in extractor.extract("guide.md", b"# Markdown guide").text
+    assert "Plain guide" in extractor.extract("guide.txt", b"Plain guide").text
+    assert "Docx guide" in extractor.extract("guide.docx", _docx_bytes("Docx guide")).text
+    assert "Slide guide" in extractor.extract("guide.pptx", _pptx_bytes("Slide guide")).text
+    assert extractor.extract("blank.pdf", _blank_pdf_bytes()).extractor_name == "pypdf"
+    for file_name in ["legacy.doc", "legacy.ppt", "archive.zip", "installer.exe"]:
+        with pytest.raises(UnsupportedFileTypeError):
+            extractor.extract(file_name, b"not readable")
+
+
+def test_onenote_parser_preserves_br_separated_command_lines() -> None:
+    parser = OneNoteHtmlParser()
+    parsed = parser.parse(
+        """
+        <html><body>
+        <h1>Install</h1>
+        <p>
+        sudo apt update<br />
+        sudo apt install -y build-essential cmake git libboost-all-dev tcpdump<br />
+        git clone https://github.com/COVESA/vsomeip.git third_party/vsomeip<br />
+        cmake -S third_party/vsomeip -B third_party/vsomeip/build<br />
+        cmake --build third_party/vsomeip/build -j
+        </p>
+        </body></html>
+        """
+    )
+
+    assert "```bash" in parsed.text
+    assert "sudo apt update\nsudo apt install -y build-essential cmake git libboost-all-dev tcpdump" in parsed.text
+    assert "git clone https://github.com/COVESA/vsomeip.git third_party/vsomeip\ncmake -S" in parsed.text
+    assert "sudo apt update sudo apt install" not in parsed.text
+
+
+def test_onenote_normalizer_attaches_topic_metadata_from_config() -> None:
+    settings = AppSettings(app_env="test", topics_config_path="config/topics.json")
+    page = make_page("page-benefits", section_name="Benefits", title="Paid leave benefits checklist")
+    site = OneNoteSite(
+        id="site-1",
+        name="Onboarding",
+        web_url="https://contoso.example.test/sites/onboarding",
+        hostname="contoso.example.test",
+        relative_path="sites/onboarding",
+    )
+    parsed = OneNoteHtmlParser().parse(
+        "<html><body><p>Employees should review paid leave policy and benefits enrollment.</p></body></html>"
+    )
+    normalizer = OneNoteDocumentNormalizer(topic_classifier=OneNoteTopicClassifier.from_settings(settings))
+
+    document = normalizer.normalize(site=site, page=page, parsed_page=parsed)
+
+    assert "hr" in document.metadata["topic_ids"]
+    assert document.metadata["topic_source"] == "deterministic-config-match"
+    assert "topic:hr" in document.tags
+
+
 def test_mock_onenote_client_uses_all_notebooks_when_scope_is_blank() -> None:
     settings = AppSettings(
         app_env="test",
@@ -243,6 +423,104 @@ def test_mock_onenote_client_uses_all_notebooks_when_scope_is_blank() -> None:
     assert {notebook.display_name for notebook in notebooks} == {"Team Notebook", "Engineering Notebook"}
     assert {section.display_name for section in sections} == {"Orientation", "Tooling"}
     assert {page.notebook_name for page in pages} == {"Team Notebook", "Engineering Notebook"}
+
+
+def test_live_onenote_client_paginates_sections() -> None:
+    settings = AppSettings(
+        app_env="test",
+        onenote_graph_mode="live",
+        graph_onenote_scope_mode="me",
+        onenote_retry_attempts=1,
+    )
+    requested_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_urls.append(str(request.url))
+        if len(requested_urls) == 1:
+            return httpx.Response(
+                200,
+                json={
+                    "value": [
+                        {
+                            "id": "section-1",
+                            "displayName": "Orientation",
+                            "parentNotebook": {"id": "notebook-1", "displayName": "Team Notebook"},
+                        }
+                    ],
+                    "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/onenote/sections?$skip=100",
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "value": [
+                    {
+                        "id": "section-2",
+                        "displayName": "Tooling",
+                        "parentNotebook": {"id": "notebook-1", "displayName": "Team Notebook"},
+                    }
+                ]
+            },
+        )
+
+    client = MicrosoftGraphOneNoteClient(
+        settings,
+        auth_provider=MockOneNoteDelegatedAuthProvider(),
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    sections = client.list_sections("me")
+
+    assert [section.id for section in sections] == ["section-1", "section-2"]
+    assert requested_urls[0].startswith("https://graph.microsoft.com/v1.0/me/onenote/sections?")
+    assert requested_urls[1] == "https://graph.microsoft.com/v1.0/me/onenote/sections?$skip=100"
+
+
+def test_live_onenote_client_lists_pages_by_section() -> None:
+    settings = AppSettings(
+        app_env="test",
+        onenote_graph_mode="live",
+        graph_onenote_scope_mode="me",
+        onenote_retry_attempts=1,
+    )
+    requested_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_urls.append(str(request.url))
+        return httpx.Response(
+            200,
+            json={
+                "value": [
+                    {
+                        "id": "page-1",
+                        "title": "Welcome",
+                        "contentUrl": "https://graph.microsoft.com/v1.0/me/onenote/pages/page-1/content",
+                        "createdDateTime": "2026-04-24T08:00:00Z",
+                        "lastModifiedDateTime": "2026-04-24T09:00:00Z",
+                        "parentNotebook": {"id": "notebook-1", "displayName": "Team Notebook"},
+                        "parentSection": {"id": "section/one", "displayName": "Orientation"},
+                    }
+                ]
+            },
+        )
+
+    client = MicrosoftGraphOneNoteClient(
+        settings,
+        auth_provider=MockOneNoteDelegatedAuthProvider(),
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    pages, next_url = client.list_pages(
+        "me",
+        section_id="section/one",
+        modified_since=datetime(2026, 4, 24, 8, 30, tzinfo=UTC),
+    )
+
+    assert next_url is None
+    assert pages[0].id == "page-1"
+    assert "/me/onenote/sections/section%2Fone/pages?" in requested_urls[0]
+    assert "%24filter=lastModifiedDateTime+ge+2026-04-24T08%3A30%3A00Z" in requested_urls[0]
+    assert "pagelevel=true" in requested_urls[0]
 
 
 def test_onenote_personal_scope_does_not_require_site_configuration() -> None:
@@ -359,6 +637,43 @@ def test_onenote_incremental_initializes_schema_before_checkpoint_lookup() -> No
     assert vector_store.upserts
 
 
+def test_onenote_incremental_lists_pages_one_section_at_a_time() -> None:
+    first_page = make_page("page-1", last_modified=datetime(2026, 4, 24, 9, 0, tzinfo=UTC))
+    second_page = make_page(
+        "page-2",
+        section_name="Tooling",
+        last_modified=datetime(2026, 4, 24, 10, 0, tzinfo=UTC),
+        title="Engineering setup",
+    )
+    fake_client = FakeOneNoteGraphClient(
+        inventory_pages=[first_page, second_page],
+        incremental_pages=[first_page, second_page],
+        content_by_url={
+            first_page.content_url: "<html><body><p>Welcome content.</p></body></html>",
+            second_page.content_url: "<html><body><p>Tooling content.</p></body></html>",
+        },
+    )
+    service, metadata_store, _ = build_service(fake_client)
+    metadata_store.upsert_onenote_checkpoint(
+        OneNoteCheckpoint(
+            scope_key=service.settings.onenote_scope_key,
+            sync_mode=SyncMode.bootstrap,
+            site_id="site-1",
+            notebook_scope="Team Notebook",
+            last_modified_cursor_utc=datetime(2026, 4, 24, 8, 0, tzinfo=UTC),
+            page_count=0,
+            item_count=0,
+            updated_at_utc=datetime(2026, 4, 24, 8, 0, tzinfo=UTC),
+        )
+    )
+
+    report = service.incremental()
+
+    assert report.items_changed == 2
+    assert {call["section_id"] for call in fake_client.page_calls} == {"section-1", "section-2"}
+    assert all(call["section_id"] is not None for call in fake_client.page_calls)
+
+
 def test_onenote_reconciliation_marks_deleted_pages_and_updates_moved_pages() -> None:
     original_page = make_page("page-1")
     service, metadata_store, vector_store = build_service(
@@ -389,6 +704,42 @@ def test_onenote_reconciliation_marks_deleted_pages_and_updates_moved_pages() ->
         tags=["onenote"],
         metadata={"page_id": deleted_page.id, "section_id": deleted_page.section_id, "notebook_id": deleted_page.notebook_id},
     )
+    metadata_store.documents["onenote-attachment:old-download"] = SourceDocument(
+        tenant_id="local-tenant",
+        source_system="onenote",
+        source_container="sites/onboarding/Team Notebook",
+        source_item_id="onenote-attachment:old-download",
+        source_url="/api/v1/attachments/old-download/download",
+        title="old-guide.txt",
+        file_name="old-guide.txt",
+        file_extension="txt",
+        mime_type="text/plain",
+        section_path="Team Notebook / Orientation / Attachments",
+        last_modified_utc=deleted_page.last_modified_utc,
+        acl_tags=[],
+        content_hash="old-attachment-hash",
+        content_text="old deleted attachment",
+        tags=["onenote", "attachment"],
+        metadata={"document_kind": "attachment", "parent_source_item_id": "onenote:page-2"},
+    )
+    metadata_store.attachments["old-download"] = SourceAttachment(
+        download_id="old-download",
+        tenant_id="local-tenant",
+        source_system="onenote",
+        source_container="sites/onboarding/Team Notebook",
+        parent_source_item_id="onenote:page-2",
+        parent_title=deleted_page.title,
+        source_url=deleted_page.web_url,
+        resource_url="mock://old-guide",
+        file_name="old-guide.txt",
+        file_extension="txt",
+        size_bytes=10,
+        readable=True,
+        indexed_source_item_id="onenote-attachment:old-download",
+        storage_path="aa/old-download.txt",
+        content_hash="old-attachment-hash",
+        acl_tags=[],
+    )
     service.connector.client = FakeOneNoteGraphClient(
         inventory_pages=[moved_page],
         incremental_pages=[],
@@ -399,5 +750,121 @@ def test_onenote_reconciliation_marks_deleted_pages_and_updates_moved_pages() ->
 
     assert report.items_deleted == 1
     assert "onenote:page-2" in metadata_store.deleted_items
+    assert "onenote-attachment:old-download" in metadata_store.deleted_items
     assert "onenote:page-2" in vector_store.deleted_source_item_ids
+    assert "onenote-attachment:old-download" in vector_store.deleted_source_item_ids
     assert metadata_store.documents["onenote:page-1"].section_path == "Team Notebook / Moved Section"
+
+
+def test_onenote_sync_indexes_readable_attachments_and_stores_unsupported_downloads(tmp_path) -> None:
+    page = make_page("page-attachments", title="Project setup")
+    text_url = "mock://onenote/resources/setup-guide.txt"
+    exe_url = "mock://onenote/resources/setup-installer.exe"
+    service, metadata_store, vector_store = build_service_with_settings(
+        FakeOneNoteGraphClient(
+            inventory_pages=[page],
+            content_by_url={
+                page.content_url: f"""
+                <html><body>
+                <h1>Setup</h1>
+                <p>Use the attached setup guide and installer.</p>
+                <object data="{text_url}" data-attachment="setup-guide.txt" type="text/plain"></object>
+                <object data="{exe_url}" data-attachment="setup-installer.exe" type="application/octet-stream"></object>
+                </body></html>
+                """
+            },
+            resource_by_url={
+                text_url: b"Installer step 2: run setup-installer.exe after reading the guide.",
+                exe_url: b"\x00\x01binary installer",
+            },
+        ),
+        attachment_storage_dir=str(tmp_path / "attachments"),
+    )
+
+    report = service.bootstrap()
+
+    attachments = list(metadata_store.attachments.values())
+    assert report.items_changed == 1
+    assert {attachment.file_name for attachment in attachments} == {"setup-guide.txt", "setup-installer.exe"}
+    guide = next(attachment for attachment in attachments if attachment.file_name == "setup-guide.txt")
+    installer = next(attachment for attachment in attachments if attachment.file_name == "setup-installer.exe")
+    assert guide.readable is True
+    assert guide.indexed_source_item_id in metadata_store.documents
+    assert "Installer step 2" in metadata_store.documents[guide.indexed_source_item_id].content_text
+    assert guide.indexed_source_item_id in vector_store.upserts
+    assert installer.readable is False
+    assert installer.indexed_source_item_id is None
+    assert (tmp_path / "attachments" / installer.storage_path).exists()
+    assert len(metadata_store.documents["onenote:page-attachments"].metadata["attachment_refs"]) == 2
+
+
+def test_attachment_index_carries_parent_page_title_for_name_based_questions(tmp_path) -> None:
+    # A page whose content lives entirely in a readme.md attachment - the page
+    # name ("ModelViewer") must be searchable on the indexed attachment so a
+    # question naming the page matches it even though the file text never says
+    # "ModelViewer".
+    page = make_page("page-modelviewer", title="ModelViewer")
+    readme_url = "mock://onenote/resources/readme.md"
+    service, metadata_store, _vector_store = build_service_with_settings(
+        FakeOneNoteGraphClient(
+            inventory_pages=[page],
+            content_by_url={
+                page.content_url: (
+                    f'<html><body><h1>ModelViewer</h1>'
+                    f'<object data="{readme_url}" data-attachment="readme.md" type="text/markdown"></object>'
+                    f"</body></html>"
+                )
+            },
+            resource_by_url={
+                readme_url: b"# Overview\nRenders 3D meshes in the browser with WebGL.\n## Usage\nStart the dev server.",
+            },
+        ),
+        attachment_storage_dir=str(tmp_path / "attachments"),
+    )
+
+    service.bootstrap()
+
+    attachment = next(
+        document
+        for document in metadata_store.documents.values()
+        if document.metadata.get("document_kind") == "attachment"
+    )
+    haystack = " ".join([attachment.title, attachment.section_path or "", attachment.content_text]).lower()
+    assert "modelviewer" in haystack  # page name is searchable even though the file text omits it
+    assert "readme.md" in attachment.title.lower()  # filename preserved for display
+    assert attachment.metadata.get("parent_title") == "ModelViewer"
+
+
+def _docx_bytes(text: str) -> bytes:
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        archive.writestr(
+            "word/document.xml",
+            (
+                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                f"<w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body></w:document>"
+            ),
+        )
+    return buffer.getvalue()
+
+
+def _pptx_bytes(text: str) -> bytes:
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        archive.writestr(
+            "ppt/slides/slide1.xml",
+            (
+                '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
+                'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+                f"<p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>{text}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>"
+            ),
+        )
+    return buffer.getvalue()
+
+
+def _blank_pdf_bytes() -> bytes:
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    buffer = BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()

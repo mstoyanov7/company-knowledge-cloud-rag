@@ -47,6 +47,7 @@ class ChunkDocument(BaseModel):
     chunk_id: str
     chunk_index: int
     chunk_text: str
+    chunk_kind: str | None = None
     embedding_model: str
     language: str = "en"
     tags: list[str] = Field(default_factory=list)
@@ -66,6 +67,7 @@ class SourceDocument(BaseModel):
     mime_type: str | None = None
     section_path: str | None = None
     last_modified_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at_utc: datetime | None = None
     acl_tags: list[str] = Field(default_factory=list)
     acl_bindings: list[AclBinding] = Field(default_factory=list)
     content_hash: str
@@ -73,6 +75,94 @@ class SourceDocument(BaseModel):
     language: str = "en"
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SourceAttachment(BaseModel):
+    download_id: str
+    tenant_id: str
+    source_system: str
+    source_container: str
+    parent_source_item_id: str
+    parent_title: str
+    source_url: str
+    resource_url: str
+    file_name: str
+    file_extension: str
+    mime_type: str | None = None
+    size_bytes: int = 0
+    readable: bool = False
+    indexed_source_item_id: str | None = None
+    storage_path: str | None = None
+    content_hash: str
+    last_modified_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at_utc: datetime | None = None
+    acl_tags: list[str] = Field(default_factory=list)
+    acl_bindings: list[AclBinding] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class DownloadLink(BaseModel):
+    download_id: str
+    file_name: str
+    mime_type: str | None = None
+    file_extension: str
+    size_bytes: int = 0
+    readable: bool = False
+    parent_source_item_id: str
+    parent_title: str
+    download_url: str
+    indexed_source_item_id: str | None = None
+
+
+class NotebookPage(BaseModel):
+    id: str
+    title: str
+    section_path: str | None = None
+    source_url: str
+    source_item_id: str
+    source_system: str = "onenote"
+    source_container: str | None = None
+    last_modified_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at_utc: datetime | None = None
+    snippet: str | None = None
+    last_edited_by: str | None = None
+    client_url: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class NotebookSection(BaseModel):
+    id: str
+    title: str
+    source_url: str | None = None
+    section_path: str | None = None
+    pages: list[NotebookPage] = Field(default_factory=list)
+
+
+class Notebook(BaseModel):
+    id: str
+    title: str
+    source_url: str | None = None
+    sections: list[NotebookSection] = Field(default_factory=list)
+
+
+class DocumentSummary(BaseModel):
+    id: str
+    title: str
+    section_path: str | None = None
+    source_url: str
+    source_item_id: str
+    source_system: str = "onenote"
+    source_container: str | None = None
+    last_modified_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at_utc: datetime | None = None
+    snippet: str | None = None
+    last_edited_by: str | None = None
+    client_url: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class DocumentDetail(DocumentSummary):
+    content_text: str
 
 
 class RetrievalRequest(BaseModel):
@@ -83,6 +173,9 @@ class RetrievalRequest(BaseModel):
     access_scope: AccessScope | None = None
     topic_id: str | None = None
     topic_tags: list[str] = Field(default_factory=list)
+    # Restrict retrieval to these OneNote pages (source_item_id) when the user
+    # has picked one in answer to a clarifying question.
+    focus_source_item_ids: list[str] = Field(default_factory=list)
 
 
 class RetrievalMetadata(BaseModel):

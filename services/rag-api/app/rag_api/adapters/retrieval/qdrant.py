@@ -19,6 +19,12 @@ from shared_schemas import (
 
 from rag_api.adapters.embeddings import DeterministicQueryEmbedder
 from rag_api.services.query_understanding import canonical_key_phrase
+from rag_api.services.retrieval_ranking import fuzzy_metadata_relevance_score
+
+# Per-scroll batch size and the absolute safety cap used when the lexical scan
+# limit is configured as "unbounded" (<= 0).
+_LEXICAL_SCAN_BATCH = 512
+_LEXICAL_SCAN_HARD_CAP = 100_000
 
 
 class QdrantAclRetriever:
@@ -36,7 +42,7 @@ class QdrantAclRetriever:
 
         access_scope = request.access_scope
         collections = self._collections_for_request(request)
-        payload_filter = self.build_payload_filter(access_scope)
+        payload_filter = self.build_payload_filter(access_scope, focus_source_item_ids=request.focus_source_item_ids)
         query_vector = self.embedder.embed_text(request.question)
         candidates: list[ChunkDocument] = []
         collections_queried: list[str] = []
@@ -98,25 +104,42 @@ class QdrantAclRetriever:
         payload_filter: models.Filter,
         question: str,
     ) -> list[ChunkDocument]:
-        try:
-            points, _next_offset = self.client.scroll(
-                collection_name=collection_name,
-                scroll_filter=payload_filter,
-                limit=self.settings.retrieval_lexical_scan_limit,
-                with_payload=True,
-                with_vectors=False,
-            )
-        except (UnexpectedResponse, ValueError):
-            return []
-
+        # Paginate through every accessible chunk (bounded by the scan cap) so a
+        # page whose title matches the question is found regardless of where it
+        # sits in the collection. Scanning only the first page silently misses
+        # title matches once the corpus grows past one batch, which makes short
+        # queries fail even when the page exists.
+        scan_cap = self.settings.retrieval_lexical_scan_limit
+        if scan_cap <= 0:
+            scan_cap = _LEXICAL_SCAN_HARD_CAP
+        batch_size = min(_LEXICAL_SCAN_BATCH, scan_cap)
         candidates: list[ChunkDocument] = []
-        for point in points:
-            if not point.payload:
-                continue
-            chunk = self._chunk_from_payload(point.payload, score=0.0)
-            lexical_score = lexical_relevance_score(question, chunk)
-            if lexical_score > 0:
-                candidates.append(chunk.model_copy(update={"score": 100.0 + lexical_score}))
+        scanned = 0
+        offset = None
+        while scanned < scan_cap:
+            try:
+                points, offset = self.client.scroll(
+                    collection_name=collection_name,
+                    scroll_filter=payload_filter,
+                    limit=min(batch_size, scan_cap - scanned),
+                    offset=offset,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            except (UnexpectedResponse, ValueError):
+                break
+            if not points:
+                break
+            scanned += len(points)
+            for point in points:
+                if not point.payload:
+                    continue
+                chunk = self._chunk_from_payload(point.payload, score=0.0)
+                lexical_score = lexical_relevance_score(question, chunk)
+                if lexical_score > 0:
+                    candidates.append(chunk.model_copy(update={"score": 100.0 + lexical_score}))
+            if offset is None:
+                break
         return candidates
 
     def _dedupe_and_rank(self, candidates: list[ChunkDocument]) -> list[ChunkDocument]:
@@ -149,7 +172,11 @@ class QdrantAclRetriever:
         return filtered
 
     @staticmethod
-    def build_payload_filter(access_scope: AccessScope) -> models.Filter:
+    def build_payload_filter(
+        access_scope: AccessScope,
+        *,
+        focus_source_item_ids: list[str] | None = None,
+    ) -> models.Filter:
         acl_tags = access_scope.allowed_acl_tags or ["__no_allowed_acl_tags__"]
         must: list[models.FieldCondition] = [
             models.FieldCondition(
@@ -166,6 +193,20 @@ class QdrantAclRetriever:
                 models.FieldCondition(
                     key="source_system",
                     match=models.MatchAny(any=access_scope.source_filters),
+                )
+            )
+        if focus_source_item_ids:
+            focus = list(focus_source_item_ids)
+            # Match the page itself OR a readable attachment belonging to it, so a
+            # focused page keeps its attachment chunks eligible as evidence.
+            must.append(
+                models.Filter(
+                    should=[
+                        models.FieldCondition(key="source_item_id", match=models.MatchAny(any=focus)),
+                        models.FieldCondition(
+                            key="metadata.parent_source_item_id", match=models.MatchAny(any=focus)
+                        ),
+                    ]
                 )
             )
         return models.Filter(must=must)
@@ -259,7 +300,8 @@ def lexical_relevance_score(question: str, chunk: ChunkDocument) -> float:
     tag_tokens = _content_tokens(" ".join(chunk.tags))
     all_tokens = title_tokens | section_tokens | body_tokens | tag_tokens
     overlap = question_tokens.intersection(all_tokens)
-    if not overlap:
+    fuzzy_score = fuzzy_metadata_relevance_score(question, chunk)
+    if not overlap and fuzzy_score <= 0:
         return 0.0
 
     title_overlap = question_tokens.intersection(title_tokens)
@@ -270,6 +312,7 @@ def lexical_relevance_score(question: str, chunk: ChunkDocument) -> float:
         + (coverage * 2.0)
         + (len(title_overlap) * 3.0)
         + (len(section_overlap) * 0.75)
+        + fuzzy_score
     )
     key_phrase = _question_key_phrase(question)
     if key_phrase:

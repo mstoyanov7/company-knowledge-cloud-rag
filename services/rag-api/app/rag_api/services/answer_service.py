@@ -1,31 +1,51 @@
 import time
 from contextlib import nullcontext
+from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
 import logging
 import re
 from textwrap import shorten
 
-from rag_api.ports import LlmPort, RerankerPort, RetrievalPort
+from rag_api.ports import DocumentMetadataPort, LlmPort, RerankerPort, RetrievalPort
 from rag_api.services.access_scope import AccessScopeResolver
+from rag_api.services.clarification import clarification_answer_text, detect_clarification
 from rag_api.services.context_builder import build_answer_context
+from rag_api.services.conversation_context import contextualize_question
 from rag_api.services.evidence_grading import (
     DIRECT_ANSWER_FOUND,
     EvidenceAssessment,
     EvidenceGrade,
     EvidenceGrader,
     PARTIAL_ANSWER_FOUND,
+    RELATED_BUT_NOT_ENOUGH,
 )
 from rag_api.services.prompt_builder import PromptBuilder
 from rag_api.services.query_understanding import QuestionAnalysis, QueryPlanner, canonical_key_phrase
 from rag_api.services.retrieval_ranking import (
     analysis_relevance_score,
+    chunk_kind_of,
     chunk_relevance_breakdown,
+    fuzzy_metadata_relevance_score,
+    is_procedure_question,
     rank_chunks_by_question_analysis,
 )
 from rag_api.services.security_audit import SecurityAuditLogger
 from rag_api.services.topic_service import AnswerTopicScope, TopicService
-from shared_schemas import AnswerMetadata, AnswerRequest, AnswerResponse, Citation, RetrievalMetadata, RetrievalRequest, RetrievalResult
+from shared_schemas import (
+    AccessScope,
+    AnswerMetadata,
+    AnswerRequest,
+    AnswerResponse,
+    Citation,
+    Clarification,
+    DownloadLink,
+    RetrievalMetadata,
+    RetrievalRequest,
+    RetrievalResult,
+    SourceAttachment,
+    SourceDocument,
+)
 
 try:
     from opentelemetry import metrics, trace
@@ -34,7 +54,14 @@ except ModuleNotFoundError:  # pragma: no cover - optional runtime dependency
     trace = None
 
 
-NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes or readable attachments."
+# Friendly caveat used when the notes hold something topically related but not a
+# confident, direct answer. Keeps the assistant helpful instead of dead-ending on
+# "no information" whenever the match is not 100% certain.
+HEDGED_ANSWER_PREAMBLE = (
+    "I couldn't find a definitive answer to your exact question, but here's some "
+    "related information from the notes that may be helpful:"
+)
 logger = logging.getLogger(__name__)
 _GENERIC_ENTITY_TERMS = {
     "any",
@@ -52,6 +79,71 @@ _GENERIC_ENTITY_TERMS = {
     "rules",
     "there",
 }
+# Tokens too generic to justify surfacing a note as "partially related" on their
+# own. A hedge needs a stronger topical link than one of these shared words, so a
+# coincidental overlap (e.g. "paid" between a salary question and a leave note)
+# does not trigger a misleading near-answer.
+_GENERIC_HEDGE_TERMS = _GENERIC_ENTITY_TERMS | {
+    "date",
+    "day",
+    "days",
+    "page",
+    "pages",
+    "paid",
+    "section",
+    "sections",
+    "time",
+    "topic",
+    # Generic how-to scaffolding: shared "setup"/"project"/"guide" words do not
+    # make an unrelated guide "partially related" to the question's real subject.
+    "setup",
+    "install",
+    "installation",
+    "configure",
+    "configuration",
+    "config",
+    "guide",
+    "tutorial",
+    "step",
+    "steps",
+    "process",
+    "procedure",
+    "instruction",
+    "instructions",
+    "documentation",
+    "overview",
+    "project",
+    "projects",
+    "create",
+    "build",
+    "run",
+    "reference",
+}
+
+
+def _is_attachment_chunk(chunk) -> bool:
+    return bool((chunk.metadata or {}).get("document_kind") == "attachment")
+
+
+def _chunk_parent_page_id(chunk) -> str:
+    """The page a chunk belongs to - the parent page for readable attachments,
+    so an attachment is treated as part of its OneNote page."""
+    metadata = chunk.metadata or {}
+    if metadata.get("document_kind") == "attachment":
+        return str(metadata.get("parent_source_item_id") or chunk.source_item_id)
+    return chunk.source_item_id
+
+
+def _chunk_in_focus(chunk, focus_ids: set[str]) -> bool:
+    return chunk.source_item_id in focus_ids or _chunk_parent_page_id(chunk) in focus_ids
+
+
+@dataclass(frozen=True, slots=True)
+class InventoryRequestMatch:
+    mode: str
+    target_tokens: tuple[str, ...]
+    target_label: str
+    section_inventory: bool = False
 
 
 class AnswerService:
@@ -61,6 +153,7 @@ class AnswerService:
         llm: LlmPort,
         prompt_builder: PromptBuilder,
         retriever: RetrievalPort,
+        metadata: DocumentMetadataPort | None = None,
         access_scope_resolver: AccessScopeResolver,
         reranker: RerankerPort | None = None,
         retrieval_candidate_multiplier: int = 3,
@@ -70,10 +163,14 @@ class AnswerService:
         evidence_grader: EvidenceGrader | None = None,
         topic_service: TopicService | None = None,
         debug_enabled: bool = False,
+        clarify_enabled: bool = True,
+        clarify_closeness_ratio: float = 0.6,
+        clarify_max_options: int = 5,
     ) -> None:
         self.llm = llm
         self.prompt_builder = prompt_builder
         self.retriever = retriever
+        self.metadata = metadata
         self.access_scope_resolver = access_scope_resolver
         self.reranker = reranker
         self.retrieval_candidate_multiplier = max(1, retrieval_candidate_multiplier)
@@ -83,6 +180,9 @@ class AnswerService:
         self.evidence_grader = evidence_grader or EvidenceGrader(llm=llm)
         self.topic_service = topic_service
         self.debug_enabled = debug_enabled
+        self.clarify_enabled = clarify_enabled
+        self.clarify_closeness_ratio = clarify_closeness_ratio
+        self.clarify_max_options = max(2, clarify_max_options)
         self.tracer = trace.get_tracer("rag_api.answer") if trace else None
         self.answer_latency_ms = (
             metrics.get_meter("rag_api.answer").create_histogram("rag_answer_latency_ms") if metrics else None
@@ -104,13 +204,26 @@ class AnswerService:
                 effective_request.user_context,
                 effective_request.source_filters,
             )
-            question_analysis = await self.query_planner.plan(request.question)
+            effective_question = contextualize_question(request.question, request.history)
+            question_analysis = await self.query_planner.plan(effective_question)
             self._debug_event(
                 "query_plan",
                 original_question=request.question,
+                effective_question=effective_question,
+                history_turns=len(request.history),
                 topic_id=topic_scope.topic.id if topic_scope else None,
                 plan=_question_analysis_debug_payload(question_analysis),
             )
+            inventory_response = self._answer_inventory_question(
+                request=effective_request,
+                question_analysis=question_analysis,
+                topic_scope=topic_scope,
+                access_scope=access_scope,
+                suggested_questions=suggested_questions,
+                started=started,
+            )
+            if inventory_response is not None:
+                return inventory_response
             candidate_top_k = request.top_k
             if self.reranker:
                 candidate_top_k = max(request.top_k, request.top_k * self.retrieval_candidate_multiplier)
@@ -126,6 +239,14 @@ class AnswerService:
             retrieval_result.metadata.topic_id = topic_scope.topic.id if topic_scope else None
             retrieval_result.metadata.topic_tags = list(topic_scope.retrieval_terms) if topic_scope else []
             chunks = retrieval_result.chunks
+            if request.focus_source_item_ids:
+                # The user already picked a page in answer to a clarification;
+                # keep only that page so the answer is drawn from their choice.
+                # Readable attachments belong to their parent page, so a chunk
+                # whose parent_source_item_id matches the focus stays eligible.
+                focus_ids = set(request.focus_source_item_ids)
+                chunks = [chunk for chunk in chunks if _chunk_in_focus(chunk, focus_ids)]
+                retrieval_result.chunks = chunks
             self._debug_event("retrieved_chunks", chunks=_chunk_debug_payload(chunks))
             if self.reranker:
                 chunks = self.reranker.rerank(
@@ -156,6 +277,7 @@ class AnswerService:
                 sufficiency=evidence_assessment.sufficiency,
                 grades=[_grade_debug_payload(grade) for grade in evidence_assessment.grades],
             )
+            graded_chunks = chunks
             chunks = list(evidence_assessment.selected_chunks)
             retrieval_result.metadata.returned_count = len(chunks)
             retrieval_result.metadata.evidence_sufficiency = evidence_assessment.sufficiency
@@ -168,7 +290,49 @@ class AnswerService:
                 }
                 for grade in evidence_assessment.grades
             ]
-            if evidence_assessment.sufficiency not in {DIRECT_ANSWER_FOUND, PARTIAL_ANSWER_FOUND} or not chunks:
+            if self.clarify_enabled and not request.focus_source_item_ids:
+                clarification = detect_clarification(
+                    question_analysis,
+                    graded_chunks,
+                    evidence_assessment.grades,
+                    closeness_ratio=self.clarify_closeness_ratio,
+                    max_options=self.clarify_max_options,
+                )
+                if clarification is not None:
+                    self._debug_event(
+                        "clarification",
+                        options=[option.title for option in clarification.options],
+                    )
+                    return self._build_clarification_response(
+                        clarification=clarification,
+                        retrieval_result=retrieval_result,
+                        request=effective_request,
+                        suggested_questions=suggested_questions,
+                        started=started,
+                    )
+            answer_accepted = (
+                evidence_assessment.sufficiency in {DIRECT_ANSWER_FOUND, PARTIAL_ANSWER_FOUND} and bool(chunks)
+            )
+            if not answer_accepted:
+                # Before giving up, try to surface anything topically related with
+                # an explicit caveat. Only a genuine empty-handed result should
+                # ever reach the bare "no information" reply.
+                hedged_response = self._build_hedged_response(
+                    question_analysis=question_analysis,
+                    graded_chunks=graded_chunks,
+                    evidence_assessment=evidence_assessment,
+                    retrieval_result=retrieval_result,
+                    request=effective_request,
+                    suggested_questions=suggested_questions,
+                    started=started,
+                )
+                if hedged_response is not None:
+                    self._debug_event(
+                        "evidence_hedged",
+                        sufficiency=evidence_assessment.sufficiency,
+                        citations=[citation.title for citation in hedged_response.citations],
+                    )
+                    return hedged_response
                 self._debug_event("evidence_rejected", sufficiency=evidence_assessment.sufficiency)
                 citations: list[Citation] = []
                 self._audit_retrieval(effective_request, retrieval_result, citations)
@@ -201,11 +365,16 @@ class AnswerService:
             )
             self._debug_event(
                 "selected_context",
+                topic_id=topic_scope.topic.id if topic_scope else None,
+                answer_depth=request.answer_depth,
+                answer_style=request.answer_style,
+                chunk_kinds=[chunk_kind_of(chunk) for chunk in chunks],
                 source_titles=list(answer_context.source_titles),
+                context_chars=answer_context.total_chars,
                 context_blocks=list(answer_context.context_blocks),
             )
             prompt = self.prompt_builder.build(
-                request.question,
+                effective_question,
                 chunks,
                 citations,
                 question_analysis=question_analysis,
@@ -218,7 +387,7 @@ class AnswerService:
             completion_started = time.perf_counter()
             generation = await self.llm.generate(prompt)
             answer_text, citations = self._guard_generated_answer(
-                question=request.question,
+                question=effective_question,
                 question_analysis=question_analysis,
                 answer_text=generation.answer_text,
                 chunks=chunks,
@@ -226,13 +395,17 @@ class AnswerService:
                 evidence_assessment=evidence_assessment,
             )
             answer_text = _strip_inline_citation_markers(answer_text)
+            answer_text = _strip_trailing_source_line(answer_text)
             answer_text = _normalize_no_information_text(answer_text)
-            answer_text = _append_source_titles(answer_text, citations)
             validation_passed = _final_answer_is_valid(answer_text, citations, evidence_assessment)
             self._debug_event("final_answer_validation", passed=validation_passed, answer_preview=answer_text[:300])
+            downloads: list[DownloadLink] = []
             if not validation_passed:
                 answer_text = NO_INFORMATION_ANSWER
                 citations = []
+            else:
+                downloads = self._downloads_for_answer(question_analysis, chunks, citations)
+                answer_text = _append_downloads_section(answer_text, downloads)
             completion_latency_ms = int((time.perf_counter() - completion_started) * 1000)
             duration_ms = int((time.perf_counter() - started) * 1000)
             freshness_delay_ms = _freshness_delay_ms(citations)
@@ -256,6 +429,7 @@ class AnswerService:
             return AnswerResponse(
                 answer=answer_text,
                 citations=citations,
+                downloads=downloads,
                 retrieval_meta=retrieval_result.metadata,
                 metadata=AnswerMetadata(
                     provider=generation.provider,
@@ -272,10 +446,138 @@ class AnswerService:
                 suggested_questions=suggested_questions,
             )
 
+    def _build_hedged_response(
+        self,
+        *,
+        question_analysis: QuestionAnalysis,
+        graded_chunks: list,
+        evidence_assessment: EvidenceAssessment,
+        retrieval_result: RetrievalResult,
+        request: AnswerRequest,
+        suggested_questions: list[str],
+        started: float,
+    ) -> AnswerResponse | None:
+        """Build a friendly "partially related" answer instead of a flat refusal.
+
+        When grading found content topically connected to the question but not
+        confident enough to be a direct or partial answer, we still help: extract
+        the closest related notes and prefix a clear caveat so the user knows it
+        is not a guaranteed match. Returns ``None`` when nothing is genuinely
+        related, so the caller falls back to the strict no-information reply (the
+        only case the user should ever see that message).
+        """
+        related_chunks = _related_chunks_for_hedge(question_analysis, evidence_assessment.grades, graded_chunks)
+        if not related_chunks:
+            return None
+        citations = self._build_citations(related_chunks)
+        body, used_citations = _extractive_response(question_analysis, related_chunks, citations)
+        body = _strip_inline_citation_markers(body)
+        if not used_citations or not body.strip() or _is_no_information_text(body):
+            return None
+        answer_text = _hedged_answer_text(body)
+        self._audit_retrieval(request, retrieval_result, used_citations)
+        retrieval_result.metadata.returned_count = len(used_citations)
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        return AnswerResponse(
+            answer=answer_text,
+            citations=used_citations,
+            retrieval_meta=retrieval_result.metadata,
+            metadata=AnswerMetadata(
+                provider=self.llm.provider_name,
+                model=self.llm.model_name,
+                retrieval_strategy=retrieval_result.metadata.strategy,
+                retrieved_chunk_count=len(used_citations),
+                source_systems=sorted({citation.source_system for citation in used_citations}),
+                duration_ms=duration_ms,
+                retrieval_latency_ms=retrieval_result.metadata.duration_ms,
+                completion_latency_ms=0,
+                freshness_delay_ms=_freshness_delay_ms(used_citations),
+                citation_count=len(used_citations),
+            ),
+            suggested_questions=suggested_questions,
+        )
+
+    def _build_clarification_response(
+        self,
+        *,
+        clarification: Clarification,
+        retrieval_result: RetrievalResult,
+        request: AnswerRequest,
+        suggested_questions: list[str],
+        started: float,
+    ) -> AnswerResponse:
+        """Return a quiz-style follow-up asking which page the user means.
+
+        Carries no citations - the candidate pages live in ``clarification`` so
+        the client can render pickable options - and is returned directly so the
+        answer-grounding guards do not strip the prompt.
+        """
+        retrieval_result.metadata.returned_count = 0
+        retrieval_result.metadata.evidence_sufficiency = "AMBIGUOUS_MULTIPLE_TOPICS"
+        self._audit_retrieval(request, retrieval_result, [])
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        return AnswerResponse(
+            answer=clarification_answer_text(clarification),
+            citations=[],
+            retrieval_meta=retrieval_result.metadata,
+            metadata=AnswerMetadata(
+                provider=self.llm.provider_name,
+                model=self.llm.model_name,
+                retrieval_strategy=retrieval_result.metadata.strategy,
+                retrieved_chunk_count=0,
+                source_systems=[],
+                duration_ms=duration_ms,
+                retrieval_latency_ms=retrieval_result.metadata.duration_ms,
+                completion_latency_ms=0,
+                freshness_delay_ms=None,
+                citation_count=0,
+            ),
+            suggested_questions=suggested_questions,
+            clarification=clarification,
+        )
+
     def _debug_event(self, event: str, **fields) -> None:
         if not self.debug_enabled:
             return
         logger.info("rag_debug %s", json.dumps({"event": event, **fields}, default=str, ensure_ascii=False))
+
+    def _answer_inventory_question(
+        self,
+        *,
+        request: AnswerRequest,
+        question_analysis: QuestionAnalysis,
+        topic_scope: AnswerTopicScope | None,
+        access_scope,
+        suggested_questions: list[str],
+        started: float,
+    ) -> AnswerResponse | None:
+        match = _inventory_request_match(question_analysis, topic_scope)
+        if match is None or self.metadata is None:
+            return None
+
+        documents = _allowed_inventory_documents(self.metadata.list_documents(), access_scope)
+        matched_documents = _matching_inventory_documents(documents, match)
+        if not matched_documents:
+            return _inventory_response(
+                answer=_no_inventory_answer(match),
+                documents=[],
+                request=request,
+                access_scope=access_scope,
+                candidate_count=len(documents),
+                started=started,
+                suggested_questions=suggested_questions,
+            )
+
+        answer = _format_inventory_answer(match, matched_documents)
+        return _inventory_response(
+            answer=answer,
+            documents=matched_documents,
+            request=request,
+            access_scope=access_scope,
+            candidate_count=len(documents),
+            started=started,
+            suggested_questions=suggested_questions,
+        )
 
     async def _retrieve_for_question_analysis(
         self,
@@ -299,6 +601,7 @@ class AnswerService:
                 access_scope=access_scope,
                 topic_id=topic_scope.topic.id if topic_scope else None,
                 topic_tags=list(topic_scope.retrieval_terms) if topic_scope else [],
+                focus_source_item_ids=list(request.focus_source_item_ids),
             )
             results.append(await self.retriever.retrieve(retrieval_request))
         merged = _merge_retrieval_results(question_analysis, results, top_k=top_k)
@@ -388,27 +691,94 @@ class AnswerService:
     def _build_citations(self, chunks: list) -> list[Citation]:
         citations: list[Citation] = []
         for index, chunk in enumerate(chunks, start=1):
+            chunk_metadata = chunk.metadata or {}
+            citation_metadata = {
+                **chunk_metadata,
+                "content_hash": chunk.content_hash,
+                "score": chunk.score,
+                "tags": chunk.tags,
+            }
+            if chunk_metadata.get("document_kind") == "attachment":
+                parent_title = _optional_string(chunk_metadata.get("parent_title")) or chunk.title
+                file_name = (
+                    _optional_string(chunk_metadata.get("attachment_file_name"))
+                    or _optional_string(chunk_metadata.get("file_name"))
+                    or chunk.title
+                )
+                citation_metadata["citation_page_title"] = parent_title
+                citation_metadata["citation_file_name"] = file_name
+                title = f"Page: {parent_title} | File: {file_name}"
+            else:
+                title = chunk.title
             citations.append(
                 Citation(
                     index=index,
                     chunk_id=chunk.chunk_id,
                     source_item_id=chunk.source_item_id,
                     chunk_index=chunk.chunk_index,
-                    title=chunk.title,
+                    title=title,
                     source_system=chunk.source_system,
                     source_container=chunk.source_container,
                     source_url=chunk.source_url,
                     section_path=chunk.section_path,
                     snippet=shorten(chunk.chunk_text, width=180, placeholder="..."),
                     last_modified_utc=chunk.last_modified_utc,
-                    metadata={
-                        "content_hash": chunk.content_hash,
-                        "score": chunk.score,
-                        "tags": chunk.tags,
-                    },
+                    last_edited_by=_metadata_string(
+                        chunk.metadata,
+                        "last_edited_by",
+                        "lastEditedBy",
+                        "last_modified_by",
+                        "lastModifiedBy",
+                    ),
+                    client_url=_metadata_string(
+                        chunk.metadata,
+                        "client_url",
+                        "oneNoteClientUrl",
+                        "onenote_client_url",
+                    ),
+                    metadata=citation_metadata,
                 )
             )
         return citations
+
+    def _downloads_for_answer(
+        self,
+        question_analysis: QuestionAnalysis,
+        chunks: list,
+        citations: list[Citation],
+    ) -> list[DownloadLink]:
+        downloads_by_id: dict[str, DownloadLink] = {}
+
+        def add(download: DownloadLink | None) -> None:
+            if download is not None:
+                downloads_by_id.setdefault(download.download_id, download)
+
+        chunks_by_id = {chunk.chunk_id: chunk for chunk in chunks}
+        cited_chunks_by_id = {
+            citation.chunk_id: chunk
+            for citation in citations
+            if (chunk := chunks_by_id.get(citation.chunk_id)) is not None
+        }
+        parent_source_item_ids: set[str] = set()
+        for citation in citations:
+            metadata = citation.metadata or {}
+            if metadata.get("document_kind") == "attachment":
+                add(_download_from_metadata(metadata))
+                parent_source_item_id = _optional_string(metadata.get("parent_source_item_id"))
+                if parent_source_item_id:
+                    parent_source_item_ids.add(parent_source_item_id)
+            else:
+                parent_source_item_ids.add(citation.source_item_id)
+            chunk = cited_chunks_by_id.get(citation.chunk_id)
+            if chunk is not None:
+                for payload in _attachment_refs(chunk):
+                    add(_download_from_metadata(payload))
+
+        if self.metadata is not None and parent_source_item_ids:
+            for attachment in self.metadata.list_attachments(sorted(parent_source_item_ids)):
+                add(_download_from_attachment(attachment))
+
+        return list(downloads_by_id.values())
 
     def _audit_retrieval(self, request: AnswerRequest, retrieval_result, citations: list[Citation]) -> None:
         if self.audit_logger is None:
@@ -488,6 +858,318 @@ def _grade_debug_payload(grade: EvidenceGrade) -> dict[str, object]:
     }
 
 
+_INVENTORY_TRIGGER_NOUNS = {
+    "benefit",
+    "document",
+    "guide",
+    "note",
+    "page",
+    "policy",
+    "project",
+    "section",
+    "setup",
+    "topic",
+}
+
+_INVENTORY_GENERIC_TERMS = {
+    "accessible",
+    "all",
+    "available",
+    "base",
+    "company",
+    "count",
+    "document",
+    "exist",
+    "existing",
+    "found",
+    "knowledge",
+    "list",
+    "many",
+    "note",
+    "number",
+    "page",
+    "section",
+    "show",
+    "there",
+    "total",
+}
+
+
+def _inventory_request_match(
+    question_analysis: QuestionAnalysis,
+    topic_scope: AnswerTopicScope | None,
+) -> InventoryRequestMatch | None:
+    normalized = _normalized_words(question_analysis.original_question)
+    raw_tokens = set(normalized.split())
+    tokens = _content_tokens(question_analysis.original_question)
+    has_inventory_noun = bool(tokens.intersection(_INVENTORY_TRIGGER_NOUNS) or raw_tokens.intersection(_INVENTORY_TRIGGER_NOUNS))
+    has_count_trigger = bool(re.search(r"\b(how many|number of|count|total)\b", normalized))
+    has_list_trigger = bool(re.search(r"\b(list|which|what are|show)\b", normalized))
+    has_available_trigger = bool(re.search(r"\b(available|exist|there are|there is|do we have)\b", normalized))
+    is_inventory = (
+        (has_count_trigger and has_inventory_noun)
+        or (has_list_trigger and has_inventory_noun and has_available_trigger)
+        or (has_list_trigger and tokens.intersection({"project", "benefit", "policy", "setup"}))
+        or (question_analysis.answer_type == "list" and has_inventory_noun and has_available_trigger)
+    )
+    if not is_inventory:
+        return None
+
+    target_tokens = tuple(
+        token
+        for token in tokens
+        if token not in _INVENTORY_GENERIC_TERMS and token not in {"available", "many", "total"}
+    )
+    if not target_tokens and topic_scope:
+        target_tokens = tuple(
+            token
+            for token in _content_tokens(" ".join([topic_scope.topic.name, *topic_scope.retrieval_terms]))
+            if token not in _INVENTORY_GENERIC_TERMS
+        )
+    target_tokens = tuple(dict.fromkeys(target_tokens))
+    section_inventory = "section" in raw_tokens and not tokens.intersection({"project", "benefit", "policy", "setup"})
+    mode = "count" if has_count_trigger else "list"
+    return InventoryRequestMatch(
+        mode=mode,
+        target_tokens=target_tokens,
+        target_label=_target_label(target_tokens, section_inventory=section_inventory),
+        section_inventory=section_inventory,
+    )
+
+
+def _allowed_inventory_documents(documents: list[SourceDocument], access_scope: AccessScope) -> list[SourceDocument]:
+    allowed_acl_tags = set(access_scope.allowed_acl_tags)
+    allowed: list[SourceDocument] = []
+    for document in documents:
+        if document.tenant_id != access_scope.tenant_id:
+            continue
+        if access_scope.source_filters and document.source_system not in access_scope.source_filters:
+            continue
+        document_acl_tags = set(document.acl_tags)
+        if document_acl_tags and not document_acl_tags.intersection(allowed_acl_tags):
+            continue
+        allowed.append(document)
+    return allowed
+
+
+def _matching_inventory_documents(
+    documents: list[SourceDocument],
+    match: InventoryRequestMatch,
+) -> list[SourceDocument]:
+    if not match.target_tokens:
+        return _dedupe_documents(documents)
+    scored: list[tuple[int, str, SourceDocument]] = []
+    target = set(match.target_tokens)
+    required_overlap = 2 if len(target) > 1 else 1
+    for document in documents:
+        section_text = _document_section_text(document)
+        title_text = document.title
+        metadata_text = _document_metadata_text(document)
+        tag_text = " ".join(document.tags)
+        section_tokens = _content_tokens(section_text)
+        title_tokens = _content_tokens(title_text)
+        metadata_tokens = _content_tokens(metadata_text)
+        tag_tokens = _content_tokens(tag_text)
+        overlap = target.intersection(section_tokens | title_tokens | metadata_tokens | tag_tokens)
+        phrase_score = _inventory_phrase_score(" ".join(match.target_tokens), section_text, title_text, metadata_text, tag_text)
+        if len(overlap) < required_overlap and phrase_score <= 0:
+            continue
+        score = len(overlap)
+        score += len(target.intersection(section_tokens)) * 3
+        score += len(target.intersection(title_tokens)) * 2
+        score += len(target.intersection(tag_tokens))
+        score += phrase_score
+        scored.append((score, f"{document.section_path or ''}/{document.title}".lower(), document))
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return _dedupe_documents([document for _score, _sort_key, document in scored])
+
+
+def _inventory_phrase_score(target_phrase: str, *values: str) -> int:
+    if not target_phrase:
+        return 0
+    score = 0
+    for index, value in enumerate(values):
+        if _contains_phrase(value, target_phrase):
+            score += 8 if index == 0 else 4
+    return score
+
+
+def _dedupe_documents(documents: list[SourceDocument]) -> list[SourceDocument]:
+    deduped: dict[str, SourceDocument] = {}
+    for document in documents:
+        existing = deduped.get(document.source_item_id)
+        if existing is None or document.last_modified_utc > existing.last_modified_utc:
+            deduped[document.source_item_id] = document
+    return sorted(deduped.values(), key=lambda document: ((document.section_path or "").lower(), document.title.lower()))
+
+
+def _format_inventory_answer(match: InventoryRequestMatch, documents: list[SourceDocument]) -> str:
+    if match.section_inventory:
+        return _format_section_inventory_answer(documents)
+
+    count = len(documents)
+    noun = _inventory_noun(match.target_tokens, count=count)
+    section_label = _common_section_label(documents)
+    heading = match.target_label if match.target_label != "Pages" else "Available Pages"
+    location = f" in {section_label}" if section_label and match.target_tokens else ""
+    lead = f"There {'is' if count == 1 else 'are'} {count} accessible {noun}{location}."
+    listed_documents = documents[:25]
+    lines = [f"### {heading}", "", lead]
+    if listed_documents:
+        lines.extend(["", "Page titles:"])
+        lines.extend(f"- {document.title}" for document in listed_documents)
+        if count > len(listed_documents):
+            lines.append(f"- ...and {count - len(listed_documents)} more pages.")
+    return "\n".join(lines)
+
+
+def _format_section_inventory_answer(documents: list[SourceDocument]) -> str:
+    sections: dict[str, int] = {}
+    for document in documents:
+        section = _document_section_text(document) or "Unsectioned"
+        sections[section] = sections.get(section, 0) + 1
+    items = sorted(sections.items(), key=lambda item: item[0].lower())
+    lines = ["### Available Sections", "", f"There {'is' if len(items) == 1 else 'are'} {len(items)} accessible sections."]
+    if items:
+        lines.extend(["", "Sections:"])
+        lines.extend(f"- {section} ({count} {'page' if count == 1 else 'pages'})" for section, count in items[:25])
+        if len(items) > 25:
+            lines.append(f"- ...and {len(items) - 25} more sections.")
+    return "\n".join(lines)
+
+
+def _no_inventory_answer(match: InventoryRequestMatch) -> str:
+    noun = _inventory_noun(match.target_tokens)
+    return f"I could not find any accessible {noun} in the indexed OneNote source titles or sections."
+
+
+def _inventory_response(
+    *,
+    answer: str,
+    documents: list[SourceDocument],
+    request: AnswerRequest,
+    access_scope: AccessScope,
+    candidate_count: int,
+    started: float,
+    suggested_questions: list[str],
+) -> AnswerResponse:
+    citations = [_citation_from_source_document(index, document) for index, document in enumerate(documents[:25], start=1)]
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    retrieval_meta = RetrievalMetadata(
+        strategy="metadata-inventory",
+        access_scope=access_scope,
+        requested_top_k=request.top_k,
+        candidate_count=candidate_count,
+        returned_count=len(documents),
+        filtered_count=0,
+        source_filters=access_scope.source_filters,
+        collections_queried=[],
+        payload_filter={},
+        duration_ms=duration_ms,
+        topic_id=request.topic_id,
+        answer_type="inventory",
+    )
+    return AnswerResponse(
+        answer=answer,
+        citations=citations,
+        retrieval_meta=retrieval_meta,
+        metadata=AnswerMetadata(
+            provider="metadata-inventory",
+            model="source-title-index",
+            retrieval_strategy="metadata-inventory",
+            retrieved_chunk_count=len(citations),
+            source_systems=sorted({document.source_system for document in documents}),
+            duration_ms=duration_ms,
+            retrieval_latency_ms=duration_ms,
+            completion_latency_ms=0,
+            freshness_delay_ms=_freshness_delay_ms(citations),
+            citation_count=len(citations),
+        ),
+        suggested_questions=suggested_questions,
+    )
+
+
+def _citation_from_source_document(index: int, document: SourceDocument) -> Citation:
+    return Citation(
+        index=index,
+        chunk_id=f"inventory:{document.source_item_id}",
+        source_item_id=document.source_item_id,
+        chunk_index=0,
+        title=document.title,
+        source_system=document.source_system,
+        source_container=document.source_container,
+        source_url=document.source_url,
+        section_path=document.section_path,
+        snippet=f"Page title: {document.title}. Section: {_document_section_text(document) or 'N/A'}.",
+        last_modified_utc=document.last_modified_utc,
+        last_edited_by=_metadata_string(
+            document.metadata,
+            "last_edited_by",
+            "lastEditedBy",
+            "last_modified_by",
+            "lastModifiedBy",
+        ),
+        client_url=_metadata_string(document.metadata, "client_url", "oneNoteClientUrl", "onenote_client_url"),
+        metadata={**document.metadata, "inventory_source": True},
+    )
+
+
+def _target_label(target_tokens: tuple[str, ...], *, section_inventory: bool) -> str:
+    if section_inventory:
+        return "Available Sections"
+    if not target_tokens:
+        return "Pages"
+    if "project" in target_tokens:
+        return "Projects"
+    if "benefit" in target_tokens:
+        return "Company Benefits"
+    if "policy" in target_tokens:
+        return "Company Policies"
+    return " ".join(target_tokens).title()
+
+
+def _inventory_noun(target_tokens: tuple[str, ...], *, count: int | None = None) -> str:
+    if "project" in target_tokens:
+        return "project" if count == 1 else "projects"
+    if "benefit" in target_tokens:
+        return "benefit page" if count == 1 else "benefit pages"
+    if "policy" in target_tokens:
+        return "policy page" if count == 1 else "policy pages"
+    if "setup" in target_tokens:
+        return "setup page" if count == 1 else "setup pages"
+    if "guide" in target_tokens:
+        return "guide page" if count == 1 else "guide pages"
+    return "page" if count == 1 else "pages"
+
+
+def _common_section_label(documents: list[SourceDocument]) -> str:
+    sections = {_document_section_name(document) for document in documents}
+    sections.discard("")
+    return next(iter(sections)) if len(sections) == 1 else ""
+
+
+def _document_section_text(document: SourceDocument) -> str:
+    return document.section_path or str(document.metadata.get("section_name") or "").strip()
+
+
+def _document_section_name(document: SourceDocument) -> str:
+    metadata_section = str(document.metadata.get("section_name") or "").strip()
+    if metadata_section:
+        return metadata_section
+    if document.section_path:
+        return document.section_path.rsplit("/", maxsplit=1)[-1].strip()
+    return ""
+
+
+def _document_metadata_text(document: SourceDocument) -> str:
+    values = [
+        document.metadata.get("notebook_name"),
+        document.metadata.get("section_name"),
+        document.metadata.get("page_id"),
+    ]
+    return " ".join(str(value) for value in values if value)
+
+
 def _final_answer_is_valid(
     answer_text: str,
     citations: list[Citation],
@@ -505,8 +1187,6 @@ def _final_answer_is_valid(
     if not allowed_chunk_ids:
         return False
     if any(citation.chunk_id not in allowed_chunk_ids for citation in citations):
-        return False
-    if not re.search(r"(?im)^_?sources?:", answer_text) and not re.search(r"\[\d+\]", answer_text):
         return False
     return True
 
@@ -609,11 +1289,33 @@ def _context_budget_for_depth(answer_depth: str) -> int:
     return 7000
 
 
+_FENCE_BLOCK = re.compile(r"(```.*?```)", re.DOTALL)
+
+
 def _strip_inline_citation_markers(answer_text: str) -> str:
-    without_markers = re.sub(r"\s*\[\d+\](?=([.,;:!?])|\s|$)", "", answer_text)
-    without_markers = re.sub(r"[ \t]+([.,;:!?])", r"\1", without_markers)
-    without_markers = re.sub(r"[ \t]+\n", "\n", without_markers)
-    return without_markers.strip()
+    # Never edit inside fenced code blocks - punctuation/whitespace there is
+    # part of commands (e.g. "wayland-0 ./build/...") and must be preserved.
+    pieces = _FENCE_BLOCK.split(answer_text)
+    for index, piece in enumerate(pieces):
+        if index % 2 == 1:  # captured fenced block
+            continue
+        piece = re.sub(r"\s*\[\d+\](?=([.,;:!?])|\s|$)", "", piece)
+        piece = re.sub(r"[ \t]+([.,;:!?])", r"\1", piece)
+        piece = re.sub(r"[ \t]+\n", "\n", piece)
+        pieces[index] = piece
+    return "".join(pieces).strip()
+
+
+def _strip_trailing_source_line(answer_text: str) -> str:
+    lines = answer_text.rstrip().splitlines()
+    if not lines:
+        return answer_text.strip()
+    if not re.match(r"(?i)^\s*[_*]?\s*sources?\s*:\s*.+?\s*[_*]?\s*$", lines[-1]):
+        return answer_text.strip()
+    lines = lines[:-1]
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return "\n".join(lines).strip()
 
 
 def _is_no_information_text(answer_text: str) -> bool:
@@ -628,18 +1330,6 @@ def _normalize_no_information_text(answer_text: str) -> str:
     if _is_no_information_text(answer_text):
         return NO_INFORMATION_ANSWER
     return answer_text
-
-
-def _append_source_titles(answer_text: str, citations: list[Citation]) -> str:
-    if not citations or _is_no_information_text(answer_text):
-        return answer_text
-    if re.search(r"(?im)^_?sources?:", answer_text):
-        return answer_text
-    titles = list(dict.fromkeys(citation.title for citation in citations if citation.title))
-    if not titles:
-        return answer_text
-    label = "Source" if len(titles) == 1 else "Sources"
-    return f"{answer_text.rstrip()}\n\n_{label}: {'; '.join(titles)}_"
 
 
 _STOP_WORDS = {
@@ -737,13 +1427,15 @@ def _chunk_relevance_score(question: str, chunk) -> float:
     tag_tokens = _content_tokens(" ".join(chunk.tags))
     all_tokens = title_tokens | section_tokens | body_tokens | tag_tokens
     overlap = question_tokens.intersection(all_tokens)
-    if not overlap:
+    fuzzy_score = fuzzy_metadata_relevance_score(question, chunk)
+    if not overlap and fuzzy_score <= 0:
         return 0.0
 
     score = float(len(overlap))
     score += (len(overlap) / len(question_tokens)) * 2.0
     score += len(question_tokens.intersection(title_tokens)) * 3.0
     score += len(question_tokens.intersection(section_tokens)) * 1.0
+    score += fuzzy_score
 
     key_phrase = _question_key_phrase(question)
     if key_phrase:
@@ -1039,6 +1731,67 @@ def _append_missing_citation(answer_text: str, citations: list[Citation]) -> str
     return f"{stripped} {citation_marker}"
 
 
+_HEDGE_RELEVANCE_ORDER = {"direct": 3, "partial": 2, "related": 1, "irrelevant": 0}
+
+
+def _related_chunks_for_hedge(
+    question_analysis: QuestionAnalysis,
+    grades: tuple[EvidenceGrade, ...],
+    chunks: list,
+    *,
+    limit: int = 3,
+) -> list:
+    """Pick the chunks worth surfacing behind a "partially related" caveat.
+
+    Keeps only chunks that grading did not mark irrelevant and that share a real
+    topical link with the question (see ``_chunk_supports_hedge``), ranked by how
+    relevant grading judged them. Returns an empty list when nothing qualifies.
+    """
+    grade_by_id = {grade.chunk_id: grade for grade in grades}
+    scored: list[tuple[int, float, object]] = []
+    for chunk in chunks:
+        grade = grade_by_id.get(chunk.chunk_id)
+        if grade is None or grade.relevance == "irrelevant":
+            continue
+        if not _chunk_supports_hedge(question_analysis, chunk):
+            continue
+        scored.append((_HEDGE_RELEVANCE_ORDER.get(grade.relevance, 0), grade.confidence, chunk))
+    scored.sort(key=lambda item: (-item[0], -item[1]))
+    return [chunk for _relevance, _confidence, chunk in scored[:limit]]
+
+
+def _chunk_supports_hedge(question_analysis: QuestionAnalysis, chunk) -> bool:
+    """True when a chunk is genuinely topically related to the question.
+
+    Requires more than one weak/generic shared word so a coincidental overlap
+    (for example "paid" between a salary question and a paid-leave note) never
+    surfaces a misleading near-answer.
+    """
+    if _is_value_reference_only(question_analysis.search_text, chunk.chunk_text):
+        return False
+    haystack = _content_tokens(
+        " ".join([chunk.title, chunk.section_path or "", chunk.chunk_text, " ".join(chunk.tags)])
+    )
+    if not haystack:
+        return False
+    must_tokens = _content_tokens(" ".join(question_analysis.must_have_concepts))
+    if _meaningful_tokens(must_tokens.intersection(haystack)):
+        return True
+    entity_tokens = _content_tokens(" ".join(question_analysis.important_entities))
+    if len(_meaningful_tokens(entity_tokens.intersection(haystack))) >= 2:
+        return True
+    query_tokens = _content_tokens(question_analysis.search_text)
+    return len(_meaningful_tokens(query_tokens.intersection(haystack))) >= 2
+
+
+def _meaningful_tokens(tokens: set[str]) -> set[str]:
+    return {token for token in tokens if token not in _GENERIC_HEDGE_TERMS}
+
+
+def _hedged_answer_text(body: str) -> str:
+    return f"{HEDGED_ANSWER_PREAMBLE}\n\n{body.strip()}"
+
+
 def _extractive_response(
     question_analysis: QuestionAnalysis | str,
     chunks: list,
@@ -1058,8 +1811,115 @@ def _extractive_response(
     else:
         selection_question = question_analysis
         extraction_question = question_analysis
+    if isinstance(question_analysis, QuestionAnalysis) and is_procedure_question(question_analysis):
+        procedure = _procedure_extractive_answer(chunks, citations)
+        if procedure is not None:
+            return procedure
     selected_citations = _select_fallback_citations(selection_question, chunks, citations)
-    return _extractive_answer(extraction_question, chunks, selected_citations), selected_citations
+    answer = _extractive_answer(extraction_question, chunks, selected_citations)
+    if _is_no_information_text(answer):
+        return NO_INFORMATION_ANSWER, []
+    return answer, selected_citations
+
+
+_PROCEDURE_FALLBACK_KINDS = {
+    "procedure",
+    "prerequisites",
+    "install",
+    "configuration",
+    "commands",
+    "run",
+    "verification",
+    "checklist",
+    "troubleshooting",
+}
+
+
+def _procedure_extractive_answer(
+    chunks: list,
+    citations: list[Citation],
+) -> tuple[str, list[Citation]] | None:
+    """Build a full, multi-section setup answer from procedure chunks.
+
+    Only uses content already present in the retrieved chunks. Returns ``None``
+    when no procedure content is available so the caller can fall back to the
+    standard extractive path.
+    """
+    procedure_chunks = [chunk for chunk in chunks if chunk_kind_of(chunk) in _PROCEDURE_FALLBACK_KINDS]
+    if not procedure_chunks:
+        return None
+    procedure_chunks.sort(key=lambda chunk: (0 if chunk_kind_of(chunk) == "procedure" else 1, -chunk.score))
+    citations_by_chunk = {citation.chunk_id: citation for citation in citations}
+
+    sections: list[str] = []
+    used_citations: list[Citation] = []
+    seen_headings: set[str] = set()
+    title = procedure_chunks[0].title
+    for chunk in procedure_chunks:
+        rendered = _render_procedure_markdown(chunk.chunk_text, seen_headings)
+        if not rendered:
+            continue
+        sections.append(rendered)
+        citation = citations_by_chunk.get(chunk.chunk_id)
+        if citation is not None and citation not in used_citations:
+            used_citations.append(citation)
+        if chunk_kind_of(chunk) == "procedure":
+            break  # the combined chunk already covers the whole procedure
+
+    body = "\n\n".join(part for part in sections if part).strip()
+    if not body:
+        return None
+    heading_title = title if re.search(r"\bsetup\b", title, re.IGNORECASE) else f"{title} setup"
+    answer = f"### {heading_title}\n\n{body}"
+    return answer, (used_citations or citations[:1])
+
+
+def _render_procedure_markdown(text: str, seen_headings: set[str]) -> str:
+    """Reformat clean procedure text into nested Markdown for an answer.
+
+    Drops the page title and metadata lines, demotes section headings so they
+    nest under the answer heading, and keeps fenced code blocks, lists, and
+    table rows intact.
+    """
+    out: list[str] = []
+    in_fence = False
+    for line in text.replace("\r\n", "\n").split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            out.append(line)
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            out.append(line)
+            continue
+        if re.match(r"^#\s+\S", stripped):  # page H1 title - drop
+            continue
+        if _METADATA_FALLBACK_LABEL.match(stripped) or _is_breadcrumb_line(stripped):
+            continue
+        heading_match = re.match(r"^(#{2,6})\s+(.*)$", stripped)
+        if heading_match:
+            heading_text = heading_match.group(2).strip()
+            key = heading_text.lower()
+            if key in seen_headings:
+                continue
+            seen_headings.add(key)
+            level = min(len(heading_match.group(1)) + 2, 6)
+            out.append(f"{'#' * level} {heading_text}")
+            continue
+        out.append(line)
+    # collapse excess blank lines
+    rendered = re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+    return rendered
+
+
+_METADATA_FALLBACK_LABEL = re.compile(
+    r"^(section|repository|owner|author|summary|tags?|status|page metadata|last edited|last modified|notebook)\s*:",
+    re.IGNORECASE,
+)
+
+
+def _is_breadcrumb_line(value: str) -> bool:
+    return " / " in value or bool(re.search(r"\S\s-\s\d+\s\S", value))
 
 
 def _select_fallback_citations(question: str, chunks: list, citations: list[Citation]) -> list[Citation]:
@@ -1102,24 +1962,75 @@ def _extractive_answer(question: str, chunks: list, citations: list[Citation]) -
         if not block:
             continue
         blocks.append(block)
-    return "\n\n".join(blocks) if blocks else NO_INFORMATION_ANSWER
+    if not blocks:
+        return NO_INFORMATION_ANSWER
+    answer = "\n\n".join(blocks)
+    # A chunk whose only usable text echoes its own title or heading is not a
+    # real answer - decline rather than emit a title-only response.
+    if _is_title_only_answer(answer, chunks):
+        return NO_INFORMATION_ANSWER
+    return answer
 
 
 def _split_content_segments(value: str) -> list[tuple[str, bool]]:
     segments: list[tuple[str, bool]] = []
-    for raw_segment in re.split(r"(?<=[.!?])\s+|\n+", value):
-        cleaned = raw_segment.strip(" \t\r\n-*")
-        if not cleaned:
+    for part, is_code in _iter_fence_aware_parts(value):
+        if is_code:
+            segments.append((part, False))  # fenced code block, kept atomic
             continue
-        is_page_heading = _is_page_heading(cleaned)
-        is_heading = cleaned.startswith("#") or is_page_heading
-        if is_heading:
-            cleaned = cleaned.lstrip("#").strip()
-        if is_page_heading:
-            cleaned = _page_heading_text(cleaned)
-        if cleaned:
-            segments.append((cleaned, is_heading))
+        for raw_segment in re.split(r"(?<=[.!?])\s+|\n+", part):
+            cleaned = raw_segment.strip(" \t\r\n-*")
+            if not cleaned:
+                continue
+            is_page_heading = _is_page_heading(cleaned)
+            is_heading = cleaned.startswith("#") or is_page_heading
+            if is_heading:
+                cleaned = cleaned.lstrip("#").strip()
+            if is_page_heading:
+                cleaned = _page_heading_text(cleaned)
+            if cleaned:
+                segments.append((cleaned, is_heading))
     return segments
+
+
+def _iter_fence_aware_parts(value: str):
+    """Yield (text, is_code) parts, keeping ```...``` fenced blocks atomic."""
+    lines = value.replace("\r\n", "\n").split("\n")
+    buffer: list[str] = []
+    code: list[str] | None = None
+    for line in lines:
+        if line.strip().startswith("```"):
+            if code is None:
+                if buffer:
+                    yield "\n".join(buffer), False
+                    buffer = []
+                code = [line]
+            else:
+                code.append(line)
+                yield "\n".join(code), True
+                code = None
+            continue
+        if code is not None:
+            code.append(line)
+        else:
+            buffer.append(line)
+    if code is not None:  # unterminated fence; treat as code
+        yield "\n".join(code), True
+    elif buffer:
+        yield "\n".join(buffer), False
+
+
+def _is_code_segment(value: str) -> bool:
+    return value.lstrip().startswith("```")
+
+
+def _strip_code_fence(value: str) -> str:
+    lines = value.strip().split("\n")
+    if lines and lines[0].lstrip().startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
 
 
 def _is_page_heading(value: str) -> bool:
@@ -1193,6 +2104,10 @@ def _best_supported_segments(question: str, chunk) -> list[str]:
         ):
             return _segment_window_segments(segments, _first_body_segment_index(segments), include_following=True)
 
+    if fuzzy_metadata_relevance_score(question, chunk) > 0:
+        fuzzy_index = _best_fuzzy_metadata_segment_index(segments)
+        return _segment_window_segments(segments, fuzzy_index, include_following=True)
+
     ranked: list[tuple[float, int]] = []
     title_tokens = _content_tokens(chunk.title)
     section_tokens = _content_tokens(chunk.section_path or "")
@@ -1234,6 +2149,26 @@ def _best_supported_segments(question: str, chunk) -> list[str]:
     return _segment_window_segments(segments, start_index, include_following=include_following)
 
 
+def _best_fuzzy_metadata_segment_index(segments: list[tuple[str, bool]]) -> int:
+    procedure_terms = {"install", "configure", "configuration", "run", "setup", "step", "verify", "verification"}
+    first_informative = 0
+    for index, (segment, is_heading) in enumerate(segments):
+        if is_heading or _metadata_or_breadcrumb_segment(segment):
+            continue
+        if first_informative == 0:
+            first_informative = index
+        if _content_tokens(segment).intersection(procedure_terms):
+            return index
+    return first_informative
+
+
+def _metadata_or_breadcrumb_segment(segment: str) -> bool:
+    if _METADATA_FALLBACK_LABEL.match(segment) or _is_breadcrumb_line(segment):
+        return True
+    tokens = _content_tokens(segment)
+    return bool(" - " in segment and len(tokens) <= 4 and not re.search(r"[.!?:]", segment))
+
+
 def _best_supported_segment(question: str, chunk) -> str:
     return "\n".join(_best_supported_segments(question, chunk))
 
@@ -1260,18 +2195,32 @@ def _heading_is_subtitle_of_fallback(heading: str, fallback_title: str) -> bool:
 
 
 def _format_markdown_block(title: str, lines: list[str], citation_index: int, *, question: str) -> str:
-    cleaned_lines = [_clean_answer_line(line) for line in lines]
-    cleaned_lines = [line for line in cleaned_lines if line]
-    cleaned_lines = _filter_answer_lines(question, cleaned_lines)
-    if not cleaned_lines:
-        return ""
+    text_lines = [_clean_answer_line(line) for line in lines if not _is_code_segment(line)]
+    text_lines = _filter_answer_lines(question, [line for line in text_lines if line])
+    allowed_text = set(text_lines)
 
-    bullets = [_format_markdown_bullet(line, citation_index) for line in cleaned_lines]
-    bullets = [bullet for bullet in bullets if bullet]
-    if not bullets:
+    parts: list[str] = []
+    for line in lines:
+        if _is_code_segment(line):
+            code = _strip_code_fence(line)
+            if code:
+                parts.append(f"```{_code_lang(line)}\n{code}\n```")
+            continue
+        cleaned = _clean_answer_line(line)
+        if not cleaned or cleaned not in allowed_text:
+            continue
+        bullet = _format_markdown_bullet(cleaned, citation_index)
+        if bullet:
+            parts.append(bullet)
+    if not parts:
         return ""
     heading = title.strip() or "Answer"
-    return f"### {heading}\n\n" + "\n".join(bullets)
+    return f"### {heading}\n\n" + "\n".join(parts)
+
+
+def _code_lang(fence_block: str) -> str:
+    first_line = fence_block.lstrip().split("\n", 1)[0]
+    return first_line.lstrip("`").strip() or "text"
 
 
 def _clean_answer_line(value: str) -> str:
@@ -1355,3 +2304,126 @@ def _freshness_delay_ms(citations: list[Citation]) -> int | None:
         return None
     newest_source_timestamp = max(citation.last_modified_utc.astimezone(UTC) for citation in citations)
     return max(0, int((datetime.now(UTC) - newest_source_timestamp).total_seconds() * 1000))
+
+
+def _related_attachment_refs(question: str, chunk) -> list[dict]:
+    refs = (chunk.metadata or {}).get("attachment_refs")
+    if not isinstance(refs, list):
+        return []
+    return [
+        ref
+        for ref in refs
+        if isinstance(ref, dict) and _attachment_related_to_chunk(question, chunk, ref)
+    ]
+
+
+def _attachment_refs(chunk) -> list[dict]:
+    refs = (chunk.metadata or {}).get("attachment_refs")
+    if not isinstance(refs, list):
+        return []
+    return [ref for ref in refs if isinstance(ref, dict)]
+
+
+def _attachment_related_to_chunk(question: str, chunk, payload: dict) -> bool:
+    file_name = str(payload.get("file_name") or "")
+    download_url = str(payload.get("download_url") or "")
+    if not file_name and not download_url:
+        return False
+    haystack = _normalized_words(" ".join([question, chunk.title, chunk.section_path or "", chunk.chunk_text]))
+    name_words = _normalized_words(file_name)
+    stem_words = _normalized_words(file_name.rsplit(".", maxsplit=1)[0])
+    if name_words and name_words in haystack:
+        return True
+    if stem_words and stem_words in haystack:
+        return True
+    if download_url and download_url in chunk.chunk_text:
+        return True
+    tokens = _content_tokens(file_name)
+    return bool(tokens and tokens.intersection(_content_tokens(question)))
+
+
+def _download_from_metadata(metadata: dict) -> DownloadLink | None:
+    download_id = metadata.get("download_id")
+    file_name = metadata.get("attachment_file_name") or metadata.get("file_name")
+    download_url = metadata.get("download_url")
+    parent_source_item_id = metadata.get("parent_source_item_id")
+    parent_title = metadata.get("parent_title")
+    if not all([download_id, file_name, download_url, parent_source_item_id, parent_title]):
+        return None
+    return DownloadLink(
+        download_id=str(download_id),
+        file_name=str(file_name),
+        mime_type=_optional_string(metadata.get("mime_type") or metadata.get("attachment_mime_type")),
+        file_extension=str(metadata.get("attachment_file_extension") or metadata.get("file_extension") or ""),
+        size_bytes=_int_value(metadata.get("attachment_size_bytes") or metadata.get("size_bytes")),
+        readable=bool(metadata.get("readable", True)),
+        parent_source_item_id=str(parent_source_item_id),
+        parent_title=str(parent_title),
+        download_url=str(download_url),
+        indexed_source_item_id=_optional_string(metadata.get("indexed_source_item_id")),
+    )
+
+
+def _download_from_attachment(attachment: SourceAttachment) -> DownloadLink:
+    return DownloadLink(
+        download_id=attachment.download_id,
+        file_name=attachment.file_name,
+        mime_type=attachment.mime_type,
+        file_extension=attachment.file_extension,
+        size_bytes=attachment.size_bytes,
+        readable=attachment.readable,
+        parent_source_item_id=attachment.parent_source_item_id,
+        parent_title=attachment.parent_title,
+        download_url=f"/api/v1/attachments/{attachment.download_id}/download" if attachment.storage_path else attachment.resource_url,
+        indexed_source_item_id=attachment.indexed_source_item_id,
+    )
+
+
+def _attachment_payload(attachment: SourceAttachment) -> dict:
+    return {
+        "download_id": attachment.download_id,
+        "file_name": attachment.file_name,
+        "download_url": f"/api/v1/attachments/{attachment.download_id}/download" if attachment.storage_path else attachment.resource_url,
+        "parent_source_item_id": attachment.parent_source_item_id,
+        "parent_title": attachment.parent_title,
+        "file_extension": attachment.file_extension,
+        "mime_type": attachment.mime_type,
+        "size_bytes": attachment.size_bytes,
+        "readable": attachment.readable,
+        "indexed_source_item_id": attachment.indexed_source_item_id,
+    }
+
+
+def _append_downloads_section(answer_text: str, downloads: list[DownloadLink]) -> str:
+    if not downloads or re.search(r"^###\s+Downloads\b", answer_text, flags=re.IGNORECASE | re.MULTILINE):
+        return answer_text
+    lines = ["### Downloads", ""]
+    for download in downloads:
+        label = "Readable source" if download.readable else "Download"
+        detail = f"{label} from {download.parent_title}"
+        lines.append(f"- [{download.file_name}]({download.download_url}) - {detail}")
+    return f"{answer_text.rstrip()}\n\n" + "\n".join(lines)
+
+
+def _optional_string(value) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _int_value(value) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _metadata_string(metadata: dict, *keys: str) -> str | None:
+    for key in keys:
+        value = metadata.get(key)
+        if isinstance(value, dict):
+            value = value.get("displayName") or value.get("user", {}).get("displayName")
+        if value:
+            return str(value).strip()
+    return None

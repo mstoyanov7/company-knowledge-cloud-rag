@@ -46,13 +46,16 @@ class AppSettings(BaseSettings):
     graph_onenote_notebook_scope: str = ""
     graph_onenote_scope: str = ""
     onenote_page_page_size: int = 100
-    onenote_chunk_size_chars: int = 800
-    onenote_chunk_overlap_chars: int = 120
+    onenote_chunk_size_chars: int = 2000
+    onenote_chunk_overlap_chars: int = 300
+    onenote_procedure_chunk_max_chars: int = 5000
+    rag_context_max_chars: int = 10000
     onenote_vector_collection: str = "onenote_chunks"
     onenote_token_cache_path: str = ".cache/onenote_token_cache.json"
     onenote_retry_attempts: int = 3
     onenote_retry_backoff_seconds: float = 1.0
     onenote_incremental_lookback_seconds: int = 0
+    attachment_storage_dir: str = ".cache/attachments"
 
     ops_job_max_attempts: int = 5
     ops_job_base_backoff_seconds: int = 30
@@ -86,12 +89,30 @@ class AppSettings(BaseSettings):
     retrieval_candidate_multiplier: int = 3
     retrieval_score_threshold: float | None = None
     retrieval_min_keyword_overlap: int = 1
-    retrieval_lexical_scan_limit: int = 1000
+    # Max chunks the lexical (title/keyword) fallback scans per query. The scan
+    # paginates through the whole accessible corpus; <= 0 means "scan all" so a
+    # title match is never missed because the page sat past the first batch.
+    retrieval_lexical_scan_limit: int = 0
+    # Quiz-style clarification: when a specific question is equally answerable
+    # from several distinct pages, ask the user which one they mean instead of
+    # guessing. closeness_ratio gates "no single dominant page"; max_options caps
+    # how many candidates are offered (count is otherwise dynamic, min 2).
+    clarify_enabled: bool = True
+    clarify_closeness_ratio: float = 0.6
+    clarify_max_options: int = 5
     rerank_enabled: bool = True
     rag_debug_enabled: bool = False
+    app_database_url: str = "sqlite:///./.cache/rag_api.sqlite3"
 
     auth_enabled: bool = False
     auth_required: bool = False
+    auth_session_secret: SecretStr = SecretStr("local-dev-session-secret-change-me")
+    auth_session_ttl_hours: int = 168
+    auth_registration_tenant_id: str = ""
+    auth_registration_acl_tags: str = ""
+    auth_bootstrap_admin_email: str = ""
+    auth_bootstrap_admin_password: SecretStr = SecretStr("")
+    auth_bootstrap_admin_name: str = ""
     auth_tenant_id: str = ""
     auth_client_id: str = ""
     auth_allowed_audiences: str = ""
@@ -222,6 +243,12 @@ class AppSettings(BaseSettings):
     @property
     def auth_default_acl_tag_list(self) -> list[str]:
         return [tag.strip() for tag in self.auth_default_acl_tags.split(",") if tag.strip()]
+
+    @computed_field
+    @property
+    def auth_registration_acl_tag_list(self) -> list[str]:
+        configured = [tag.strip() for tag in self.auth_registration_acl_tags.split(",") if tag.strip()]
+        return configured or self.auth_default_acl_tag_list
 
     @computed_field
     @property

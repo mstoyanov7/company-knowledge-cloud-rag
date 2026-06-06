@@ -1,0 +1,88 @@
+/* ============================================================
+   Atlas — Knowledge Assistant · Design tokens
+   Warm-neutral base · terracotta accent · dark default
+   ============================================================ */
+
+:root {
+  --font-sans: "Figtree", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  /* compact pro-tool spacing (overridable by density tweak) */
+  --space: 1;            /* density multiplier */
+  --rail-w: 268px;
+  --source-w: 392px;
+
+  --r-xs: 5px;
+  --r-sm: 7px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  --ease: cubic-bezier(.32, .72, .29, 1);
+  --accent-h: 45;        /* terracotta hue (overridable) */
+}
+
+/* ---------- DARK (default) ---------- */
+[data-theme="dark"] {
+  --bg:          oklch(0.165 0.004 65);
+  --surface-1:   oklch(0.198 0.005 65);
+  --surface-2:   oklch(0.232 0.006 65);
+  --surface-3:   oklch(0.275 0.008 65);
+  --surface-hi:  oklch(0.315 0.009 65);
+
+  --border:      oklch(1 0 0 / 0.085);
+  --border-2:    oklch(1 0 0 / 0.15);
+
+  --text:        oklch(0.955 0.005 80);
+  --text-2:      oklch(0.745 0.007 80);
+  --text-3:      oklch(0.575 0.007 80);
+
+  --accent:        oklch(0.71 0.125 var(--accent-h));
+  --accent-strong: oklch(0.66 0.14 var(--accent-h));
+  --accent-soft:   oklch(0.71 0.125 var(--accent-h) / 0.16);
+  --accent-line:   oklch(0.71 0.125 var(--accent-h) / 0.42);
+  --on-accent:     oklch(0.20 0.02 65);
+
+  --ok:    oklch(0.74 0.12 155);
+  --warn:  oklch(0.78 0.12 75);
+  --danger: oklch(0.70 0.16 25);
+
+  --shadow-panel: 0 2px 6px rgba(0,0,0,.25), 0 24px 60px -12px rgba(0,0,0,.55);
+  --shadow-pop:   0 1px 2px rgba(0,0,0,.3), 0 16px 44px -10px rgba(0,0,0,.6);
+  --hl: oklch(0.78 0.12 75 / 0.26);  /* snippet highlight */
+}
+
+/* ---------- LIGHT ---------- */
+[data-theme="light"] {
+  --bg:          oklch(0.976 0.004 80);
+  --surface-1:   oklch(0.987 0.003 80);
+  --surface-2:   oklch(1 0 0);
+  --surface-3:   oklch(0.958 0.004 80);
+  --surface-hi:  oklch(0.935 0.005 80);
+
+  --border:      oklch(0 0 0 / 0.10);
+  --border-2:    oklch(0 0 0 / 0.16);
+
+  --text:        oklch(0.27 0.012 60);
+  --text-2:      oklch(0.46 0.012 60);
+  --text-3:      oklch(0.60 0.011 60);
+
+  --accent:        oklch(0.55 0.15 var(--accent-h));
+  --accent-strong: oklch(0.50 0.16 var(--accent-h));
+  --accent-soft:   oklch(0.55 0.15 var(--accent-h) / 0.10);
+  --accent-line:   oklch(0.55 0.15 var(--accent-h) / 0.30);
+  --on-accent:     oklch(0.99 0.01 80);
+
+  --ok:    oklch(0.55 0.13 155);
+  --warn:  oklch(0.62 0.13 65);
+  --danger: oklch(0.55 0.18 25);
+
+  --shadow-panel: 0 2px 6px rgba(31,25,18,.06), 0 22px 50px -14px rgba(31,25,18,.20);
+  --shadow-pop:   0 1px 2px rgba(31,25,18,.08), 0 14px 40px -10px rgba(31,25,18,.22);
+  --hl: oklch(0.80 0.14 75 / 0.40);
+}
+
+/* density tweak */
+[data-density="cozy"]    { --space: 1.18; }
+[data-density="compact"] { --space: 1; }
+[data-density="dense"]   { --space: 0.86; }

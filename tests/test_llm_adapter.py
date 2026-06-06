@@ -9,7 +9,7 @@ from rag_api.ports import PromptContext
 from rag_api.services.prompt_builder import PromptBuilder
 from shared_schemas import AppSettings, ChunkDocument, Citation
 
-NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes or readable attachments."
 
 
 def test_openai_compatible_llm_calls_chat_completions() -> None:

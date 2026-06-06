@@ -25,7 +25,7 @@ class OpenAICompatibleLlmAdapter:
             return GenerationResult(
                 provider=self.provider_name,
                 model=self.model_name,
-                answer_text="I could not find that information in the available OneNote notes.",
+                answer_text="I could not find that information in the available OneNote notes or readable attachments.",
             )
 
         response = await self._request(
@@ -196,7 +196,6 @@ class OpenAICompatibleLlmAdapter:
     def _messages(self, prompt: PromptContext) -> list[dict[str, str]]:
         context = "\n\n".join(prompt.context_blocks)
         question_analysis = _format_question_analysis(prompt.question_analysis)
-        source_titles = ", ".join(prompt.source_titles)
         request_fingerprint = hashlib.sha256(
             f"{prompt.user_question}\n{context}".encode("utf-8")
         ).hexdigest()[:12]
@@ -211,20 +210,23 @@ class OpenAICompatibleLlmAdapter:
             "Do not use any outside knowledge. "
             "Answer only the current user question, not a different topic from the context. "
             "Think silently about what the user means, but do not show hidden reasoning or chain-of-thought. "
-            "Do not answer by copying only the first keyword-matching sentence. "
+            "Do not answer by copying raw note text unless the user explicitly asks for exact wording. "
+            "Synthesize the context into a polished, human-like answer, as if a knowledgeable teammate is replying. "
             "Use the context to create a clear, descriptive answer that explains the relevant details. "
             "If the context contains multiple directly relevant facts, include all important details rather than only the first sentence. "
             "Answer naturally and politely, like a helpful human assistant. "
             "Return clean Markdown. Start with a brief summary, then details, then steps or bullets when applicable. "
             "Use a short heading and bullets, numbered steps, or tables for structured facts. "
-            "For key-value lines, preserve source labels as bold bullet labels. "
+            "When the answer includes commands, configuration, scripts, JSON, YAML, code, environment variables, or terminal output, "
+            "place that content in fenced Markdown code blocks with the best language hint, such as powershell, bash, json, yaml, python, or text. "
+            "Keep short identifiers, file paths, and variable names as inline code. "
+            "For key-value lines, rewrite them naturally unless a label is useful; then preserve the label as a bold bullet label. "
             "Do not add facts from loosely related chunks. "
-            "Do not include numeric citation markers like [1], [2], or source IDs. "
-            f"If you answer with facts, end with an italic Sources line using only these page titles: {source_titles}. "
+            "Do not include numeric citation markers like [1], [2], source IDs, or a visible Source/Sources line. "
             "If the context is related but does not directly answer the question, reply exactly: "
-            "I could not find that information in the available OneNote notes. "
+            "I could not find that information in the available OneNote notes or readable attachments. "
             "If the context does not answer the question, reply exactly: "
-            "I could not find that information in the available OneNote notes."
+            "I could not find that information in the available OneNote notes or readable attachments."
         )
         return [
             {"role": "system", "content": prompt.system_instruction},

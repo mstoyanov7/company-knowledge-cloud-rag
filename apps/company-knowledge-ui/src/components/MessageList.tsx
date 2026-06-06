@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import type { Citation, ClarificationOption } from "../api/answers";
 import type { Topic } from "../api/topics";
 import type { ChatMessage as ChatMessageModel } from "../state/conversations";
 import { ChatMessage } from "./ChatMessage";
@@ -8,10 +9,20 @@ import { SuggestedQuestions } from "./SuggestedQuestions";
 type MessageListProps = {
   topic: Topic;
   messages: ChatMessageModel[];
+  streamingId?: string | null;
   onSelectQuestion: (question: string) => void;
+  onOpenSource: (citation: Citation) => void;
+  onSelectClarification?: (message: ChatMessageModel, option: ClarificationOption) => void;
 };
 
-export function MessageList({ topic, messages, onSelectQuestion }: MessageListProps) {
+export function MessageList({
+  topic,
+  messages,
+  streamingId,
+  onSelectQuestion,
+  onOpenSource,
+  onSelectClarification
+}: MessageListProps) {
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -38,8 +49,12 @@ export function MessageList({ topic, messages, onSelectQuestion }: MessageListPr
         <ChatMessage
           key={message.id}
           message={message}
+          isStreaming={message.id === streamingId}
           followUpQuestions={message.id === lastDoneAssistantId ? topic.suggested_questions : []}
           onSelectQuestion={onSelectQuestion}
+          onOpenSource={onOpenSource}
+          onSelectClarification={onSelectClarification}
+          onStreamTick={() => scrollAnchorRef.current?.scrollIntoView({ block: "end" })}
         />
       ))}
       <div ref={scrollAnchorRef} />

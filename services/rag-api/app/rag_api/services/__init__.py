@@ -1,4 +1,5 @@
 from rag_api.services.access_scope import AccessScopeResolver
+from rag_api.services.activity import FeedbackService, QueryLogService
 from rag_api.services.answer_service import AnswerService
 from rag_api.services.auth import (
     AuthenticationService,
@@ -6,6 +7,7 @@ from rag_api.services.auth import (
     OidcTokenValidator,
     TokenValidationError,
 )
+from rag_api.services.documents import DocumentService
 from rag_api.services.evidence_grading import EvidenceAssessment, EvidenceGrade, EvidenceGrader
 from rag_api.services.prompt_builder import PromptBuilder
 from rag_api.services.query_understanding import (
@@ -29,11 +31,14 @@ __all__ = [
     "EvidenceAssessment",
     "EvidenceGrade",
     "EvidenceGrader",
+    "DocumentService",
+    "FeedbackService",
     "KeywordOverlapReranker",
     "OidcTokenValidator",
     "PromptBuilder",
     "QuestionAnalysis",
     "QueryPlanner",
+    "QueryLogService",
     "QueryUnderstanding",
     "SecurityAuditLogger",
     "SystemService",

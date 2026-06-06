@@ -13,10 +13,12 @@ from shared_schemas import (
     RetrievalMetadata,
     RetrievalRequest,
     RetrievalResult,
+    SourceDocument,
+    SourceAttachment,
     UserContext,
 )
 
-NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes or readable attachments."
 
 
 class StaticRetriever:
@@ -46,6 +48,26 @@ class StaticRetriever:
 
     async def ready(self) -> bool:
         return True
+
+
+class StaticMetadata:
+    name = "static-metadata"
+
+    def __init__(self, documents: list[SourceDocument], attachments: list[SourceAttachment] | None = None) -> None:
+        self.documents = documents
+        self.attachments = attachments or []
+
+    def list_documents(self) -> list[SourceDocument]:
+        return list(self.documents)
+
+    def list_attachments(self, parent_source_item_ids: list[str] | None = None) -> list[SourceAttachment]:
+        if parent_source_item_ids is None:
+            return list(self.attachments)
+        parents = set(parent_source_item_ids)
+        return [attachment for attachment in self.attachments if attachment.parent_source_item_id in parents]
+
+    def get_attachment(self, download_id: str) -> SourceAttachment | None:
+        return None
 
 
 class QueryAwareRetriever:
@@ -149,6 +171,94 @@ def _chunk(text: str, *, title: str = "Travel notes", chunk_id: str | None = Non
     )
 
 
+def _readable_attachment_chunk(
+    text: str,
+    *,
+    parent_source_item_id: str,
+    parent_title: str,
+    file_name: str,
+    chunk_id: str = "attachment-chunk",
+) -> ChunkDocument:
+    return _chunk(text, title=f"{parent_title} - {file_name}", chunk_id=chunk_id).model_copy(
+        update={
+            "source_item_id": f"onenote-attachment:{file_name}",
+            "source_url": f"/api/v1/attachments/download-{file_name}/download",
+            "chunk_id": chunk_id,
+            "metadata": {
+                "document_kind": "attachment",
+                "download_id": f"download-{file_name}",
+                "download_url": f"/api/v1/attachments/download-{file_name}/download",
+                "readable": True,
+                "indexed_source_item_id": f"onenote-attachment:{file_name}",
+                "parent_source_item_id": parent_source_item_id,
+                "parent_title": parent_title,
+                "parent_source_url": "https://example.test/page-abc",
+                "attachment_file_name": file_name,
+                "attachment_file_extension": file_name.rsplit(".", maxsplit=1)[-1],
+            },
+        }
+    )
+
+
+def _source_document(
+    title: str,
+    *,
+    section_path: str,
+    source_item_id: str | None = None,
+    acl_tags: list[str] | None = None,
+    content_text: str = "",
+) -> SourceDocument:
+    section_name = section_path.rsplit("/", maxsplit=1)[-1].strip()
+    return SourceDocument(
+        tenant_id="local-tenant",
+        source_system="onenote",
+        source_container="onenote",
+        source_item_id=source_item_id or f"onenote:{title}",
+        source_url=f"https://example.test/{title.replace(' ', '-').lower()}",
+        title=title,
+        file_name=f"{title}.one",
+        file_extension="one",
+        mime_type="text/html",
+        section_path=section_path,
+        last_modified_utc=datetime(2026, 4, 26, tzinfo=UTC),
+        acl_tags=acl_tags or ["employees"],
+        content_hash="hash",
+        content_text=content_text,
+        tags=[],
+        metadata={"section_name": section_name, "notebook_name": "Cloud-RAG"},
+    )
+
+
+def _attachment(
+    file_name: str,
+    *,
+    parent_source_item_id: str,
+    parent_title: str,
+    download_id: str | None = None,
+) -> SourceAttachment:
+    extension = file_name.rsplit(".", maxsplit=1)[-1].lower() if "." in file_name else ""
+    resolved_download_id = download_id or f"download-{file_name}"
+    return SourceAttachment(
+        download_id=resolved_download_id,
+        tenant_id="local-tenant",
+        source_system="onenote",
+        source_container="onenote",
+        parent_source_item_id=parent_source_item_id,
+        parent_title=parent_title,
+        source_url="https://example.test/page",
+        resource_url=f"https://example.test/{file_name}",
+        file_name=file_name,
+        file_extension=extension,
+        mime_type="application/octet-stream",
+        size_bytes=12,
+        readable=False,
+        storage_path=f"ab/{resolved_download_id}.{extension}",
+        content_hash=f"hash-{resolved_download_id}",
+        last_modified_utc=datetime(2026, 4, 26, tzinfo=UTC),
+        acl_tags=["employees"],
+    )
+
+
 async def _answer_for(question: str, chunk: ChunkDocument):
     service = AnswerService(
         llm=MockLlmAdapter("mock"),
@@ -198,6 +308,79 @@ async def _answer_with_static_llm_for_chunks(
     )
 
 
+def test_inventory_count_uses_page_titles_from_matching_section() -> None:
+    import asyncio
+
+    service = AnswerService(
+        llm=StaticLlm("This should not be used."),
+        prompt_builder=PromptBuilder(),
+        retriever=StaticRetriever([]),
+        metadata=StaticMetadata(
+            [
+                _source_document("Customer Portal Upgrade", section_path="Cloud-RAG / Project Setups"),
+                _source_document("Warehouse Scanner Rollout", section_path="Cloud-RAG / Project Setups"),
+                _source_document("Code of Conduct", section_path="Cloud-RAG / Company Policies"),
+            ]
+        ),
+        access_scope_resolver=AccessScopeResolver(),
+    )
+    from shared_schemas import AnswerRequest
+
+    response = asyncio.run(
+        service.answer(
+            AnswerRequest(
+                question="How many projects are available in the company?",
+                user_context=UserContext(acl_tags=["employees"]),
+                source_filters=["onenote"],
+            )
+        )
+    )
+
+    assert response.retrieval_meta.strategy == "metadata-inventory"
+    assert "There are 2 accessible projects in Project Setups." in response.answer
+    assert "Customer Portal Upgrade" in response.answer
+    assert "Warehouse Scanner Rollout" in response.answer
+    assert [citation.title for citation in response.citations] == [
+        "Customer Portal Upgrade",
+        "Warehouse Scanner Rollout",
+    ]
+
+
+def test_inventory_count_respects_acl_tags() -> None:
+    import asyncio
+
+    service = AnswerService(
+        llm=StaticLlm("This should not be used."),
+        prompt_builder=PromptBuilder(),
+        retriever=StaticRetriever([]),
+        metadata=StaticMetadata(
+            [
+                _source_document("Public Project", section_path="Cloud-RAG / Project Setups"),
+                _source_document(
+                    "Finance Migration",
+                    section_path="Cloud-RAG / Project Setups",
+                    acl_tags=["finance"],
+                ),
+            ]
+        ),
+        access_scope_resolver=AccessScopeResolver(),
+    )
+    from shared_schemas import AnswerRequest
+
+    response = asyncio.run(
+        service.answer(
+            AnswerRequest(
+                question="How many projects are available in the company?",
+                user_context=UserContext(acl_tags=["employees"]),
+                source_filters=["onenote"],
+            )
+        )
+    )
+
+    assert "There is 1 accessible project in Project Setups." in response.answer
+    assert [citation.title for citation in response.citations] == ["Public Project"]
+
+
 def test_answer_service_returns_no_information_for_irrelevant_retrieval_hit() -> None:
     import asyncio
 
@@ -241,8 +424,7 @@ def test_answer_service_falls_back_to_extract_when_model_output_is_uncited() -> 
 
     assert response.answer == (
         "### Developer setup\n\n"
-        "- Install Docker Desktop and configure Git credentials\n\n"
-        "_Source: Developer setup_"
+        "- Install Docker Desktop and configure Git credentials"
     )
     assert response.citations
 
@@ -268,8 +450,7 @@ def test_answer_service_repairs_uncited_grounded_descriptive_answer() -> None:
     assert response.answer == (
         "### Developer setup\n\n"
         "To configure Docker, install Docker Desktop from the onboarding package, "
-        "then sign in and configure Git credentials.\n\n"
-        "_Source: Developer setup_"
+        "then sign in and configure Git credentials."
     )
     assert response.citations
 
@@ -287,8 +468,7 @@ def test_answer_service_falls_back_to_extract_when_model_output_has_unsupported_
 
     assert response.answer == (
         "### Developer setup\n\n"
-        "- Install Docker Desktop and configure Git credentials\n\n"
-        "_Source: Developer setup_"
+        "- Install Docker Desktop and configure Git credentials"
     )
     assert response.citations
 
@@ -310,8 +490,7 @@ def test_answer_service_extracts_question_matching_sentence_from_mixed_chunk() -
 
     assert response.answer == (
         "### Developer setup\n\n"
-        "- Install Docker Desktop and configure Git credentials\n\n"
-        "_Source: Developer setup_"
+        "- Install Docker Desktop and configure Git credentials"
     )
     assert response.citations
 
@@ -335,8 +514,7 @@ def test_answer_service_replaces_title_only_model_answer_with_body_content() -> 
     assert response.answer == (
         "### Docker setup\n\n"
         "- Run the Docker Desktop installer from the onboarding package\n"
-        "- After installation, sign in and configure Git credentials\n\n"
-        "_Source: Docker setup_"
+        "- After installation, sign in and configure Git credentials"
     )
     assert response.citations
 
@@ -448,7 +626,7 @@ def test_answer_service_answers_specific_overtime_question_from_matching_line() 
     assert "09:00" not in response.answer
     assert "Flexible start" not in response.answer
     assert "Lunch break" not in response.answer
-    assert "_Source: Working Hours_" in response.answer
+    assert "_Source:" not in response.answer
 
 
 def test_answer_service_answers_from_internal_page_heading_body() -> None:
@@ -620,7 +798,7 @@ def test_answer_service_uses_multiple_queries_for_thesis_focus_question() -> Non
     assert any("diploma work" in query for query in retriever.queries)
     assert response.answer.startswith("### Diploma Work Overview")
     assert "OneNote RAG assistant" in response.answer
-    assert "_Source: Diploma Work Overview_" in response.answer
+    assert "_Source:" not in response.answer
 
 
 def test_answer_service_allows_supported_cited_model_output() -> None:
@@ -636,7 +814,173 @@ def test_answer_service_allows_supported_cited_model_output() -> None:
 
     assert response.answer == (
         "### Developer setup\n\n"
-        "Install Docker Desktop and configure Git credentials.\n\n"
-        "_Source: Developer setup_"
+        "Install Docker Desktop and configure Git credentials."
     )
     assert response.citations
+
+
+def test_answer_service_appends_related_downloads_from_selected_context() -> None:
+    import asyncio
+
+    chunk = _chunk(
+        "# Setup\n"
+        "Step 2: download setup-installer.exe from the attached installer package.",
+        title="Project setup",
+    ).model_copy(
+        update={
+            "metadata": {
+                "attachment_refs": [
+                    {
+                        "download_id": "download-1",
+                        "file_name": "setup-installer.exe",
+                        "file_extension": "exe",
+                        "mime_type": "application/octet-stream",
+                        "size_bytes": 12,
+                        "readable": False,
+                        "parent_source_item_id": "onenote:project-setup",
+                        "parent_title": "Project setup",
+                        "download_url": "/api/v1/attachments/download-1/download",
+                    }
+                ]
+            }
+        }
+    )
+
+    response = asyncio.run(
+        _answer_with_static_llm(
+            "How do I setup the project?",
+            chunk,
+            "Step 2 is to download setup-installer.exe from the installer package. [1]",
+        )
+    )
+
+    assert response.downloads
+    assert response.downloads[0].file_name == "setup-installer.exe"
+    assert "### Downloads" in response.answer
+    assert "[setup-installer.exe](/api/v1/attachments/download-1/download)" in response.answer
+
+
+def test_answer_service_lists_all_downloads_from_cited_page() -> None:
+    import asyncio
+    from shared_schemas import AnswerRequest
+
+    chunk = _chunk(
+        "# Setup\n"
+        "Install Docker Desktop and configure Git credentials.",
+        title="Project setup",
+        chunk_id="project-setup",
+    )
+    service = AnswerService(
+        llm=StaticLlm("Install Docker Desktop and configure Git credentials. [1]"),
+        prompt_builder=PromptBuilder(),
+        retriever=StaticRetriever([chunk]),
+        metadata=StaticMetadata(
+            [],
+            attachments=[
+                _attachment(
+                    "setup-installer.exe",
+                    parent_source_item_id=chunk.source_item_id,
+                    parent_title=chunk.title,
+                    download_id="installer",
+                ),
+                _attachment(
+                    "setup-tools.zip",
+                    parent_source_item_id=chunk.source_item_id,
+                    parent_title=chunk.title,
+                    download_id="tools",
+                ),
+            ],
+        ),
+        access_scope_resolver=AccessScopeResolver(),
+        min_keyword_overlap=1,
+    )
+
+    response = asyncio.run(
+        service.answer(
+            AnswerRequest(
+                question="How do I configure Docker?",
+                user_context=UserContext(acl_tags=["employees"]),
+                source_filters=["onenote"],
+            )
+        )
+    )
+
+    assert [download.file_name for download in response.downloads] == [
+        "setup-installer.exe",
+        "setup-tools.zip",
+    ]
+    assert "[setup-installer.exe](/api/v1/attachments/installer/download)" in response.answer
+    assert "[setup-tools.zip](/api/v1/attachments/tools/download)" in response.answer
+
+
+def test_answer_service_combines_page_body_and_readable_attachment_evidence() -> None:
+    import asyncio
+
+    page = _chunk(
+        "# abc\nFact A: the release owner is Platform Enablement.",
+        title="abc",
+        chunk_id="page-abc",
+    ).model_copy(update={"source_item_id": "onenote:page-abc", "source_url": "https://example.test/page-abc"})
+    attachment = _readable_attachment_chunk(
+        "# file.docx\nChecklist requirement: QA sign-off must be completed before rollout.",
+        parent_source_item_id="onenote:page-abc",
+        parent_title="abc",
+        file_name="file.docx",
+    )
+
+    response = asyncio.run(
+        _answer_with_static_llm_for_chunks(
+            "For abc, who owns the release and what does the attached checklist require?",
+            [page, attachment],
+            (
+                "### abc\n\n"
+                "The release owner is Platform Enablement, and the attached checklist requires QA sign-off before rollout. [1] [2]"
+            ),
+        )
+    )
+
+    assert response.answer.startswith("### abc")
+    assert "Platform Enablement" in response.answer
+    assert "QA sign-off" in response.answer
+    assert [citation.source_item_id for citation in response.citations] == [
+        "onenote:page-abc",
+        "onenote-attachment:file.docx",
+    ]
+    assert response.citations[1].title == "Page: abc | File: file.docx"
+    assert response.citations[1].metadata["citation_page_title"] == "abc"
+    assert response.citations[1].metadata["citation_file_name"] == "file.docx"
+
+
+def test_focused_parent_page_keeps_readable_attachment_chunks_eligible() -> None:
+    import asyncio
+    from shared_schemas import AnswerRequest
+
+    attachment = _readable_attachment_chunk(
+        "# file.docx\nChecklist requirement: QA sign-off must be completed before rollout.",
+        parent_source_item_id="onenote:page-abc",
+        parent_title="abc",
+        file_name="file.docx",
+    )
+    service = AnswerService(
+        llm=StaticLlm("The attached file says QA sign-off must be completed before rollout. [1]"),
+        prompt_builder=PromptBuilder(),
+        retriever=StaticRetriever([attachment]),
+        access_scope_resolver=AccessScopeResolver(),
+        min_keyword_overlap=1,
+    )
+
+    response = asyncio.run(
+        service.answer(
+            AnswerRequest(
+                question="What does abc's attached checklist require?",
+                user_context=UserContext(acl_tags=["employees"]),
+                source_filters=["onenote"],
+                focus_source_item_ids=["onenote:page-abc"],
+            )
+        )
+    )
+
+    assert response.answer != NO_INFORMATION_ANSWER
+    assert response.citations
+    assert response.citations[0].source_item_id == "onenote-attachment:file.docx"
+    assert response.citations[0].title == "Page: abc | File: file.docx"

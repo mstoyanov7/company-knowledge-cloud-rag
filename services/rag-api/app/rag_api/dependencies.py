@@ -4,15 +4,20 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from shared_schemas import AppSettings, UserContext
 
 from rag_api.adapters import MockLlmAdapter, MockRetriever, OpenAICompatibleLlmAdapter, QdrantAclRetriever
-from rag_api.ports import LlmPort, RetrievalPort
+from rag_api.adapters.source_metadata import MockSourceMetadataAdapter, PostgresSourceMetadataAdapter
+from rag_api.persistence import AppDataStore
+from rag_api.ports import DocumentMetadataPort, LlmPort, RetrievalPort
 from rag_api.services import (
     AccessScopeResolver,
     AnswerService,
     AuthenticationService,
     ClaimsToScopeMapper,
+    DocumentService,
+    FeedbackService,
     KeywordOverlapReranker,
     OidcTokenValidator,
     PromptBuilder,
+    QueryLogService,
     QueryPlanner,
     SecurityAuditLogger,
     SystemService,
@@ -20,6 +25,7 @@ from rag_api.services import (
     TopicService,
     TokenValidationError,
 )
+from rag_api.services.local_auth import LocalAuthService
 
 
 @dataclass(slots=True)
@@ -32,10 +38,20 @@ def get_runtime_settings(request: Request) -> AppSettings:
     return request.app.state.settings
 
 
+def get_app_data_store(request: Request) -> AppDataStore:
+    return request.app.state.app_data_store
+
+
 def get_retriever(settings: AppSettings) -> RetrievalPort:
     if settings.retrieval_provider == "qdrant":
         return QdrantAclRetriever(settings)
     return MockRetriever(settings)
+
+
+def get_document_metadata(settings: AppSettings) -> DocumentMetadataPort:
+    if settings.retrieval_provider == "qdrant":
+        return PostgresSourceMetadataAdapter(settings)
+    return MockSourceMetadataAdapter(settings)
 
 
 def get_llm(settings: AppSettings) -> LlmPort:
@@ -44,21 +60,29 @@ def get_llm(settings: AppSettings) -> LlmPort:
     return MockLlmAdapter(model_name=settings.default_model_name)
 
 
-def get_answer_service(settings: AppSettings = Depends(get_runtime_settings)) -> AnswerService:
+def get_answer_service(
+    settings: AppSettings = Depends(get_runtime_settings),
+    store: AppDataStore | None = Depends(get_app_data_store),
+) -> AnswerService:
+    app_store = store if isinstance(store, AppDataStore) else None
     reranker = KeywordOverlapReranker() if settings.rerank_enabled else None
     llm = get_llm(settings)
     return AnswerService(
         llm=llm,
         prompt_builder=PromptBuilder(),
         retriever=get_retriever(settings),
+        metadata=get_document_metadata(settings),
         access_scope_resolver=AccessScopeResolver(),
         reranker=reranker,
         retrieval_candidate_multiplier=settings.retrieval_candidate_multiplier,
         min_keyword_overlap=settings.retrieval_min_keyword_overlap,
         audit_logger=get_security_audit_logger(settings),
         query_planner=QueryPlanner(llm=llm),
-        topic_service=get_topic_service(settings),
+        topic_service=get_topic_service(settings=settings, store=app_store),
         debug_enabled=settings.rag_debug_enabled,
+        clarify_enabled=settings.clarify_enabled,
+        clarify_closeness_ratio=settings.clarify_closeness_ratio,
+        clarify_max_options=settings.clarify_max_options,
     )
 
 
@@ -70,8 +94,34 @@ def get_system_service(settings: AppSettings = Depends(get_runtime_settings)) ->
     )
 
 
-def get_topic_service(settings: AppSettings = Depends(get_runtime_settings)) -> TopicService:
-    return TopicService(TopicLoader(settings.topics_config_path))
+def get_topic_service(
+    settings: AppSettings = Depends(get_runtime_settings),
+    store: AppDataStore | None = Depends(get_app_data_store),
+) -> TopicService:
+    app_store = store if isinstance(store, AppDataStore) else None
+    return TopicService(loader=TopicLoader(settings.topics_config_path), store=app_store)
+
+
+def get_document_service(settings: AppSettings = Depends(get_runtime_settings)) -> DocumentService:
+    return DocumentService(
+        metadata=get_document_metadata(settings),
+        access_scope_resolver=AccessScopeResolver(),
+    )
+
+
+def get_query_log_service(store: AppDataStore = Depends(get_app_data_store)) -> QueryLogService:
+    return QueryLogService(store=store)
+
+
+def get_feedback_service(store: AppDataStore = Depends(get_app_data_store)) -> FeedbackService:
+    return FeedbackService(store=store)
+
+
+def get_local_auth_service(
+    settings: AppSettings = Depends(get_runtime_settings),
+    store: AppDataStore = Depends(get_app_data_store),
+) -> LocalAuthService:
+    return LocalAuthService(settings=settings, store=store)
 
 
 def get_security_audit_logger(settings: AppSettings = Depends(get_runtime_settings)) -> SecurityAuditLogger:
@@ -94,9 +144,30 @@ def get_request_auth_context(
     x_rag_api_key: str | None = Header(default=None),
     settings: AppSettings = Depends(get_runtime_settings),
     auth_service: AuthenticationService = Depends(get_authentication_service),
+    local_auth_service: LocalAuthService = Depends(get_local_auth_service),
 ) -> RequestAuthContext:
     expected_api_key = settings.rag_api_key.get_secret_value()
     bearer_token = _bearer_token(authorization)
+
+    if bearer_token and bearer_token != expected_api_key:
+        try:
+            user_context, _profile = local_auth_service.authenticate_bearer_token(bearer_token)
+            auth_service.audit.record(
+                "authentication",
+                "success",
+                actor_user_id=user_context.user_id,
+                tenant_id=user_context.tenant_id,
+                metadata={"method": "session"},
+            )
+            return RequestAuthContext(user_context=user_context, auth_method="session")
+        except TokenValidationError:
+            if settings.auth_enabled:
+                try:
+                    principal = auth_service.authenticate_bearer_token(bearer_token)
+                    return RequestAuthContext(user_context=principal.user_context, auth_method="oidc")
+                except TokenValidationError as error:
+                    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(error)) from error
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired session token.")
 
     if expected_api_key and (x_rag_api_key == expected_api_key or bearer_token == expected_api_key):
         auth_service.audit.record("authentication", "success", metadata={"method": "api_key"})
@@ -121,6 +192,36 @@ def get_request_auth_context(
         )
 
     return RequestAuthContext(auth_method="anonymous")
+
+
+def effective_user_context(
+    *,
+    auth_context: RequestAuthContext,
+    settings: AppSettings,
+    x_user_id: str | None = None,
+    x_user_email: str | None = None,
+    x_tenant_id: str | None = None,
+    x_acl_tags: str | None = None,
+) -> UserContext:
+    if auth_context.user_context is not None:
+        return auth_context.user_context
+    user_context = UserContext()
+    if any([x_user_id, x_user_email, x_tenant_id, x_acl_tags]):
+        user_context = user_context.model_copy(
+            update={
+                key: value
+                for key, value in {
+                    "user_id": x_user_id,
+                    "email": x_user_email,
+                    "tenant_id": x_tenant_id,
+                    "acl_tags": _parse_header_list(x_acl_tags) if x_acl_tags is not None else None,
+                }.items()
+                if value is not None
+            }
+        )
+    elif settings.auth_default_acl_tag_list:
+        user_context = user_context.model_copy(update={"acl_tags": settings.auth_default_acl_tag_list})
+    return user_context
 
 
 def verify_rag_api_key(
@@ -172,3 +273,9 @@ def _bearer_token(authorization: str | None) -> str | None:
     if authorization and authorization.startswith("Bearer "):
         return authorization.split(" ", maxsplit=1)[1]
     return None
+
+
+def _parse_header_list(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]

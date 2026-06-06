@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-density="compact">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Company Knowledge Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;450;500;550;600;650;700;750;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/tokens.css" />
+<link rel="stylesheet" href="css/layout.css" />
+<link rel="stylesheet" href="css/center.css" />
+<link rel="stylesheet" href="css/panels.css" />
+<link rel="stylesheet" href="css/auth.css" />
+</head>
+<body>
+<div class="app" id="app" data-source="closed" data-rail="closed">
+
+  <!-- ============ LEFT RAIL ============ -->
+  <aside class="rail">
+    <div class="rail__top">
+      <div class="brand">
+        <div class="brand__mark"><span class="ic-mark"></span></div>
+        <div>
+          <div class="brand__name">Company Knowledge</div>
+          <div class="brand__sub"><span class="dot-onenote"></span> Assistant · OneNote</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="rail__search" id="open-cmdk">
+      <span class="ic-search"></span>
+      <span>Search or ask…</span>
+    </button>
+
+    <div class="seg" id="rail-seg" data-i="0">
+      <span class="seg__thumb"></span>
+      <button data-mode="notebook" aria-selected="true"><span class="ic-book"></span> Notebooks</button>
+      <button data-mode="topic" aria-selected="false"><span class="ic-hash"></span> Topics</button>
+    </div>
+
+    <div class="rail__scroll scroll" id="rail-scroll"><!-- tree / topics injected --></div>
+
+    <div class="rail__foot">
+      <button class="profile-btn" id="profile-btn" aria-haspopup="true" aria-expanded="false">
+        <span class="avatar" id="me-ava">PN</span>
+        <span class="who">
+          <b id="me-name">Priya Nair</b>
+          <span id="me-role">People Operations</span>
+        </span>
+        <span class="profile-btn__chev" id="profile-chev"></span>
+      </button>
+      <button class="iconbtn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme"></button>
+    </div>
+  </aside>
+
+  <!-- ============ CENTER ============ -->
+  <main class="center">
+    <div class="topbar">
+      <div class="topbar__title" id="topbar-title">
+        <h1>Home</h1>
+      </div>
+      <div class="topbar__spacer"></div>
+      <button class="btn btn--ghost btn--sm" id="new-chat"><span class="ic-plus"></span> New chat</button>
+    </div>
+
+    <div class="thread scroll" id="thread">
+      <!-- home or conversation injected -->
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer-inner">
+        <div class="scopebar" id="scopebar"><!-- scope chip injected --></div>
+        <div class="composer">
+          <div class="composer__top">
+            <textarea id="composer-input" rows="1" placeholder="Ask anything about Vantor's docs…"></textarea>
+            <button class="composer__send" id="send-btn" aria-label="Send"></button>
+          </div>
+          <div class="composer__bottom">
+            <button class="composer__tool" id="scope-tool"><span class="ic-filter"></span> Scope</button>
+            <span class="composer__hint">Answers cite OneNote sources · <span class="kbd">↵</span> to send</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ RIGHT SOURCE PANEL ============ -->
+  <aside class="source" id="source-panel" aria-hidden="true">
+    <!-- injected -->
+  </aside>
+
+</div>
+
+<!-- command palette -->
+<div class="cmdk-overlay" id="cmdk-overlay">
+  <div class="cmdk" role="dialog" aria-label="Command palette">
+    <div class="cmdk__input">
+      <span class="ic-search" id="cmdk-ico"></span>
+      <input id="cmdk-input" type="text" placeholder="Search docs, ask a question, or jump to a state…" autocomplete="off" />
+      <span class="kbd esc">esc</span>
+    </div>
+    <div class="cmdk__list scroll" id="cmdk-list"></div>
+  </div>
+</div>
+
+<!-- tweaks panel (vanilla, host-protocol driven) -->
+<div class="twk" id="twk" role="dialog" aria-label="Tweaks">
+  <div class="twk__hd"><b>Tweaks</b><button class="iconbtn" id="twk-close" aria-label="Close"></button></div>
+  <div class="twk__body">
+    <div class="twk__row">
+      <div class="twk__lbl">Theme</div>
+      <div class="twk__seg" id="twk-theme">
+        <button data-v="dark" aria-pressed="true">Dark</button>
+        <button data-v="light" aria-pressed="false">Light</button>
+      </div>
+    </div>
+    <div class="twk__row">
+      <div class="twk__lbl">Density</div>
+      <div class="twk__seg" id="twk-density">
+        <button data-v="cozy" aria-pressed="false">Cozy</button>
+        <button data-v="compact" aria-pressed="true">Compact</button>
+        <button data-v="dense" aria-pressed="false">Dense</button>
+      </div>
+    </div>
+    <div class="twk__row">
+      <div class="twk__lbl">Accent</div>
+      <div class="twk__sw" id="twk-accent">
+        <button data-h="45"  style="background:oklch(0.62 0.15 45)"  aria-pressed="true"  title="Terracotta"></button>
+        <button data-h="250" style="background:oklch(0.58 0.14 250)" aria-pressed="false" title="Indigo"></button>
+        <button data-h="160" style="background:oklch(0.58 0.12 160)" aria-pressed="false" title="Teal"></button>
+        <button data-h="20"  style="background:oklch(0.58 0.17 20)"  aria-pressed="false" title="Rosewood"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- profile popover + modal + auth gate roots -->
+<div id="profile-menu-root"></div>
+<div id="modal-root"></div>
+<div class="auth" id="auth-root" aria-hidden="true"></div>
+
+<script src="js/icons.js"></script>
+<script src="js/data.js"></script>
+<script src="js/render.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

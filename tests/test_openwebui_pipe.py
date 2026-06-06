@@ -4,7 +4,7 @@ import asyncio
 
 from apps.openwebui.cloud_rag_pipe import Pipe
 
-NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes or readable attachments."
 
 
 class FakeResponse:
@@ -64,7 +64,7 @@ def test_openwebui_pipe_returns_answer_with_title_sources_without_numeric_marker
 
     FakeAsyncClient.requests = []
     FakeAsyncClient.payload = {
-        "answer": "### Remote Work Policy\n\n- Allowed up to 3 days per week\n\n_Source: Remote Work Policy_",
+        "answer": "### Remote Work Policy\n\n- Allowed up to 3 days per week",
         "citations": [
             {
                 "index": 1,
@@ -89,4 +89,4 @@ def test_openwebui_pipe_returns_answer_with_title_sources_without_numeric_marker
 
     assert "[1]" not in result
     assert "https://example.test/remote-work" not in result
-    assert result == "### Remote Work Policy\n\n- Allowed up to 3 days per week\n\n_Source: Remote Work Policy_"
+    assert result == "### Remote Work Policy\n\n- Allowed up to 3 days per week"

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CAN Bus Trace Missing Frames</title>
+  <style>body {
+  font-family: Aptos, Arial, sans-serif;
+  color: #1f2933;
+  line-height: 1.45;
+  max-width: 900px;
+  margin: 32px auto;
+  padding: 0 24px;
+}
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.muted { color: #52606d; }</style>
+</head>
+<body>
+  <article>
+    <h1>CAN Bus Trace Missing Frames</h1>
+    <p class="summary">Troubleshoots missing CAN frames during bench or vehicle capture sessions.</p>
+    <h2>Field Note</h2>
+    <p>CAN Bus Trace Missing Frames is written for the first engineer who sees the failure and has to decide whether to fix, escalate, or collect more evidence. This page troubleshoots missing CAN frames during bench or vehicle capture sessions.</p>
+    <p>The page deliberately starts with evidence, because a fast change can hide the original failure. Keep the first logs, the affected environment, and the last known good state before restarting services or changing configuration.</p>
+
+    <h2>Before Changing Anything</h2>
+    <p>Collect trace file and bus load reading before applying the fix. If the case depends on DBC version, save the version or checksum as part of the incident note.</p>
+    <p>Only after that should the engineer touch CAN Analyzer, Vehicle Log Portal, or Bench Scheduler. The goal is to make recovery possible without losing the reason the issue happened.</p>
+
+
+    <h2>Diagnostic Commands</h2>
+    <p class="note">Run commands from a clean shell and keep the output with the related ticket or workspace.</p>
+    <pre><code class="language-bash"># Capture evidence before changing configuration
+systemctl status &quot;$SERVICE_NAME&quot; --no-pager
+journalctl -u &quot;$SERVICE_NAME&quot; --since &quot;30 minutes ago&quot; --no-pager
+ip addr show
+ip route</code></pre>
+
+
+    <h2>Reading The Result</h2>
+    <p>Compare the current output with the last known good state and the affected environment. For this case the important evidence is trace file, bus load reading, DBC version, and the relevant systems are CAN Analyzer, Vehicle Log Portal, Bench Scheduler.</p>
+
+    <h2>Investigation Path</h2>
+    <ol>
+      <li>Capture the current error, timestamp, affected environment, and owner before changing configuration.</li>
+      <li>Collect diagnostic inputs: trace file, bus load reading, DBC version.</li>
+      <li>Check the relevant systems in this order: CAN Analyzer, Vehicle Log Portal, Bench Scheduler.</li>
+      <li>Apply the documented fix only after preserving logs and current configuration.</li>
+      <li>Verify that the symptom is gone and attach the before-and-after evidence.</li>
+    </ol>
+
+    <h2>Recovery Check</h2>
+    <ul>
+      <li>The original symptom is documented with timestamp and environment.</li>
+      <li>Diagnostic evidence includes trace file, bus load reading, DBC version.</li>
+      <li>The fix is linked to a ticket or incident record.</li>
+      <li>Verification evidence shows the symptom is resolved.</li>
+    </ul>
+
+    <h2>Notes From Previous Incidents</h2>
+    <ul>
+      <li>Changing configuration before collecting logs can hide the original failure.</li>
+      <li>A fix applied to the wrong environment can create misleading verification results.</li>
+      <li>Recurring incidents should be linked to problem management, not closed as one-off tickets.</li>
+    </ul>
+
+    <h2>Escalation</h2>
+    <p>Escalate unclear ownership, missing evidence, blocked approvals, or exceptions to Diagnostics Engineering. The usual requester is the support engineer or developer, and the standard service desk or program channel should hold the final note.</p>
+  </article>
+</body>
+</html>

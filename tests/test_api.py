@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from rag_api.main import create_app
 from shared_schemas import AppSettings
 
-NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes or readable attachments."
 
 
 def create_test_client() -> TestClient:

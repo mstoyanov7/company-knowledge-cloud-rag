@@ -19,7 +19,7 @@ from shared_schemas import (
 )
 
 
-NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes or readable attachments."
 
 
 class StaticRetriever:
@@ -276,7 +276,7 @@ def test_citations_only_use_direct_salary_source() -> None:
     response = asyncio.run(_answer("When is the salary paid?", [_leave_chunk(), _salary_chunk()]))
 
     assert [citation.title for citation in response.citations] == ["Salary Payment"]
-    assert "_Source: Salary Payment_" in response.answer
+    assert "_Source:" not in response.answer
 
 
 def test_bulgarian_paraphrase_retrieves_bulgarian_salary_note() -> None:

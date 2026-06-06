@@ -7,6 +7,7 @@ from sync_worker.ingestion import DeterministicEmbedder, TextChunker
 from sync_worker.onenote.normalization import OneNoteDocumentNormalizer
 from sync_worker.onenote.parser import NullOneNoteResourceHook, OneNoteHtmlParser
 from sync_worker.onenote.service import OneNoteSyncService
+from sync_worker.onenote.topic_classifier import OneNoteTopicClassifier
 from sync_worker.persistence import PostgresMetadataStore, QdrantChunkStore
 
 
@@ -15,7 +16,7 @@ def build_onenote_sync_service(settings: AppSettings) -> OneNoteSyncService:
         settings=settings,
         connector=OneNoteConnector(settings),
         parser=OneNoteHtmlParser(),
-        normalizer=OneNoteDocumentNormalizer(),
+        normalizer=OneNoteDocumentNormalizer(topic_classifier=OneNoteTopicClassifier.from_settings(settings)),
         chunker=TextChunker(
             settings,
             chunk_size_chars=settings.onenote_chunk_size_chars,

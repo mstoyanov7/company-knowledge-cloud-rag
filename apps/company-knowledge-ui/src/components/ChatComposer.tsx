@@ -1,12 +1,14 @@
-import { Send, X } from "lucide-react";
+import { Send, Square, X } from "lucide-react";
 import { FormEvent, KeyboardEvent, useState } from "react";
 
 type ChatComposerProps = {
   isSubmitting: boolean;
   onSubmit: (question: string) => void;
+  onStop?: () => void;
+  placeholder?: string;
 };
 
-export function ChatComposer({ isSubmitting, onSubmit }: ChatComposerProps) {
+export function ChatComposer({ isSubmitting, onSubmit, onStop, placeholder }: ChatComposerProps) {
   const [draft, setDraft] = useState("");
 
   function submitDraft() {
@@ -24,7 +26,7 @@ export function ChatComposer({ isSubmitting, onSubmit }: ChatComposerProps) {
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       submitDraft();
       return;
@@ -42,8 +44,8 @@ export function ChatComposer({ isSubmitting, onSubmit }: ChatComposerProps) {
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Ask a question inside this topic"
-        rows={2}
+        placeholder={placeholder || "Ask a question inside this topic"}
+        rows={1}
         aria-label="Question"
       />
       {draft ? (
@@ -51,9 +53,15 @@ export function ChatComposer({ isSubmitting, onSubmit }: ChatComposerProps) {
           <X size={16} aria-hidden="true" />
         </button>
       ) : null}
-      <button className="composer-send" type="submit" disabled={!draft.trim() || isSubmitting} aria-label="Send">
-        <Send size={18} aria-hidden="true" />
-      </button>
+      {isSubmitting ? (
+        <button className="composer-send composer-stop" type="button" onClick={onStop} aria-label="Stop answer">
+          <Square size={15} aria-hidden="true" />
+        </button>
+      ) : (
+        <button className="composer-send" type="submit" disabled={!draft.trim()} aria-label="Send">
+          <Send size={18} aria-hidden="true" />
+        </button>
+      )}
     </form>
   );
 }

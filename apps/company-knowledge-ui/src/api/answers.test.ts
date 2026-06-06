@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { submitTopicQuestion } from "./answers";
+import { streamTopicQuestion, submitTopicQuestion } from "./answers";
 
 describe("answer API", () => {
   afterEach(() => {
@@ -31,5 +31,27 @@ describe("answer API", () => {
       answer_depth: "detailed",
       question: "How do I deploy?"
     });
+  });
+
+  it("passes abort signals to streaming answer fetches", async () => {
+    const controller = new AbortController();
+    const response = new Response(
+      'event: final\ndata: {"answer":"Stopped test","citations":[],"metadata":{"response_id":"resp-1"}}\n\n',
+      { status: 200 }
+    );
+    const fetchMock = vi.fn().mockResolvedValue(response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await streamTopicQuestion(
+      {
+        topic_id: "project-deployment",
+        conversation_id: "conv-1",
+        question: "How do I deploy?"
+      },
+      { onDelta: () => undefined },
+      { signal: controller.signal }
+    );
+
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);
   });
 });

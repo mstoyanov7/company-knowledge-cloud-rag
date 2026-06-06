@@ -1,18 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { fetchMe, logout, updateMe, type AuthResponse, type UserProfile } from "./api/auth";
+import { fetchUiSettings, type UiSettings } from "./api/admin";
+import { clearAuthToken, getAuthToken } from "./api/client";
 import { fetchTopics, type Topic } from "./api/topics";
+import { AuthGate } from "./components/AuthGate";
 import { ErrorState } from "./components/ErrorState";
+import { KnowledgeShell } from "./components/KnowledgeShell";
 import { LoadingState } from "./components/LoadingState";
-import { TopicAskPage } from "./pages/TopicAskPage";
-import { TopicSelectionPage } from "./pages/TopicSelectionPage";
+import { useToast } from "./components/ToastProvider";
+import { applyPrefs, loadPrefs, savePrefs, type AccentHue, type Density, type Prefs } from "./state/prefs";
 import { loadTheme, nextTheme, saveTheme, type Theme } from "./state/theme";
 
+const DEFAULT_UI_SETTINGS: UiSettings = {
+  app_name: "Company Knowledge",
+  app_subtitle: "Assistant",
+  accent_hue: 45,
+  logo_url: null,
+  logo_text: null
+};
+
 export default function App() {
+  const { toast } = useToast();
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
+  const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs());
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [uiSettings, setUiSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -20,21 +38,62 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    document.documentElement.style.setProperty("--accent-h", String(uiSettings.accent_hue));
+    document.title = uiSettings.app_subtitle ? `${uiSettings.app_name} - ${uiSettings.app_subtitle}` : uiSettings.app_name;
+  }, [uiSettings]);
+
+  useEffect(() => {
+    applyPrefs(prefs);
+    savePrefs(prefs);
+  }, [prefs]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    fetchUiSettings()
+      .then((settings) => {
+        if (isCurrent) {
+          setUiSettings(settings);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!getAuthToken()) {
+      setIsAuthLoading(false);
+      return;
+    }
+    let isCurrent = true;
+    fetchMe()
+      .then((profile) => {
+        if (isCurrent) {
+          setUser(profile);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          clearAuthToken();
+          setUser(null);
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsAuthLoading(false);
+        }
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  useEffect(() => {
     let isCurrent = true;
 
-    fetchTopics()
-      .then((items) => {
-        if (!isCurrent) {
-          return;
-        }
-        setTopics(items);
-        setError(null);
-      })
-      .catch((loadError: Error) => {
-        if (isCurrent) {
-          setError(loadError.message);
-        }
-      })
+    refreshTopics()
+      .catch(() => undefined)
       .finally(() => {
         if (isCurrent) {
           setIsLoading(false);
@@ -51,6 +110,57 @@ export default function App() {
     [selectedTopicId, topics]
   );
 
+  useEffect(() => {
+    if (selectedTopicId && !topics.some((topic) => topic.id === selectedTopicId)) {
+      setSelectedTopicId(null);
+    }
+  }, [selectedTopicId, topics]);
+
+  function signIn(response: AuthResponse, message: string) {
+    setUser(response.user);
+    refreshTopics().catch((refreshError: Error) => toast(refreshError.message, "err"));
+    toast(message, "ok");
+  }
+
+  function signOut() {
+    logout().catch(() => undefined);
+    setUser(null);
+    setSelectedTopicId(null);
+  }
+
+  function updateUser(nextUser: UserProfile) {
+    updateMe({
+      name: nextUser.name,
+      role: nextUser.role,
+      dept: nextUser.dept
+    })
+      .then((profile) => {
+        setUser(profile);
+        toast("Profile updated.", "ok");
+      })
+      .catch((updateError: Error) => toast(updateError.message, "err"));
+  }
+
+  async function refreshTopics() {
+    try {
+      const items = await fetchTopics();
+      setTopics(items);
+      setError(null);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : "Topics are unavailable.";
+      setError(message);
+      throw new Error(message);
+    }
+  }
+
+  if (isAuthLoading) {
+    return <LoadingState label="Checking session" />;
+  }
+
+  if (!user) {
+    return <AuthGate onSignIn={signIn} uiSettings={uiSettings} />;
+  }
+
   if (isLoading) {
     return <LoadingState label="Loading knowledge topics" />;
   }
@@ -63,23 +173,24 @@ export default function App() {
     );
   }
 
-  if (selectedTopic) {
-    return (
-      <TopicAskPage
-        topic={selectedTopic}
-        theme={theme}
-        onToggleTheme={() => setTheme((currentTheme) => nextTheme(currentTheme))}
-        onChangeTopic={() => setSelectedTopicId(null)}
-      />
-    );
-  }
-
   return (
-    <TopicSelectionPage
+    <KnowledgeShell
       topics={topics}
+      selectedTopic={selectedTopic}
       theme={theme}
-      onToggleTheme={() => setTheme((currentTheme) => nextTheme(currentTheme))}
+      prefs={prefs}
+      user={user}
+      uiSettings={uiSettings}
       onSelectTopic={setSelectedTopicId}
+      onClearTopic={() => setSelectedTopicId(null)}
+      onToggleTheme={() => setTheme((currentTheme) => nextTheme(currentTheme))}
+      onSetTheme={setTheme}
+      onSetDensity={(density: Density) => setPrefs((current) => ({ ...current, density }))}
+      onSetAccent={(accentHue: AccentHue) => setPrefs((current) => ({ ...current, accentHue }))}
+      onSignOut={signOut}
+      onUpdateUser={updateUser}
+      onTopicsChanged={() => refreshTopics().catch((refreshError: Error) => toast(refreshError.message, "err"))}
+      onUiSettingsChanged={setUiSettings}
     />
   );
 }

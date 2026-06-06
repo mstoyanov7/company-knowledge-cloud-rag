@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CAN LIN Trace Analyzer Setup</title>
+  <style>body {
+  font-family: Aptos, Arial, sans-serif;
+  color: #1f2933;
+  line-height: 1.45;
+  max-width: 900px;
+  margin: 32px auto;
+  padding: 0 24px;
+}
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.muted { color: #52606d; }</style>
+</head>
+<body>
+  <article>
+    <h1>CAN LIN Trace Analyzer Setup</h1>
+    <p class="summary">Sets up the trace analyzer used to decode CAN and LIN captures during ECU validation.</p>
+    <h2>Project Context</h2>
+    <p>CAN LIN Trace Analyzer Setup is used when an engineer needs a working local copy of the project, not just read access to the repository. This page sets up the trace analyzer used to decode CAN and LIN captures during ECU validation.</p>
+    <p>The setup normally starts with access to CAN Analyzer, then moves through the required artifacts: decoder config, DBC library, trace samples. The important part is to keep the machine, the project configuration, and the verification output aligned. If those three do not match, the project can appear to work locally and still fail during integration.</p>
+    <p>Diagnostics Engineering keeps this page current because small toolchain changes matter in automotive work. A different compiler, DBC file, ODX package, schema version, or bench profile can change the result enough to waste a full validation session.</p>
+
+    <h2>Downloads and Links</h2>
+    <p>Use the internal links below rather than files passed through chat. They point to the maintained project material and keep the setup reproducible for release, validation, and supplier support.</p>
+    <p><strong>Repository:</strong> <a href="ssh://git.company.local/diagnostics/can-lin-trace-analyzer.git">ssh://git.company.local/diagnostics/can-lin-trace-analyzer.git</a></p>
+    <p><strong>Download package:</strong> <a href="https://downloads.company.local/automotive/can-lin-trace-analyzer-setup/">https://downloads.company.local/automotive/can-lin-trace-analyzer-setup/</a></p>
+    <p><strong>Setup notes:</strong> <a href="https://docs.company.local/automotive/can-lin-trace-analyzer-setup/setup">https://docs.company.local/automotive/can-lin-trace-analyzer-setup/setup</a></p>
+    <p><strong>Windows tools bundle:</strong> <a href="https://downloads.company.local/automotive/can-lin-trace-analyzer-setup/windows-tools.zip">https://downloads.company.local/automotive/can-lin-trace-analyzer-setup/windows-tools.zip</a></p>
+
+    <h2>Who Maintains It</h2>
+    <dl>
+      <dt>Owner</dt><dd>Diagnostics Engineering</dd>
+      <dt>For</dt><dd>software engineers, project owners, validation engineers</dd>
+      <dt>Systems</dt><dd>CAN Analyzer, Vehicle Log Portal, Artifact Registry</dd>
+      <dt>Review</dt><dd>Review after each major release or tooling change.</dd>
+    </dl>
+
+    <h2>Before Opening a Terminal</h2>
+    <p>Confirm that your account is already in the right access group for CAN Analyzer. Do that before opening a terminal, because clone and package errors often look like network problems when they are actually permission problems.</p>
+    <p>Create a clean workspace and avoid reusing an old directory from another vehicle program. Keep decoder config and DBC library next to the setup ticket so another engineer can reproduce the same run later.</p>
+
+
+    <h2>Windows Setup</h2>
+    <p class="note">Use this path on a company Windows laptop or before switching into WSL.</p>
+    <pre><code class="language-powershell">$workspace = Join-Path $env:USERPROFILE &quot;automotive\can-lin-trace-analyzer-setup&quot;
+New-Item -ItemType Directory -Force $workspace | Out-Null
+Set-Location $workspace
+git config --global core.longpaths true
+winget install -e --id Git.Git
+winget install -e --id Python.Python.3.12
+git clone ssh://git.company.local/diagnostics/can-lin-trace-analyzer.git .
+Write-Output &quot;Run the Linux or project-specific verification block after tools are installed.&quot;</code></pre>
+
+
+
+    <h2>Analyzer Setup</h2>
+    <p class="note">Use this path on Linux, WSL, or a standard validation workstation.</p>
+    <pre><code class="language-bash">mkdir -p ~/automotive/can-lin-trace-analyzer
+cd ~/automotive/can-lin-trace-analyzer
+git clone ssh://git.company.local/diagnostics/can-lin-trace-analyzer.git .
+python -m venv .venv
+source .venv/bin/activate
+pip install -e &quot;.[dev]&quot;
+python tools/import_dbc.py data/dbc/powertrain.dbc
+pytest tests/test_trace_decoder.py</code></pre>
+
+
+
+    <h2>Local Config Example</h2>
+    <p class="note">Keep this file local unless the project owner asks for it in the repository.</p>
+    <pre><code class="language-yaml">decoder:
+  dbc_path: data/dbc/powertrain.dbc
+  lin_schedule: data/lin/body_control.ldf
+capture:
+  default_channel: can0
+  max_bus_load_percent: 70</code></pre>
+
+
+
+    <h2>Verification Commands</h2>
+    <p class="note">Run verification after setup and again after changing profiles, schemas, or hardware mappings.</p>
+    <pre><code class="language-bash">pytest tests -q
+python tools/export_diagnostic_report.py --output reports/setup-check.zip</code></pre>
+
+
+    <h2>After the First Build</h2>
+    <p>After the first successful build, attach the terminal output and the generated local config to the setup ticket. The expected evidence is setup ticket, access approval, bootstrap output, verification log, plus any project-specific logs created by Vehicle Log Portal or Artifact Registry.</p>
+    <p>Do not clean the workspace until the verification step has passed once. Keeping the first build directory for a day makes it easier for Diagnostics Engineering to compare cache files, generated code, downloaded packages, or tool versions if something fails for the next engineer.</p>
+
+    <h2>Checks To Keep With The Ticket</h2>
+    <ul>
+      <li>Workspace for CAN LIN Trace Analyzer Setup builds or starts without missing dependencies.</li>
+      <li>Access to CAN Analyzer, Vehicle Log Portal, Artifact Registry is confirmed.</li>
+      <li>Required artifacts are present: decoder config, DBC library, trace samples.</li>
+      <li>Setup ticket contains bootstrap output and final verification result.</li>
+    </ul>
+
+    <h2>Typical Setup Problems</h2>
+    <ul>
+      <li>Outdated bootstrap commands can create inconsistent local environments.</li>
+      <li>Missing DBC library usually causes setup to pass locally but fail in integration.</li>
+      <li>Access should be removed when the engineer leaves the project or supplier engagement.</li>
+    </ul>
+
+    <h2>When To Ask For Help</h2>
+    <p>Escalate unclear ownership, missing evidence, blocked approvals, or exceptions to Diagnostics Engineering. The usual requester is the engineer joining the project, and the standard service desk or program channel should hold the final note.</p>
+  </article>
+</body>
+</html>

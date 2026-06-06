@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Vehicle Telemetry Ingestion Setup</title>
+  <style>body {
+  font-family: Aptos, Arial, sans-serif;
+  color: #1f2933;
+  line-height: 1.45;
+  max-width: 900px;
+  margin: 32px auto;
+  padding: 0 24px;
+}
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.muted { color: #52606d; }</style>
+</head>
+<body>
+  <article>
+    <h1>Vehicle Telemetry Ingestion Setup</h1>
+    <p class="summary">Sets up telemetry ingestion for validation vehicles, bench streams, and connected vehicle events.</p>
+    <h2>What This Workspace Is For</h2>
+    <p>Vehicle Telemetry Ingestion Setup is used when an engineer needs a working local copy of the project, not just read access to the repository. This page sets up telemetry ingestion for validation vehicles, bench streams, and connected vehicle events.</p>
+    <p>The setup normally starts with access to Kafka, then moves through the required artifacts: ingestion service, schema contract, sample event set. The important part is to keep the machine, the project configuration, and the verification output aligned. If those three do not match, the project can appear to work locally and still fail during integration.</p>
+    <p>Data Platform keeps this page current because small toolchain changes matter in automotive work. A different compiler, DBC file, ODX package, schema version, or bench profile can change the result enough to waste a full validation session.</p>
+
+    <h2>Team and Systems</h2>
+    <table>
+      <tr><th>Owner team</th><td>Data Platform</td></tr>
+      <tr><th>Audience</th><td>software engineers, project owners, validation engineers</td></tr>
+      <tr><th>Review rhythm</th><td>Review after each major release or tooling change.</td></tr>
+      <tr><th>Primary systems</th><td>Kafka, Schema Registry, Data Lake</td></tr>
+    </table>
+
+    <h2>Downloads and Links</h2>
+    <p>Use the internal links below rather than files passed through chat. They point to the maintained project material and keep the setup reproducible for release, validation, and supplier support.</p>
+    <p><strong>Repository:</strong> <a href="ssh://git.company.local/data/vehicle-telemetry-ingestion.git">ssh://git.company.local/data/vehicle-telemetry-ingestion.git</a></p>
+    <p><strong>Download package:</strong> <a href="https://downloads.company.local/automotive/vehicle-telemetry-ingestion-setup/">https://downloads.company.local/automotive/vehicle-telemetry-ingestion-setup/</a></p>
+    <p><strong>Setup notes:</strong> <a href="https://docs.company.local/automotive/vehicle-telemetry-ingestion-setup/setup">https://docs.company.local/automotive/vehicle-telemetry-ingestion-setup/setup</a></p>
+    <p><strong>Windows tools bundle:</strong> <a href="https://downloads.company.local/automotive/vehicle-telemetry-ingestion-setup/windows-tools.zip">https://downloads.company.local/automotive/vehicle-telemetry-ingestion-setup/windows-tools.zip</a></p>
+
+    <h2>Access Notes</h2>
+    <p>The main repository or manifest is available from ssh://git.company.local/data/vehicle-telemetry-ingestion.git. The download package is published through https://downloads.company.local/automotive/vehicle-telemetry-ingestion-setup/ and the working setup notes live at https://docs.company.local/automotive/vehicle-telemetry-ingestion-setup/setup.</p>
+    <p>For Windows laptops, use the PowerShell section first and keep long paths enabled in Git. For Linux laptops or WSL, use the shell section. If the project touches lab equipment, check the reservation or bench status before running anything that talks to hardware.</p>
+
+
+    <h2>Windows Setup</h2>
+    <p class="note">Use this path on a company Windows laptop or before switching into WSL.</p>
+    <pre><code class="language-powershell">$workspace = Join-Path $env:USERPROFILE &quot;automotive\vehicle-telemetry-ingestion-setup&quot;
+New-Item -ItemType Directory -Force $workspace | Out-Null
+Set-Location $workspace
+git config --global core.longpaths true
+winget install -e --id Git.Git
+winget install -e --id Python.Python.3.12
+git clone ssh://git.company.local/data/vehicle-telemetry-ingestion.git .
+Write-Output &quot;Run the Linux or project-specific verification block after tools are installed.&quot;</code></pre>
+
+
+
+    <h2>Telemetry Ingestion</h2>
+    <p class="note">Use this path on Linux, WSL, or a standard validation workstation.</p>
+    <pre><code class="language-bash">mkdir -p ~/automotive/vehicle-telemetry-ingestion
+cd ~/automotive/vehicle-telemetry-ingestion
+git clone ssh://git.company.local/data/vehicle-telemetry-ingestion.git .
+docker compose up -d kafka schema-registry
+python tools/register_schema.py schemas/vehicle_event.avsc
+python tools/publish_sample_events.py samples/bench-events.jsonl
+pytest tests/integration/test_ingestion_flow.py</code></pre>
+
+
+
+    <h2>Local Config Example</h2>
+    <p class="note">Keep this file local unless the project owner asks for it in the repository.</p>
+    <pre><code class="language-yaml">kafka:
+  bootstrap_servers: kafka.dev.company.local:9092
+  topic: vehicle.telemetry.validation
+schema:
+  subject: vehicle-event-value
+  compatibility: BACKWARD
+sample_window_minutes: 15</code></pre>
+
+
+
+    <h2>Verification Commands</h2>
+    <p class="note">Run verification after setup and again after changing profiles, schemas, or hardware mappings.</p>
+    <pre><code class="language-bash">docker compose ps
+python tools/consume_sample_events.py --limit 5
+pytest tests/integration/test_ingestion_flow.py</code></pre>
+
+
+    <h2>How Engineers Usually Work With It</h2>
+    <p>Engineers usually start this workspace during onboarding, release preparation, or a supplier handoff. The first run should be treated like a controlled setup: download the project material, install the exact tools, run the verification command, and then save the output.</p>
+    <p>Once the project is running, daily work should happen on a feature branch with the same local profile used during setup. If sample event set changes, repeat the verification command before blaming the application code.</p>
+
+    <h2>Ready Check</h2>
+    <ul>
+      <li>Workspace for Vehicle Telemetry Ingestion Setup builds or starts without missing dependencies.</li>
+      <li>Access to Kafka, Schema Registry, Data Lake is confirmed.</li>
+      <li>Required artifacts are present: ingestion service, schema contract, sample event set.</li>
+      <li>Setup ticket contains bootstrap output and final verification result.</li>
+    </ul>
+
+    <h2>Support Path</h2>
+    <p>Escalate unclear ownership, missing evidence, blocked approvals, or exceptions to Data Platform. The usual requester is the engineer joining the project, and the standard service desk or program channel should hold the final note.</p>
+  </article>
+</body>
+</html>

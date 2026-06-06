@@ -1,5 +1,19 @@
 [
   {
+    "id": "project-setups",
+    "name": "Project Setups",
+    "description": "Project setup steps, environment preparation, tools, access, and local configuration.",
+    "icon": "wrench",
+    "acl_tags": ["public", "employees", "engineering"],
+    "source_filters": ["onenote", "sharepoint"],
+    "retrieval_tags": ["project setups", "project setup", "setup", "environment", "configuration", "tools"],
+    "suggested_questions": [
+      "How do I set up a new project?",
+      "What tools and access do I need for project setup?",
+      "What configuration steps should I complete first?"
+    ]
+  },
+  {
     "id": "project-deployment",
     "name": "Project Deployment",
     "description": "Deployment steps, environments, releases, rollback, and production checks.",
@@ -11,6 +25,20 @@
       "How do I deploy the project?",
       "What should I check before production release?",
       "How do I rollback a failed deployment?"
+    ]
+  },
+  {
+    "id": "company-benefits",
+    "name": "Company Benefits",
+    "description": "Employee benefits, medical plans, wellness options, leave benefits, and enrollment guidance.",
+    "icon": "users",
+    "acl_tags": ["public", "employees"],
+    "source_filters": ["onenote", "sharepoint"],
+    "retrieval_tags": ["company benefits", "benefits", "medical", "wellness", "leave benefits", "enrollment"],
+    "suggested_questions": [
+      "What company benefits are available?",
+      "How do I enroll in benefits?",
+      "What wellness or leave benefits should I know about?"
     ]
   },
   {

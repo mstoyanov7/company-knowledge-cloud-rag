@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from shared_schemas import AnswerRequest, Topic, TopicConfig, UserContext
 
+from rag_api.persistence.app_store import AppDataStore, AppTopicRecord, json_dumps
 from rag_api.services.topic_loader import TopicLoader
 
 NO_ALLOWED_SOURCE_FILTER = "__no_allowed_source__"
@@ -22,25 +23,30 @@ class AnswerTopicScope:
 
 
 class TopicService:
-    def __init__(self, loader: TopicLoader) -> None:
-        topics = loader.load()
+    def __init__(self, loader: TopicLoader | None = None, store: AppDataStore | None = None) -> None:
+        self._loader = loader
+        self._store = store
+        topics = loader.load() if loader is not None else []
         self._topics = {topic.id: topic for topic in topics}
+        if self._store is not None and topics:
+            self._store.seed_topics_if_empty([_record_from_topic(topic) for topic in topics])
 
     def list_topics(self, user_context: UserContext | None = None) -> list[Topic]:
+        topics = self._topic_configs(enabled_only=True)
         if user_context is None:
-            visible_topics = self._topics.values()
+            visible_topics = topics
         else:
             user_acl_tags = _normalized_set(user_context.acl_tags)
             visible_topics = [
                 topic
-                for topic in self._topics.values()
+                for topic in topics
                 if not topic.acl_tags or user_acl_tags.intersection(_normalized_set(topic.acl_tags))
             ]
         return [topic.public_view() for topic in visible_topics]
 
     def require_topic(self, topic_id: str) -> TopicConfig:
         normalized_topic_id = topic_id.strip()
-        topic = self._topics.get(normalized_topic_id)
+        topic = self._topic_by_id(normalized_topic_id)
         if topic is None:
             raise TopicNotFoundError(f"Unknown topic_id: {normalized_topic_id}")
         return topic
@@ -59,6 +65,17 @@ class TopicService:
             source_filters=source_filters,
             retrieval_terms=retrieval_terms,
         )
+
+    def _topic_configs(self, *, enabled_only: bool) -> list[TopicConfig]:
+        if self._store is None:
+            return list(self._topics.values())
+        return [_topic_from_record(record) for record in self._store.list_topic_records(enabled_only=enabled_only)]
+
+    def _topic_by_id(self, topic_id: str) -> TopicConfig | None:
+        if self._store is None:
+            return self._topics.get(topic_id)
+        record = self._store.get_topic_record(topic_id, enabled_only=True)
+        return _topic_from_record(record) if record is not None else None
 
 
 def _scope_user_context_to_topic(user_context: UserContext, topic: TopicConfig) -> UserContext:
@@ -93,3 +110,45 @@ def _topic_retrieval_terms(topic: TopicConfig) -> tuple[str, ...]:
 
 def _normalized_set(values: list[str]) -> set[str]:
     return {value.strip().lower() for value in values if value.strip()}
+
+
+def _record_from_topic(topic: TopicConfig) -> AppTopicRecord:
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC)
+    return AppTopicRecord(
+        topic_id=topic.id,
+        name=topic.name,
+        description=topic.description,
+        icon=topic.icon,
+        acl_tags_json=json_dumps(topic.acl_tags),
+        source_filters_json=json_dumps(topic.source_filters),
+        retrieval_tags_json=json_dumps(topic.retrieval_tags),
+        suggested_questions_json=json_dumps(topic.suggested_questions),
+        enabled=True,
+        created_at_utc=now,
+        updated_at_utc=now,
+        updated_by_user_id="seed",
+    )
+
+
+def _topic_from_record(record: AppTopicRecord) -> TopicConfig:
+    return TopicConfig(
+        id=record.topic_id,
+        name=record.name,
+        description=record.description,
+        icon=record.icon,
+        acl_tags=_json_list(record.acl_tags_json),
+        source_filters=_json_list(record.source_filters_json),
+        retrieval_tags=_json_list(record.retrieval_tags_json),
+        suggested_questions=_json_list(record.suggested_questions_json),
+    )
+
+
+def _json_list(value: str | None) -> list[str]:
+    import json
+
+    if not value:
+        return []
+    parsed = json.loads(value)
+    return [str(item) for item in parsed] if isinstance(parsed, list) else []

@@ -6,6 +6,25 @@ import re
 from shared_schemas import ChunkDocument, Citation
 
 from rag_api.services.query_understanding import QuestionAnalysis
+from rag_api.services.retrieval_ranking import chunk_kind_of, is_procedure_question
+
+# Canonical ordering of procedure sections in the assembled context.
+_PROCEDURE_ORDER = {
+    "procedure": 0,
+    "overview": 1,
+    "prerequisites": 2,
+    "install": 3,
+    "configuration": 4,
+    "run": 5,
+    "verification": 6,
+    "troubleshooting": 7,
+    "checklist": 8,
+    "commands": 9,
+    "reference": 10,
+    "section": 11,
+    "table": 12,
+    "metadata": 99,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +35,9 @@ class AnswerContextBlock:
     heading: str | None
     content: str
     source_url: str
+    is_attachment: bool = False
+    parent_title: str | None = None
+    attachment_file_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,8 +59,26 @@ def build_answer_context(
     rendered_blocks: list[str] = []
     total_chars = 0
 
-    for chunk, citation in zip(retrieved_chunks, citations, strict=False):
-        content = _trim_chunk_text(chunk.chunk_text, max_chars=max(400, min(2800, max_chars // 2)))
+    ordered_pairs = list(zip(retrieved_chunks, citations, strict=False))
+    if is_procedure_question(question_analysis):
+        # Keep retrieval rank as the tie-breaker, but lay procedure sections out
+        # in their natural setup order (overview -> prerequisites -> ... -> run).
+        ordered_pairs = sorted(
+            enumerate(ordered_pairs),
+            key=lambda item: (_PROCEDURE_ORDER.get(chunk_kind_of(item[1][0]) or "section", 11), item[0]),
+        )
+        ordered_pairs = [pair for _index, pair in ordered_pairs]
+
+    accumulated_norm = ""
+    for chunk, citation in ordered_pairs:
+        content = _trim_chunk_text(chunk.chunk_text, max_chars=max(400, min(3200, max_chars // 2)))
+        normalized_content = re.sub(r"\s+", " ", content).strip()
+        # Skip section chunks already fully covered by the combined procedure chunk.
+        if normalized_content and normalized_content in accumulated_norm:
+            continue
+        accumulated_norm = f"{accumulated_norm}\n{normalized_content}"
+        chunk_metadata = chunk.metadata or {}
+        is_attachment = chunk_metadata.get("document_kind") == "attachment"
         block = AnswerContextBlock(
             citation_index=citation.index,
             title=chunk.title,
@@ -46,6 +86,11 @@ def build_answer_context(
             heading=_first_heading(chunk.chunk_text),
             content=content,
             source_url=chunk.source_url,
+            is_attachment=is_attachment,
+            parent_title=str(chunk_metadata.get("parent_title")) if chunk_metadata.get("parent_title") else None,
+            attachment_file_name=(
+                str(chunk_metadata.get("attachment_file_name")) if chunk_metadata.get("attachment_file_name") else None
+            ),
         )
         rendered = _render_block(question_analysis, block)
         if total_chars + len(rendered) > max_chars and rendered_blocks:
@@ -64,9 +109,16 @@ def build_answer_context(
 
 
 def _render_block(question_analysis: QuestionAnalysis, block: AnswerContextBlock) -> str:
-    return "\n".join(
+    lines: list[str] = []
+    if block.is_attachment:
+        # Label attachment content as part of its OneNote page so the model
+        # synthesizes page body and attached file into one answer.
+        lines.append(f"Page: {block.parent_title or block.title}")
+        lines.append(f"Attached file: {block.attachment_file_name or block.title}")
+    else:
+        lines.append(f"Source title: {block.title}")
+    lines.extend(
         [
-            f"Source title: {block.title}",
             f"Section: {block.section_path or 'N/A'}",
             f"Heading: {block.heading or 'N/A'}",
             f"Answer type needed: {question_analysis.required_answer_type}",
@@ -74,6 +126,7 @@ def _render_block(question_analysis: QuestionAnalysis, block: AnswerContextBlock
             block.content,
         ]
     )
+    return "\n".join(lines)
 
 
 def _trim_chunk_text(value: str, *, max_chars: int) -> str:

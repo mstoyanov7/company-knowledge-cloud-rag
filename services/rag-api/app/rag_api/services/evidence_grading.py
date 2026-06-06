@@ -157,7 +157,18 @@ def _heuristic_grade(question_analysis: QuestionAnalysis, chunk: ChunkDocument) 
 
 
 def _guard_grade_with_heuristics(llm_grade: EvidenceGrade, heuristic_grade: EvidenceGrade) -> EvidenceGrade:
-    if _RELEVANCE_ORDER[llm_grade.relevance] <= _RELEVANCE_ORDER[heuristic_grade.relevance]:
+    llm_rank = _RELEVANCE_ORDER[llm_grade.relevance]
+    heuristic_rank = _RELEVANCE_ORDER[heuristic_grade.relevance]
+    # Floor: when the deterministic heuristic is confident the chunk directly
+    # answers (strong title/section/concept alignment plus an answer signal),
+    # don't let a literal-minded LLM grader demote it just because the question
+    # used fewer words than the page title. This keeps a partial phrasing such
+    # as "how to setup flutter" consistent with the full "how to setup flutter
+    # embedded hmi": both connect to the same page on logical similarity rather
+    # than exact keyword coverage.
+    if heuristic_grade.relevance == "direct" and heuristic_grade.answers_question and llm_rank < heuristic_rank:
+        return heuristic_grade
+    if llm_rank <= heuristic_rank:
         return llm_grade
     if heuristic_grade.relevance in {"irrelevant", "related"}:
         return EvidenceGrade(

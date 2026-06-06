@@ -5,9 +5,13 @@ from shared_schemas import SourceDocument
 from graph_connectors.onenote.models import OneNotePage, OneNoteSite
 from sync_worker.ingestion import compute_content_hash
 from sync_worker.onenote.parser import ParsedOneNotePage
+from sync_worker.onenote.topic_classifier import OneNoteTopicClassifier
 
 
 class OneNoteDocumentNormalizer:
+    def __init__(self, topic_classifier: OneNoteTopicClassifier | None = None) -> None:
+        self.topic_classifier = topic_classifier
+
     def normalize(
         self,
         *,
@@ -18,6 +22,13 @@ class OneNoteDocumentNormalizer:
     ) -> SourceDocument:
         source_item_id = f"onenote:{page.id}"
         section_path = f"{page.notebook_name} / {page.section_name}"
+        classification = (
+            self.topic_classifier.classify(page=page, content_text=parsed_page.text)
+            if self.topic_classifier
+            else None
+        )
+        base_tags = ["onenote", page.notebook_name.lower().replace(" ", "-")]
+        topic_tags = list(classification.tags) if classification else []
         return SourceDocument(
             tenant_id="local-tenant",
             source_system="onenote",
@@ -33,7 +44,7 @@ class OneNoteDocumentNormalizer:
             acl_tags=["employees"],
             content_hash=compute_content_hash(parsed_page.text),
             content_text=parsed_page.text,
-            tags=["onenote", page.notebook_name.lower().replace(" ", "-")],
+            tags=list(dict.fromkeys([*base_tags, *topic_tags])),
             metadata={
                 "site_id": site.id,
                 "site_name": site.name,
@@ -45,6 +56,13 @@ class OneNoteDocumentNormalizer:
                 "content_url": page.content_url,
                 "page_level": page.page_level,
                 "page_order": page.page_order,
+                "topic_ids": list(classification.topic_ids) if classification else [],
+                "topic_confidence": classification.confidence if classification else {},
+                "topic_matched_terms": {
+                    topic_id: list(terms)
+                    for topic_id, terms in (classification.matched_terms.items() if classification else [])
+                },
+                "topic_source": "deterministic-config-match" if classification else "unclassified",
                 "embedding_model": embedding_model,
                 "resource_refs": [
                     {

@@ -51,10 +51,10 @@ The script:
 - waits until Open WebUI answers on `http://localhost:3000`
 - opens `http://localhost:3000`
 
-Use `-NoEnvUpdate` if you do not want the script to update non-secret OneNote-only `.env` defaults.
+The startup script preserves existing `.env` values by default. Use `-ApplyLocalDefaults` only if you want it to update non-secret OneNote-only local defaults in `.env`.
 Use `-SkipOpsWorker` if you only want the one-off OneNote sync and do not want the background worker container.
 
-The startup script also sets:
+With `-ApplyLocalDefaults`, the startup script also sets:
 
 ```env
 ENABLE_PERSISTENT_CONFIG=false

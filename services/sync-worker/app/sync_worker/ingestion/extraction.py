@@ -13,6 +13,33 @@ class UnsupportedFileTypeError(ValueError):
     pass
 
 
+READABLE_ATTACHMENT_EXTENSIONS = {".txt", ".md", ".markdown", ".pdf", ".docx", ".pptx"}
+UNSUPPORTED_DOWNLOAD_EXTENSIONS = {
+    ".7z",
+    ".app",
+    ".bin",
+    ".bz2",
+    ".cab",
+    ".deb",
+    ".dmg",
+    ".doc",
+    ".exe",
+    ".gz",
+    ".iso",
+    ".msi",
+    ".pkg",
+    ".ppt",
+    ".rar",
+    ".rpm",
+    ".run",
+    ".tar",
+    ".tgz",
+    ".xz",
+    ".zip",
+}
+DOWNLOADABLE_ATTACHMENT_EXTENSIONS = READABLE_ATTACHMENT_EXTENSIONS | UNSUPPORTED_DOWNLOAD_EXTENSIONS
+
+
 @dataclass(slots=True)
 class ExtractedContent:
     text: str
@@ -23,7 +50,7 @@ class ExtractedContent:
 class CompositeFileExtractor:
     def extract(self, file_name: str, content: bytes, mime_type: str | None = None) -> ExtractedContent:
         extension = PurePosixPath(file_name).suffix.lower()
-        if extension == ".txt":
+        if extension in {".txt", ".md", ".markdown"}:
             return self._extract_txt(content)
         if extension == ".pdf":
             return self._extract_pdf(content)

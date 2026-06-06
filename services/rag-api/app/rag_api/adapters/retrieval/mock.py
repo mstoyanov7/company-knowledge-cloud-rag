@@ -6,6 +6,8 @@ from typing import Iterable
 
 from shared_schemas import AccessScope, AppSettings, ChunkDocument, RetrievalMetadata, RetrievalRequest, RetrievalResult
 
+from rag_api.services.retrieval_ranking import fuzzy_metadata_relevance_score
+
 
 def _hash_text(value: str) -> str:
     return hashlib.sha1(value.encode("utf-8")).hexdigest()
@@ -22,6 +24,10 @@ class MockRetriever:
         self.settings = settings
         self._documents = self._build_corpus()
 
+    @property
+    def documents(self) -> tuple[ChunkDocument, ...]:
+        return self._documents
+
     async def retrieve(self, request: RetrievalRequest) -> RetrievalResult:
         started = time.perf_counter()
         access_scope = request.access_scope or AccessScope(
@@ -36,10 +42,16 @@ class MockRetriever:
         question_tokens = _tokenize(request.question)
         allowed_acl_tags = set(access_scope.allowed_acl_tags)
         source_filters = set(access_scope.source_filters)
+        focus_ids = set(request.focus_source_item_ids)
 
         scored: list[ChunkDocument] = []
         filtered_count = 0
         for document in self._documents:
+            if focus_ids:
+                parent_id = (document.metadata or {}).get("parent_source_item_id")
+                if document.source_item_id not in focus_ids and parent_id not in focus_ids:
+                    filtered_count += 1
+                    continue
             if source_filters and document.source_system not in source_filters:
                 filtered_count += 1
                 continue
@@ -59,11 +71,12 @@ class MockRetriever:
                 ]
             )
             overlap = question_tokens.intersection(_tokenize(document_text))
-            if not overlap:
+            fuzzy_score = fuzzy_metadata_relevance_score(request.question, document)
+            if not overlap and fuzzy_score <= 0:
                 continue
 
             topic_overlap = set(request.topic_tags).intersection(set(document.tags))
-            scored.append(document.model_copy(update={"score": float(len(overlap) + len(topic_overlap))}))
+            scored.append(document.model_copy(update={"score": float(len(overlap) + len(topic_overlap) + fuzzy_score)}))
 
         scored.sort(key=lambda item: (-item.score, item.title, item.chunk_index))
         top_k = min(request.top_k, self.settings.mock_top_k)
@@ -112,6 +125,15 @@ class MockRetriever:
                     "review the handbook, and confirm their laptop setup with IT."
                 ),
                 tags=["onboarding", "hr", "it"],
+                metadata={
+                    "notebook_id": "nb-onboarding",
+                    "notebook_name": "Onboarding",
+                    "section_id": "sec-first-day",
+                    "section_name": "First day",
+                    "page_id": "on-001",
+                    "last_edited_by": "People Ops",
+                    "client_url": "onenote:///notebooks/onboarding/day-1",
+                },
             ),
             self._document(
                 source_system="onenote",
@@ -127,6 +149,15 @@ class MockRetriever:
                     "health coverage, review paid leave rules, and activate the wellness portal."
                 ),
                 tags=["benefits", "people-ops"],
+                metadata={
+                    "notebook_id": "nb-onboarding",
+                    "notebook_name": "Onboarding",
+                    "section_id": "sec-benefits",
+                    "section_name": "Benefits",
+                    "page_id": "on-002",
+                    "last_edited_by": "Benefits Team",
+                    "client_url": "onenote:///notebooks/onboarding/benefits",
+                },
             ),
             self._document(
                 source_system="onenote",
@@ -142,6 +173,15 @@ class MockRetriever:
                     "rotation training, and use the incident handbook for production support."
                 ),
                 tags=["engineering", "access", "operations"],
+                metadata={
+                    "notebook_id": "nb-engineering",
+                    "notebook_name": "Engineering",
+                    "section_id": "sec-handbook",
+                    "section_name": "Handbook",
+                    "page_id": "on-003",
+                    "last_edited_by": "Engineering Enablement",
+                    "client_url": "onenote:///notebooks/engineering/remote-work",
+                },
             ),
         )
         return documents
@@ -159,6 +199,7 @@ class MockRetriever:
         chunk_index: int,
         chunk_text: str,
         tags: Iterable[str],
+        metadata: dict | None = None,
     ) -> ChunkDocument:
         return ChunkDocument(
             tenant_id="local-tenant",
@@ -177,4 +218,5 @@ class MockRetriever:
             embedding_model=self.settings.default_embedding_provider,
             language="en",
             tags=list(tags),
+            metadata=metadata or {},
         )

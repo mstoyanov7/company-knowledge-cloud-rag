@@ -26,6 +26,7 @@ describe("conversation storage", () => {
       withAssistant.messageId,
       "Use the leave request process.",
       [],
+      [],
       new Date("2026-05-28T10:02:00Z")
     );
 

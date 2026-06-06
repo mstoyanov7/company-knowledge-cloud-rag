@@ -8,6 +8,7 @@ param(
     [switch]$SkipOpenWebUI,
     [switch]$NoBrowser,
     [switch]$NoEnvUpdate,
+    [switch]$ApplyLocalDefaults,
     [int]$HealthTimeoutSeconds = 120,
     [int]$CompanyKnowledgeUITimeoutSeconds = 180,
     [int]$OpenWebUITimeoutSeconds = 300
@@ -159,7 +160,7 @@ try {
         Write-Host "Created .env from .env.example"
     }
 
-    if (-not $NoEnvUpdate) {
+    if ($ApplyLocalDefaults -and -not $NoEnvUpdate) {
         Write-Step "Applying OneNote-only local defaults to .env"
         Set-DotEnvValues -Path $EnvPath -Updates @{
             ONENOTE_GRAPH_MODE             = "live"
@@ -184,6 +185,8 @@ try {
             ENABLE_PERSISTENT_CONFIG       = "false"
             ENABLE_OLLAMA_API              = "false"
         }
+    } else {
+        Write-Host "Preserving existing .env values"
     }
 
     $envValues = Read-DotEnv $EnvPath

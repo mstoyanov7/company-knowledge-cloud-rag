@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SOME/IP vSomeIP Service Setup</title>
+  <style>body {
+  font-family: Aptos, Arial, sans-serif;
+  color: #1f2933;
+  line-height: 1.45;
+  max-width: 900px;
+  margin: 32px auto;
+  padding: 0 24px;
+}
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.muted { color: #52606d; }</style>
+</head>
+<body>
+  <article>
+    <h1>SOME/IP vSomeIP Service Setup</h1>
+    <p class="summary">Sets up a SOME/IP service using vSomeIP for service discovery and integration testing.</p>
+    <h2>Project Context</h2>
+    <p>SOME/IP vSomeIP Service Setup is used when an engineer needs a working local copy of the project, not just read access to the repository. This page sets up a SOME/IP service using vSomeIP for service discovery and integration testing.</p>
+    <p>The setup normally starts with access to vSomeIP, then moves through the required artifacts: vSomeIP repo, service config, network route. The important part is to keep the machine, the project configuration, and the verification output aligned. If those three do not match, the project can appear to work locally and still fail during integration.</p>
+    <p>Middleware Team keeps this page current because small toolchain changes matter in automotive work. A different compiler, DBC file, ODX package, schema version, or bench profile can change the result enough to waste a full validation session.</p>
+
+    <h2>Downloads and Links</h2>
+    <p>Use the internal links below rather than files passed through chat. They point to the maintained project material and keep the setup reproducible for release, validation, and supplier support.</p>
+    <p><strong>Repository:</strong> <a href="ssh://git.company.local/middleware/someip-vsomeip-service.git">ssh://git.company.local/middleware/someip-vsomeip-service.git</a></p>
+    <p><strong>Download package:</strong> <a href="https://downloads.company.local/automotive/some-ip-vsomeip-service-setup/">https://downloads.company.local/automotive/some-ip-vsomeip-service-setup/</a></p>
+    <p><strong>Setup notes:</strong> <a href="https://docs.company.local/automotive/some-ip-vsomeip-service-setup/setup">https://docs.company.local/automotive/some-ip-vsomeip-service-setup/setup</a></p>
+    <p><strong>Windows tools bundle:</strong> <a href="https://downloads.company.local/automotive/some-ip-vsomeip-service-setup/windows-tools.zip">https://downloads.company.local/automotive/some-ip-vsomeip-service-setup/windows-tools.zip</a></p>
+
+    <h2>Who Maintains It</h2>
+    <dl>
+      <dt>Owner</dt><dd>Middleware Team</dd>
+      <dt>For</dt><dd>software engineers, project owners, validation engineers</dd>
+      <dt>Systems</dt><dd>vSomeIP, CMake, Wireshark</dd>
+      <dt>Review</dt><dd>Review after each major release or tooling change.</dd>
+    </dl>
+
+    <h2>Before Opening a Terminal</h2>
+    <p>Confirm that your account is already in the right access group for vSomeIP. Do that before opening a terminal, because clone and package errors often look like network problems when they are actually permission problems.</p>
+    <p>Create a clean workspace and avoid reusing an old directory from another vehicle program. Keep vSomeIP repo and service config next to the setup ticket so another engineer can reproduce the same run later.</p>
+
+
+    <h2>Windows Setup</h2>
+    <p class="note">Use this path on a company Windows laptop or before switching into WSL.</p>
+    <pre><code class="language-powershell">$workspace = Join-Path $env:USERPROFILE &quot;automotive\some-ip-vsomeip-service-setup&quot;
+New-Item -ItemType Directory -Force $workspace | Out-Null
+Set-Location $workspace
+git config --global core.longpaths true
+winget install -e --id Git.Git
+winget install -e --id Kitware.CMake
+winget install -e --id Ninja-build.Ninja
+winget install -e --id WiresharkFoundation.Wireshark
+git clone ssh://git.company.local/middleware/someip-vsomeip-service.git .
+Write-Output &quot;Run the Linux or project-specific verification block after tools are installed.&quot;</code></pre>
+
+
+
+    <h2>vSomeIP Service Build</h2>
+    <p class="note">Use this path on Linux, WSL, or a standard validation workstation.</p>
+    <pre><code class="language-bash">mkdir -p ~/automotive/someip-vsomeip-service
+cd ~/automotive/someip-vsomeip-service
+git clone ssh://git.company.local/middleware/someip-vsomeip-service.git .
+cmake -S third_party/vsomeip -B build/vsomeip -DCMAKE_BUILD_TYPE=Release
+cmake --build build/vsomeip --parallel
+cmake -S . -B build -DVSOMEIP_ROOT=$PWD/build/vsomeip
+cmake --build build --target service_smoke_test --parallel
+./build/bin/service_smoke_test --config configs/local.json</code></pre>
+
+
+
+    <h2>Local Config Example</h2>
+    <p class="note">Keep this file local unless the project owner asks for it in the repository.</p>
+    <pre><code class="language-json">{
+  &quot;unicast&quot;: &quot;192.168.56.20&quot;,
+  &quot;logging&quot;: { &quot;level&quot;: &quot;info&quot;, &quot;console&quot;: true },
+  &quot;applications&quot;: [{ &quot;name&quot;: &quot;company-someip-service&quot;, &quot;id&quot;: &quot;0x1340&quot; }],
+  &quot;services&quot;: [{ &quot;service&quot;: &quot;0x1234&quot;, &quot;instance&quot;: &quot;0x0001&quot;, &quot;reliable&quot;: 30509, &quot;unreliable&quot;: 30510 }],
+  &quot;service-discovery&quot;: { &quot;enable&quot;: true, &quot;multicast&quot;: &quot;224.244.224.245&quot;, &quot;port&quot;: 30490 }
+}</code></pre>
+
+
+
+    <h2>Verification Commands</h2>
+    <p class="note">Run verification after setup and again after changing profiles, schemas, or hardware mappings.</p>
+    <pre><code class="language-bash">./build/bin/service_smoke_test --config configs/local.json
+tshark -i any -f &quot;udp port 30490&quot; -a duration:10</code></pre>
+
+
+    <h2>After the First Build</h2>
+    <p>After the first successful build, attach the terminal output and the generated local config to the setup ticket. The expected evidence is setup ticket, access approval, bootstrap output, verification log, plus any project-specific logs created by CMake or Wireshark.</p>
+    <p>Do not clean the workspace until the verification step has passed once. Keeping the first build directory for a day makes it easier for Middleware Team to compare cache files, generated code, downloaded packages, or tool versions if something fails for the next engineer.</p>
+
+    <h2>Checks To Keep With The Ticket</h2>
+    <ul>
+      <li>Workspace for SOME/IP vSomeIP Service Setup builds or starts without missing dependencies.</li>
+      <li>Access to vSomeIP, CMake, Wireshark is confirmed.</li>
+      <li>Required artifacts are present: vSomeIP repo, service config, network route.</li>
+      <li>Setup ticket contains bootstrap output and final verification result.</li>
+    </ul>
+
+    <h2>Typical Setup Problems</h2>
+    <ul>
+      <li>Outdated bootstrap commands can create inconsistent local environments.</li>
+      <li>Missing service config usually causes setup to pass locally but fail in integration.</li>
+      <li>Access should be removed when the engineer leaves the project or supplier engagement.</li>
+    </ul>
+
+    <h2>When To Ask For Help</h2>
+    <p>Escalate unclear ownership, missing evidence, blocked approvals, or exceptions to Middleware Team. The usual requester is the engineer joining the project, and the standard service desk or program channel should hold the final note.</p>
+  </article>
+</body>
+</html>

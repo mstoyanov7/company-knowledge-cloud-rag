@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Manufacturing Plant Deployment Window</title>
+  <style>body {
+  font-family: Aptos, Arial, sans-serif;
+  color: #1f2933;
+  line-height: 1.45;
+  max-width: 900px;
+  margin: 32px auto;
+  padding: 0 24px;
+}
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.muted { color: #52606d; }</style>
+</head>
+<body>
+  <article>
+    <h1>Manufacturing Plant Deployment Window</h1>
+    <p class="summary">Defines deployment windows, freeze periods, and approval contacts for software released to plant systems.</p>
+    <h2>Release Context</h2>
+    <p>Manufacturing Plant Deployment Window is written for the moment when engineering work is almost finished but production risk is still real. This page defines deployment windows, freeze periods, and approval contacts for software released to plant systems.</p>
+    <p>The release owner should read it before the deployment window starts, not during the window. The page connects the release material with MES, Plant VPN, and Change Calendar so the team can see what is moving and how rollback will work.</p>
+
+    <h2>How The Release Usually Moves</h2>
+    <p>The normal path starts with plant change window, then confirms MES dependency list, and finally checks approval record. When one of those is missing, the release should stay in preparation rather than becoming a production incident.</p>
+    <p>During the window, Manufacturing IT keeps the handoff short: what changed, what dashboard is watched, who can stop the rollout, and where the final note will be attached.</p>
+
+    <h2>Release Ownership</h2>
+    <table>
+      <tr><th>Owner team</th><td>Manufacturing IT</td></tr>
+      <tr><th>Audience</th><td>release managers, DevOps engineers, validation leads</td></tr>
+      <tr><th>Review rhythm</th><td>Review after each major release or tooling change.</td></tr>
+      <tr><th>Primary systems</th><td>MES, Plant VPN, Change Calendar</td></tr>
+    </table>
+
+    <h2>Gate Checks</h2>
+    <ul>
+      <li>Release scope, deployment window, and responsible owner are recorded.</li>
+      <li>Deployment evidence includes plant change window, MES dependency list, approval record.</li>
+      <li>Rollback owner and monitoring path are known before rollout.</li>
+      <li>Post-deployment checks are complete before handoff.</li>
+    </ul>
+
+    <h2>Evidence Trail</h2>
+    <p>Keep release approval, validation evidence, monitoring plan, rollback owner together with the release ticket. The release owner should be able to open one record and see what was deployed, who approved it, which monitoring view was used, and who owns rollback.</p>
+
+    <h2>Release Risks</h2>
+    <ul>
+      <li>Deployment without rollback ownership increases recovery time.</li>
+      <li>Release evidence must be current for the exact software package being deployed.</li>
+      <li>Monitoring gaps should block rollout until ownership is clear.</li>
+    </ul>
+
+    <h2>Escalation</h2>
+    <p>Escalate unclear ownership, missing evidence, blocked approvals, or exceptions to Manufacturing IT. The usual requester is the release owner or program lead, and the standard service desk or program channel should hold the final note.</p>
+  </article>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import type { Citation } from "../api/answers";
+import type { AnswerMetadata, Citation, Clarification, DownloadLink } from "../api/answers";
 import { safeParseJson, type StorageLike } from "./storage";
 
 const CONVERSATION_STORAGE_KEY = "companyKnowledgeConversations.v1";
@@ -8,8 +8,16 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
+  downloads?: DownloadLink[];
+  metadata?: AnswerMetadata;
+  question?: string;
+  conversationId?: string;
   createdAt: string;
   status?: "loading" | "done" | "error";
+  // Set when the assistant asked a quiz-style follow-up. `clarificationResolved`
+  // flips to true once the user picks an option so the buttons disable.
+  clarification?: Clarification | null;
+  clarificationResolved?: boolean;
 };
 
 export type Conversation = {
@@ -114,10 +122,13 @@ export function addUserMessage(
 
 export function addAssistantPlaceholder(
   conversation: Conversation,
+  questionOrNow: string | Date = "",
   now = new Date()
 ): { conversation: Conversation; messageId: string } {
-  const timestamp = now.toISOString();
-  const messageId = messageIdFor("assistant", now);
+  const resolvedNow = questionOrNow instanceof Date ? questionOrNow : now;
+  const question = typeof questionOrNow === "string" ? questionOrNow : "";
+  const timestamp = resolvedNow.toISOString();
+  const messageId = messageIdFor("assistant", resolvedNow);
 
   return {
     messageId,
@@ -130,6 +141,8 @@ export function addAssistantPlaceholder(
           id: messageId,
           role: "assistant",
           content: "",
+          question,
+          conversationId: conversation.id,
           createdAt: timestamp,
           status: "loading"
         }
@@ -143,18 +156,46 @@ export function completeAssistantMessage(
   messageId: string,
   content: string,
   citations: Citation[] = [],
+  downloads: DownloadLink[] = [],
+  metadataOrNow?: AnswerMetadata | Date,
   now = new Date()
 ): Conversation {
+  const resolvedNow = metadataOrNow instanceof Date ? metadataOrNow : now;
+  const metadata = metadataOrNow instanceof Date ? undefined : metadataOrNow;
   return updateMessage(
     conversation,
     messageId,
     {
       content,
       citations,
+      downloads,
+      metadata,
       status: "done"
     },
-    now
+    resolvedNow
   );
+}
+
+export function updateAssistantMessage(
+  conversation: Conversation,
+  messageId: string,
+  update: Partial<
+    Pick<
+      ChatMessage,
+      "content" | "citations" | "downloads" | "metadata" | "status" | "clarification" | "clarificationResolved"
+    >
+  >,
+  now = new Date()
+): Conversation {
+  return updateMessage(conversation, messageId, update, now);
+}
+
+export function resolveClarificationMessage(
+  conversation: Conversation,
+  messageId: string,
+  now = new Date()
+): Conversation {
+  return updateMessage(conversation, messageId, { clarificationResolved: true }, now);
 }
 
 export function failAssistantMessage(
@@ -254,8 +295,14 @@ function normalizeMessage(value: unknown, fallbackTimestamp: string): ChatMessag
         role: rawMessage.role,
         content: String(rawMessage.content || ""),
         citations: rawMessage.citations || [],
+        downloads: rawMessage.downloads || [],
+        metadata: rawMessage.metadata,
+        question: rawMessage.question,
+        conversationId: rawMessage.conversationId,
         createdAt: rawMessage.createdAt || fallbackTimestamp,
-        status: rawMessage.status || "done"
+        status: rawMessage.status || "done",
+        clarification: rawMessage.clarification ?? null,
+        clarificationResolved: rawMessage.clarificationResolved ?? false
       }
     ];
   }
@@ -273,6 +320,7 @@ function normalizeMessage(value: unknown, fallbackTimestamp: string): ChatMessag
       role: "assistant",
       content: rawMessage.response?.answer || rawMessage.error || "",
       citations: rawMessage.response?.citations || [],
+      downloads: [],
       createdAt: rawMessage.createdAt || fallbackTimestamp,
       status: rawMessage.error ? "error" : rawMessage.response ? "done" : "loading"
     };

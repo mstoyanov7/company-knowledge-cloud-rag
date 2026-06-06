@@ -4,7 +4,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 
-NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes."
+NO_INFORMATION_ANSWER = "I could not find that information in the available OneNote notes or readable attachments."
 
 
 class Pipe:

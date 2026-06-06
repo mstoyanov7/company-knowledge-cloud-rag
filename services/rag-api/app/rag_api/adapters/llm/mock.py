@@ -14,7 +14,7 @@ class MockLlmAdapter:
             return GenerationResult(
                 provider=self.provider_name,
                 model=self.model_name,
-                answer_text="I could not find that information in the available OneNote notes.",
+                answer_text="I could not find that information in the available OneNote notes or readable attachments.",
             )
 
         highlights = []
@@ -22,10 +22,7 @@ class MockLlmAdapter:
             content = _content_from_block(block) or citation.snippet
             highlights.append(_trim_sentences(content, max_sentences=4))
 
-        sources = "; ".join(dict.fromkeys(citation.title for citation in prompt.citations[:2] if citation.title))
         answer = "### Answer\n\n" + "\n\n".join(f"- {highlight}" for highlight in highlights if highlight)
-        if sources:
-            answer = f"{answer}\n\n_Source: {sources}_"
         return GenerationResult(
             provider=self.provider_name,
             model=self.model_name,

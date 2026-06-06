@@ -4,6 +4,7 @@ import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from shared_schemas import AppSettings
@@ -30,6 +31,7 @@ class GraphOneNoteClient(ABC):
         self,
         site_id: str,
         *,
+        section_id: str | None = None,
         modified_since: datetime | None = None,
         next_url: str | None = None,
     ) -> tuple[list[OneNotePage], str | None]:
@@ -37,6 +39,10 @@ class GraphOneNoteClient(ABC):
 
     @abstractmethod
     def get_page_content(self, content_url: str) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_resource_content(self, resource_url: str) -> bytes:
         raise NotImplementedError
 
 
@@ -74,7 +80,7 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
         )
 
     def list_notebooks(self, site_id: str) -> list[OneNoteNotebook]:
-        payload = self._request_json(
+        raw_notebooks = self._request_collection(
             "GET",
             f"{self._onenote_root(site_id)}/notebooks",
             params={
@@ -83,7 +89,7 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
             },
         )
         notebooks: list[OneNoteNotebook] = []
-        for raw in payload.get("value", []):
+        for raw in raw_notebooks:
             web_url = (((raw.get("links") or {}).get("oneNoteWebUrl") or {}).get("href")) or raw.get("self") or ""
             notebooks.append(
                 OneNoteNotebook(
@@ -96,7 +102,7 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
         return notebooks
 
     def list_sections(self, site_id: str) -> list[OneNoteSection]:
-        payload = self._request_json(
+        raw_sections = self._request_collection(
             "GET",
             f"{self._onenote_root(site_id)}/sections",
             params={
@@ -107,7 +113,7 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
             },
         )
         sections: list[OneNoteSection] = []
-        for raw in payload.get("value", []):
+        for raw in raw_sections:
             parent_notebook = raw.get("parentNotebook") or {}
             web_url = (((raw.get("links") or {}).get("oneNoteWebUrl") or {}).get("href")) or raw.get("self") or ""
             sections.append(
@@ -125,6 +131,7 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
         self,
         site_id: str,
         *,
+        section_id: str | None = None,
         modified_since: datetime | None = None,
         next_url: str | None = None,
     ) -> tuple[list[OneNotePage], str | None]:
@@ -137,14 +144,22 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
                 "$orderby": "lastModifiedDateTime asc",
                 "$top": str(min(self.settings.onenote_page_page_size, 100)),
             }
+            path = f"{self._onenote_root(site_id)}/pages"
+            if section_id:
+                path = f"{self._onenote_root(site_id)}/sections/{quote(section_id, safe='')}/pages"
+                params["pagelevel"] = "true"
             if modified_since:
                 params["$filter"] = f"lastModifiedDateTime ge {modified_since.astimezone(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}"
-            payload = self._request_json("GET", f"{self._onenote_root(site_id)}/pages", params=params)
+            payload = self._request_json("GET", path, params=params)
         pages = [self._parse_page(raw) for raw in payload.get("value", [])]
         return pages, payload.get("@odata.nextLink")
 
     def get_page_content(self, content_url: str) -> str:
         return self._request_text("GET", content_url, absolute=True, headers={"Accept": "text/html"})
+
+    def get_resource_content(self, resource_url: str) -> bytes:
+        response = self._request("GET", resource_url, absolute=True, headers={"Accept": "application/octet-stream"})
+        return response.content
 
     def _onenote_root(self, site_id: str) -> str:
         if self.settings.resolved_onenote_scope_mode == "me":
@@ -181,6 +196,25 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
     ) -> dict[str, Any]:
         response = self._request(method, path_or_url, params=params, absolute=absolute, headers=headers)
         return response.json()
+
+    def _request_collection(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, str] | None = None,
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        next_url: str | None = None
+        while True:
+            if next_url:
+                payload = self._request_json(method, next_url, absolute=True)
+            else:
+                payload = self._request_json(method, path, params=params)
+            items.extend(payload.get("value", []))
+            next_url = payload.get("@odata.nextLink")
+            if not next_url:
+                return items
 
     def _request_text(
         self,
@@ -259,6 +293,7 @@ class MockOneNoteGraphClient(GraphOneNoteClient):
         self._sections: list[OneNoteSection] = []
         self._pages: list[OneNotePage] = []
         self._content: dict[str, str] = {}
+        self._resources: dict[str, bytes] = {}
 
         page_templates = {
             "Orientation": [
@@ -348,6 +383,11 @@ class MockOneNoteGraphClient(GraphOneNoteClient):
                     )
                 )
                 self._content[content_url] = html
+        self._resources["https://www.onenote.com/api/v1.0/me/notes/resources/file-1/$value"] = (
+            b"%PDF-1.4\n"
+            b"1 0 obj << /Type /Catalog >> endobj\n"
+            b"trailer << /Root 1 0 R >>\n%%EOF"
+        )
 
     def resolve_site(self) -> OneNoteSite:
         return self._site
@@ -362,16 +402,22 @@ class MockOneNoteGraphClient(GraphOneNoteClient):
         self,
         site_id: str,
         *,
+        section_id: str | None = None,
         modified_since: datetime | None = None,
         next_url: str | None = None,
     ) -> tuple[list[OneNotePage], str | None]:
         pages = sorted(self._pages, key=lambda page: page.last_modified_utc)
+        if section_id:
+            pages = [page for page in pages if page.section_id == section_id]
         if modified_since:
             pages = [page for page in pages if page.last_modified_utc >= modified_since]
         return pages, None
 
     def get_page_content(self, content_url: str) -> str:
         return self._content[content_url]
+
+    def get_resource_content(self, resource_url: str) -> bytes:
+        return self._resources[resource_url]
 
 
 def build_onenote_auth_provider(settings: AppSettings) -> DelegatedAuthProvider:

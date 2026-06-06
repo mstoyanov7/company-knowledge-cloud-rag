@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 
 import psycopg
-from shared_schemas import AppSettings, ChunkDocument, OneNoteCheckpoint, SourceDocument
+from shared_schemas import AppSettings, ChunkDocument, OneNoteCheckpoint, SourceAttachment, SourceDocument
 
 
 class PostgresMetadataStore:
@@ -75,8 +75,36 @@ class PostgresMetadataStore:
                             updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
                         );
 
+                        CREATE TABLE IF NOT EXISTS source_attachments (
+                            download_id TEXT PRIMARY KEY,
+                            tenant_id TEXT NOT NULL,
+                            scope_key TEXT NOT NULL,
+                            source_system TEXT NOT NULL,
+                            source_container TEXT NOT NULL,
+                            parent_source_item_id TEXT NOT NULL,
+                            parent_title TEXT NOT NULL,
+                            source_url TEXT NOT NULL,
+                            resource_url TEXT NOT NULL,
+                            file_name TEXT NOT NULL,
+                            file_extension TEXT NOT NULL,
+                            mime_type TEXT,
+                            size_bytes INTEGER NOT NULL DEFAULT 0,
+                            readable BOOLEAN NOT NULL DEFAULT FALSE,
+                            indexed_source_item_id TEXT,
+                            storage_path TEXT,
+                            content_hash TEXT NOT NULL,
+                            last_modified_utc TIMESTAMPTZ NOT NULL,
+                            acl_tags_json TEXT NOT NULL,
+                            metadata_json TEXT NOT NULL,
+                            is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+                            updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                            deleted_at_utc TIMESTAMPTZ
+                        );
+
                         CREATE INDEX IF NOT EXISTS idx_source_documents_scope_key ON source_documents(scope_key);
                         CREATE INDEX IF NOT EXISTS idx_chunk_documents_source_item_id ON chunk_documents(source_item_id);
+                        CREATE INDEX IF NOT EXISTS idx_source_attachments_scope_parent ON source_attachments(scope_key, parent_source_item_id);
+                        CREATE INDEX IF NOT EXISTS idx_source_attachments_indexed_source ON source_attachments(indexed_source_item_id);
                         """
                     )
                 finally:
@@ -235,6 +263,88 @@ class PostgresMetadataStore:
                 )
             connection.commit()
 
+    def upsert_source_attachment(self, scope_key: str, attachment: SourceAttachment) -> None:
+        with psycopg.connect(self.settings.postgres_dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO source_attachments (
+                        download_id, tenant_id, scope_key, source_system, source_container, parent_source_item_id,
+                        parent_title, source_url, resource_url, file_name, file_extension, mime_type, size_bytes,
+                        readable, indexed_source_item_id, storage_path, content_hash, last_modified_utc,
+                        acl_tags_json, metadata_json, is_deleted, deleted_at_utc, updated_at_utc
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, NULL, %s)
+                    ON CONFLICT (download_id) DO UPDATE SET
+                        tenant_id = EXCLUDED.tenant_id,
+                        scope_key = EXCLUDED.scope_key,
+                        source_system = EXCLUDED.source_system,
+                        source_container = EXCLUDED.source_container,
+                        parent_source_item_id = EXCLUDED.parent_source_item_id,
+                        parent_title = EXCLUDED.parent_title,
+                        source_url = EXCLUDED.source_url,
+                        resource_url = EXCLUDED.resource_url,
+                        file_name = EXCLUDED.file_name,
+                        file_extension = EXCLUDED.file_extension,
+                        mime_type = EXCLUDED.mime_type,
+                        size_bytes = EXCLUDED.size_bytes,
+                        readable = EXCLUDED.readable,
+                        indexed_source_item_id = EXCLUDED.indexed_source_item_id,
+                        storage_path = EXCLUDED.storage_path,
+                        content_hash = EXCLUDED.content_hash,
+                        last_modified_utc = EXCLUDED.last_modified_utc,
+                        acl_tags_json = EXCLUDED.acl_tags_json,
+                        metadata_json = EXCLUDED.metadata_json,
+                        is_deleted = FALSE,
+                        deleted_at_utc = NULL,
+                        updated_at_utc = EXCLUDED.updated_at_utc
+                    """,
+                    (
+                        attachment.download_id,
+                        attachment.tenant_id,
+                        scope_key,
+                        attachment.source_system,
+                        attachment.source_container,
+                        attachment.parent_source_item_id,
+                        attachment.parent_title,
+                        attachment.source_url,
+                        attachment.resource_url,
+                        attachment.file_name,
+                        attachment.file_extension,
+                        attachment.mime_type,
+                        attachment.size_bytes,
+                        attachment.readable,
+                        attachment.indexed_source_item_id,
+                        attachment.storage_path,
+                        attachment.content_hash,
+                        attachment.last_modified_utc,
+                        json.dumps(attachment.acl_tags),
+                        json.dumps(attachment.metadata),
+                        datetime.now(UTC),
+                    ),
+                )
+            connection.commit()
+
+    def get_source_attachment(self, download_id: str) -> SourceAttachment | None:
+        try:
+            with psycopg.connect(self.settings.postgres_dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT download_id, tenant_id, source_system, source_container, parent_source_item_id,
+                               parent_title, source_url, resource_url, file_name, file_extension, mime_type,
+                               size_bytes, readable, indexed_source_item_id, storage_path, content_hash,
+                               last_modified_utc, acl_tags_json, metadata_json, updated_at_utc
+                        FROM source_attachments
+                        WHERE download_id = %s AND is_deleted = FALSE
+                        """,
+                        (download_id,),
+                    )
+                    row = cursor.fetchone()
+        except psycopg.errors.UndefinedTable:
+            self.ensure_schema()
+            return None
+        return _attachment_from_row(row) if row else None
+
     def mark_source_deleted(self, scope_key: str, source_item_id: str, deleted_at_utc: datetime | None = None) -> None:
         deleted_at = deleted_at_utc or datetime.now(UTC)
         with psycopg.connect(self.settings.postgres_dsn) as connection:
@@ -253,6 +363,14 @@ class PostgresMetadataStore:
                     WHERE source_item_id = %s
                     """,
                     (source_item_id,),
+                )
+                cursor.execute(
+                    """
+                    UPDATE source_attachments
+                    SET is_deleted = TRUE, deleted_at_utc = %s, updated_at_utc = %s
+                    WHERE scope_key = %s AND parent_source_item_id = %s
+                    """,
+                    (deleted_at, deleted_at, scope_key, source_item_id),
                 )
             connection.commit()
 
@@ -301,7 +419,7 @@ class PostgresMetadataStore:
                     """
                     SELECT tenant_id, source_system, source_container, source_item_id, source_url, title, file_name, file_extension,
                            mime_type, section_path, last_modified_utc, acl_tags_json, content_hash, content_text,
-                           language, tags_json, metadata_json
+                           language, tags_json, metadata_json, updated_at_utc
                     FROM source_documents
                     WHERE scope_key = %s AND source_system = %s AND is_deleted = FALSE
                     ORDER BY source_item_id ASC
@@ -330,6 +448,95 @@ class PostgresMetadataStore:
                     language=row[14],
                     tags=json.loads(row[15]),
                     metadata=json.loads(row[16]),
+                    updated_at_utc=row[17],
                 )
             )
         return documents
+
+    def list_active_source_attachments(
+        self,
+        scope_key: str,
+        parent_source_item_ids: list[str] | None = None,
+    ) -> list[SourceAttachment]:
+        with psycopg.connect(self.settings.postgres_dsn) as connection:
+            with connection.cursor() as cursor:
+                if parent_source_item_ids:
+                    cursor.execute(
+                        """
+                        SELECT download_id, tenant_id, source_system, source_container, parent_source_item_id,
+                               parent_title, source_url, resource_url, file_name, file_extension, mime_type,
+                               size_bytes, readable, indexed_source_item_id, storage_path, content_hash,
+                               last_modified_utc, acl_tags_json, metadata_json, updated_at_utc
+                        FROM source_attachments
+                        WHERE scope_key = %s
+                          AND parent_source_item_id = ANY(%s)
+                          AND is_deleted = FALSE
+                        ORDER BY parent_source_item_id ASC, file_name ASC
+                        """,
+                        (scope_key, parent_source_item_ids),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        SELECT download_id, tenant_id, source_system, source_container, parent_source_item_id,
+                               parent_title, source_url, resource_url, file_name, file_extension, mime_type,
+                               size_bytes, readable, indexed_source_item_id, storage_path, content_hash,
+                               last_modified_utc, acl_tags_json, metadata_json, updated_at_utc
+                        FROM source_attachments
+                        WHERE scope_key = %s AND is_deleted = FALSE
+                        ORDER BY parent_source_item_id ASC, file_name ASC
+                        """,
+                        (scope_key,),
+                    )
+                rows = cursor.fetchall()
+        return [_attachment_from_row(row) for row in rows]
+
+    def mark_stale_attachments_deleted(
+        self,
+        scope_key: str,
+        parent_source_item_id: str,
+        active_download_ids: set[str],
+    ) -> list[SourceAttachment]:
+        existing = self.list_active_source_attachments(scope_key, [parent_source_item_id])
+        stale = [attachment for attachment in existing if attachment.download_id not in active_download_ids]
+        if not stale:
+            return []
+        deleted_at = datetime.now(UTC)
+        with psycopg.connect(self.settings.postgres_dsn) as connection:
+            with connection.cursor() as cursor:
+                for attachment in stale:
+                    cursor.execute(
+                        """
+                        UPDATE source_attachments
+                        SET is_deleted = TRUE, deleted_at_utc = %s, updated_at_utc = %s
+                        WHERE download_id = %s
+                        """,
+                        (deleted_at, deleted_at, attachment.download_id),
+                    )
+            connection.commit()
+        return stale
+
+
+def _attachment_from_row(row) -> SourceAttachment:
+    return SourceAttachment(
+        download_id=row[0],
+        tenant_id=row[1],
+        source_system=row[2],
+        source_container=row[3],
+        parent_source_item_id=row[4],
+        parent_title=row[5],
+        source_url=row[6],
+        resource_url=row[7],
+        file_name=row[8],
+        file_extension=row[9],
+        mime_type=row[10],
+        size_bytes=row[11],
+        readable=row[12],
+        indexed_source_item_id=row[13],
+        storage_path=row[14],
+        content_hash=row[15],
+        last_modified_utc=row[16],
+        acl_tags=json.loads(row[17]),
+        metadata=json.loads(row[18]),
+        updated_at_utc=row[19],
+    )
