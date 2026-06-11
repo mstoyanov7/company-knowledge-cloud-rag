@@ -51,6 +51,9 @@ class MetadataStorePort(Protocol):
     def list_active_source_documents(self, scope_key: str, source_system: str) -> list[SourceDocument]:
         ...
 
+    def list_chunks(self, scope_key: str, *, source_system: str = "onenote") -> list[ChunkDocument]:
+        ...
+
 
 class VectorStorePort(Protocol):
     def ensure_collection(self) -> None:

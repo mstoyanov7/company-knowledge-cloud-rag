@@ -1,0 +1,36 @@
+{
+  "name": "company-knowledge-behavior-v1",
+  "description": "Probes the answer engine's graded behaviour (answered / hedged / clarify / refusal) and access-control enforcement, run against eval_corpus.json by eval/run_behavior_eval.py. 'expected_outcome' is the hypothesis; the script reports the actual outcome.",
+  "outcome_cases": [
+    {"case_id": "absent-parental-leave", "question": "What is the company parental leave policy and how long is it?", "expected_outcome": "refusal", "acl_tags": ["public", "employees"]},
+    {"case_id": "absent-conference-room", "question": "How do I book a conference room for a meeting?", "expected_outcome": "refusal", "acl_tags": ["public", "employees"]},
+    {"case_id": "absent-gym-stipend", "question": "Is there a gym membership stipend I can claim?", "expected_outcome": "refusal", "acl_tags": ["public", "employees"]},
+    {"case_id": "ambiguous-get-access", "question": "How do I get access?", "expected_outcome": "clarify", "acl_tags": ["employees", "engineering"]},
+    {"case_id": "ambiguous-setup", "question": "How do I set things up?", "expected_outcome": "clarify", "acl_tags": ["employees", "engineering"]},
+    {"case_id": "related-incident-postmortem", "question": "How do we write an incident postmortem after an outage?", "expected_outcome": "hedge", "acl_tags": ["employees", "engineering"]},
+    {"case_id": "direct-control-vpn", "question": "How do I connect to the VPN and what if it fails?", "expected_outcome": "answered", "acl_tags": ["public", "employees"]}
+  ],
+  "acl_ablation": [
+    {
+      "case_id": "acl-oncall-compensation",
+      "question": "What is the on-call compensation stipend and hourly rate?",
+      "target_source_item_id": "ek-hr-003",
+      "denied_acl_tags": ["public", "employees"],
+      "allowed_acl_tags": ["public", "employees", "hr"]
+    },
+    {
+      "case_id": "acl-incident-response",
+      "question": "What are the containment steps in the security incident response process?",
+      "target_source_item_id": "ek-sec-003",
+      "denied_acl_tags": ["employees", "engineering"],
+      "allowed_acl_tags": ["employees", "security"]
+    },
+    {
+      "case_id": "acl-vendor-invoice",
+      "question": "How are vendor invoices processed and what are the payment terms?",
+      "target_source_item_id": "ek-fin-002",
+      "denied_acl_tags": ["public", "employees"],
+      "allowed_acl_tags": ["public", "employees", "finance"]
+    }
+  ]
+}

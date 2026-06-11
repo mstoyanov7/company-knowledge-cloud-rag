@@ -1,0 +1,5557 @@
+{
+  "name": "extended-eval-v1",
+  "description": "Extended deterministic evaluation: answerable, refusal, clarify, hedge and ACL-ablation cases over extended_corpus.json.",
+  "total_executions": 306,
+  "answerable": [
+    {
+      "case_id": "p0101-q1",
+      "category": "direct",
+      "question": "What should a new engineer accomplish in their first week?",
+      "expected_source_item_ids": [
+        "p0101"
+      ],
+      "expected_answer_terms": [
+        "laptop",
+        "buddy"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0101-q2",
+      "category": "direct",
+      "question": "How quickly are accounts provisioned after the IT ticket on day one?",
+      "expected_source_item_ids": [
+        "p0101"
+      ],
+      "expected_answer_terms": [
+        "4 business hours"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0101-q3",
+      "category": "procedural",
+      "question": "What are the first onboarding steps for a new engineer?",
+      "expected_source_item_ids": [
+        "p0101"
+      ],
+      "expected_answer_terms": [
+        "laptop",
+        "sso"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0101-q4",
+      "category": "paraphrase",
+      "question": "I just joined as a developer - what is expected of me in my first few days?",
+      "expected_source_item_ids": [
+        "p0101"
+      ],
+      "expected_answer_terms": [
+        "buddy"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0101-q5",
+      "category": "direct",
+      "question": "When must security awareness training be completed?",
+      "expected_source_item_ids": [
+        "p0101"
+      ],
+      "expected_answer_terms": [
+        "5 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0102-q1",
+      "category": "direct",
+      "question": "What is the standard developer toolchain for workstation setup?",
+      "expected_source_item_ids": [
+        "p0102"
+      ],
+      "expected_answer_terms": [
+        "node.js 20",
+        "python 3.12"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0102-q2",
+      "category": "direct",
+      "question": "What is the internal package registry and how do I authenticate to it?",
+      "expected_source_item_ids": [
+        "p0102"
+      ],
+      "expected_answer_terms": [
+        "registry.northwind.local"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0102-q3",
+      "category": "procedural",
+      "question": "How do I set up my developer workstation?",
+      "expected_source_item_ids": [
+        "p0102"
+      ],
+      "expected_answer_terms": [
+        "install",
+        "signing"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0102-q4",
+      "category": "paraphrase",
+      "question": "Which programs must be on my machine before I start coding on a project?",
+      "expected_source_item_ids": [
+        "p0102"
+      ],
+      "expected_answer_terms": [
+        "git"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0103-q1",
+      "category": "direct",
+      "question": "Which accounts are provisioned automatically on day one?",
+      "expected_source_item_ids": [
+        "p0103"
+      ],
+      "expected_answer_terms": [
+        "sso",
+        "slack",
+        "github"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0103-q2",
+      "category": "direct",
+      "question": "Can a new hire get production access on day one?",
+      "expected_source_item_ids": [
+        "p0103"
+      ],
+      "expected_answer_terms": [
+        "never granted",
+        "security approval"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0103-q3",
+      "category": "procedural",
+      "question": "How do I request team-specific tool access as a new hire?",
+      "expected_source_item_ids": [
+        "p0103"
+      ],
+      "expected_answer_terms": [
+        "access portal"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0103-q4",
+      "category": "paraphrase",
+      "question": "What logins will already work when I first sign in at the company?",
+      "expected_source_item_ids": [
+        "p0103"
+      ],
+      "expected_answer_terms": [
+        "sso"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0104-q1",
+      "category": "direct",
+      "question": "When does the daily standup start and how long does it last?",
+      "expected_source_item_ids": [
+        "p0104"
+      ],
+      "expected_answer_terms": [
+        "10:00",
+        "15 minutes"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0104-q2",
+      "category": "direct",
+      "question": "How long are sprints and when do they start?",
+      "expected_source_item_ids": [
+        "p0104"
+      ],
+      "expected_answer_terms": [
+        "two-week",
+        "wednesdays"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0104-q3",
+      "category": "procedural",
+      "question": "What should I do if I cannot attend standup live?",
+      "expected_source_item_ids": [
+        "p0104"
+      ],
+      "expected_answer_terms": [
+        "before 10:00"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0104-q4",
+      "category": "paraphrase",
+      "question": "Which recurring meetings should a newcomer put in their calendar?",
+      "expected_source_item_ids": [
+        "p0104"
+      ],
+      "expected_answer_terms": [
+        "standup"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0104-q5",
+      "category": "direct",
+      "question": "When do sprint review and retro happen?",
+      "expected_source_item_ids": [
+        "p0104"
+      ],
+      "expected_answer_terms": [
+        "second tuesday"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0105-q1",
+      "category": "direct",
+      "question": "What milestones should an engineer hit by day 30?",
+      "expected_source_item_ids": [
+        "p0105"
+      ],
+      "expected_answer_terms": [
+        "five pull requests",
+        "staging"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0105-q2",
+      "category": "direct",
+      "question": "When can a new engineer start on-call shadowing?",
+      "expected_source_item_ids": [
+        "p0105"
+      ],
+      "expected_answer_terms": [
+        "manager review",
+        "shadowing"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0105-q3",
+      "category": "procedural",
+      "question": "How are first month milestones tracked?",
+      "expected_source_item_ids": [
+        "p0105"
+      ],
+      "expected_answer_terms": [
+        "1:1"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0105-q4",
+      "category": "paraphrase",
+      "question": "What does being fully ramped up look like after four weeks?",
+      "expected_source_item_ids": [
+        "p0105"
+      ],
+      "expected_answer_terms": [
+        "pull requests"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0106-q1",
+      "category": "direct",
+      "question": "Who can be an onboarding buddy?",
+      "expected_source_item_ids": [
+        "p0106"
+      ],
+      "expected_answer_terms": [
+        "peer engineer"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0106-q2",
+      "category": "direct",
+      "question": "How much time does an onboarding buddy commit?",
+      "expected_source_item_ids": [
+        "p0106"
+      ],
+      "expected_answer_terms": [
+        "3 hours per week"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0106-q3",
+      "category": "procedural",
+      "question": "What does the buddy do for the new hire's first ticket?",
+      "expected_source_item_ids": [
+        "p0106"
+      ],
+      "expected_answer_terms": [
+        "pair"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0106-q4",
+      "category": "paraphrase",
+      "question": "What support am I supposed to get from the colleague assigned to me when I join?",
+      "expected_source_item_ids": [
+        "p0106"
+      ],
+      "expected_answer_terms": [
+        "buddy"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0201-q1",
+      "category": "direct",
+      "question": "What branching model do we use?",
+      "expected_source_item_ids": [
+        "p0201"
+      ],
+      "expected_answer_terms": [
+        "trunk-based"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0201-q2",
+      "category": "direct",
+      "question": "How many approvals does a pull request need?",
+      "expected_source_item_ids": [
+        "p0201"
+      ],
+      "expected_answer_terms": [
+        "one approval",
+        "two approvals"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0201-q3",
+      "category": "procedural",
+      "question": "What is the pull request workflow from branch to merge?",
+      "expected_source_item_ids": [
+        "p0201"
+      ],
+      "expected_answer_terms": [
+        "draft",
+        "squash-merge"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0201-q4",
+      "category": "paraphrase",
+      "question": "I finished my code change - how do I get it into the main branch?",
+      "expected_source_item_ids": [
+        "p0201"
+      ],
+      "expected_answer_terms": [
+        "pull request"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0201-q5",
+      "category": "direct",
+      "question": "How long can a branch sit idle before it is deleted?",
+      "expected_source_item_ids": [
+        "p0201"
+      ],
+      "expected_answer_terms": [
+        "30 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0202-q1",
+      "category": "direct",
+      "question": "What is the expected turnaround for code reviews?",
+      "expected_source_item_ids": [
+        "p0202"
+      ],
+      "expected_answer_terms": [
+        "one business day"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0202-q2",
+      "category": "direct",
+      "question": "What do reviewers check first in a code review?",
+      "expected_source_item_ids": [
+        "p0202"
+      ],
+      "expected_answer_terms": [
+        "correctness"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0202-q3",
+      "category": "procedural",
+      "question": "How should I review a pull request properly?",
+      "expected_source_item_ids": [
+        "p0202"
+      ],
+      "expected_answer_terms": [
+        "ticket",
+        "tests"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0202-q4",
+      "category": "paraphrase",
+      "question": "My PR has been sitting without review since yesterday morning - what does policy say?",
+      "expected_source_item_ids": [
+        "p0202"
+      ],
+      "expected_answer_terms": [
+        "one business day"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0203-q1",
+      "category": "direct",
+      "question": "Which formatters and linters are enforced?",
+      "expected_source_item_ids": [
+        "p0203"
+      ],
+      "expected_answer_terms": [
+        "ruff",
+        "prettier"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0203-q2",
+      "category": "direct",
+      "question": "What is the maximum line length?",
+      "expected_source_item_ids": [
+        "p0203"
+      ],
+      "expected_answer_terms": [
+        "100"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0203-q3",
+      "category": "procedural",
+      "question": "How do I set up the linting hooks locally?",
+      "expected_source_item_ids": [
+        "p0203"
+      ],
+      "expected_answer_terms": [
+        "pre-commit install"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0203-q4",
+      "category": "paraphrase",
+      "question": "Will the build fail if my code is badly formatted?",
+      "expected_source_item_ids": [
+        "p0203"
+      ],
+      "expected_answer_terms": [
+        "blocks merge"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0204-q1",
+      "category": "direct",
+      "question": "When should I write an ADR?",
+      "expected_source_item_ids": [
+        "p0204"
+      ],
+      "expected_answer_terms": [
+        "costly to reverse"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0204-q2",
+      "category": "direct",
+      "question": "What are the four parts of an ADR?",
+      "expected_source_item_ids": [
+        "p0204"
+      ],
+      "expected_answer_terms": [
+        "context",
+        "consequences"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0204-q3",
+      "category": "procedural",
+      "question": "What is the process to get an ADR accepted?",
+      "expected_source_item_ids": [
+        "p0204"
+      ],
+      "expected_answer_terms": [
+        "template",
+        "architecture review"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0204-q4",
+      "category": "paraphrase",
+      "question": "We're choosing a new database - do we need to document that decision somewhere?",
+      "expected_source_item_ids": [
+        "p0204"
+      ],
+      "expected_answer_terms": [
+        "adr"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0205-q1",
+      "category": "direct",
+      "question": "What is the code coverage target?",
+      "expected_source_item_ids": [
+        "p0205"
+      ],
+      "expected_answer_terms": [
+        "80%"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0205-q2",
+      "category": "direct",
+      "question": "When do integration and end-to-end tests run?",
+      "expected_source_item_ids": [
+        "p0205"
+      ],
+      "expected_answer_terms": [
+        "merge to main",
+        "nightly"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0205-q3",
+      "category": "procedural",
+      "question": "What tests must I add for a new external dependency?",
+      "expected_source_item_ids": [
+        "p0205"
+      ],
+      "expected_answer_terms": [
+        "integration test"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0205-q4",
+      "category": "paraphrase",
+      "question": "A test fails randomly on every third CI run - what is the procedure?",
+      "expected_source_item_ids": [
+        "p0205"
+      ],
+      "expected_answer_terms": [
+        "quarantined"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0205-q5",
+      "category": "paraphrase",
+      "question": "What happens to a flaky test?",
+      "expected_source_item_ids": [
+        "p0205"
+      ],
+      "expected_answer_terms": [
+        "quarantined"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0206-q1",
+      "category": "direct",
+      "question": "What is the rule for naming conventions in repositories?",
+      "expected_source_item_ids": [
+        "p0206"
+      ],
+      "expected_answer_terms": [
+        "kebab-case"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0206-q2",
+      "category": "direct",
+      "question": "How are environment variables named?",
+      "expected_source_item_ids": [
+        "p0206"
+      ],
+      "expected_answer_terms": [
+        "upper_snake_case"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0206-q3",
+      "category": "procedural",
+      "question": "Where do I check before naming something new?",
+      "expected_source_item_ids": [
+        "p0206"
+      ],
+      "expected_answer_terms": [
+        "catalog"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0206-q4",
+      "category": "paraphrase",
+      "question": "Is there a standard format for feature flag names?",
+      "expected_source_item_ids": [
+        "p0206"
+      ],
+      "expected_answer_terms": [
+        "area.flag-name"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0301-q1",
+      "category": "direct",
+      "question": "What stack is billing-service built on?",
+      "expected_source_item_ids": [
+        "p0301"
+      ],
+      "expected_answer_terms": [
+        "fastapi",
+        "postgresql"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0301-q2",
+      "category": "direct",
+      "question": "What port does billing-service run on locally?",
+      "expected_source_item_ids": [
+        "p0301"
+      ],
+      "expected_answer_terms": [
+        "8020"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0301-q3",
+      "category": "procedural",
+      "question": "How do I set up billing-service locally?",
+      "expected_source_item_ids": [
+        "p0301"
+      ],
+      "expected_answer_terms": [
+        "virtualenv",
+        "vault"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0301-q4",
+      "category": "paraphrase",
+      "question": "Where do I get the Stripe test credentials for local development?",
+      "expected_source_item_ids": [
+        "p0301"
+      ],
+      "expected_answer_terms": [
+        "secret/billing/stripe-test"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0302-q1",
+      "category": "direct",
+      "question": "What framework is the customer web app built with?",
+      "expected_source_item_ids": [
+        "p0302"
+      ],
+      "expected_answer_terms": [
+        "react 19",
+        "vite"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0302-q2",
+      "category": "direct",
+      "question": "What port does the web app dev server use?",
+      "expected_source_item_ids": [
+        "p0302"
+      ],
+      "expected_answer_terms": [
+        "5173"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0302-q3",
+      "category": "procedural",
+      "question": "How do I run the web app locally?",
+      "expected_source_item_ids": [
+        "p0302"
+      ],
+      "expected_answer_terms": [
+        "npm"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0302-q4",
+      "category": "paraphrase",
+      "question": "Which testing tools cover the frontend, both unit and end to end?",
+      "expected_source_item_ids": [
+        "p0302"
+      ],
+      "expected_answer_terms": [
+        "vitest",
+        "playwright"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0303-q1",
+      "category": "direct",
+      "question": "What language and engine does search-service use?",
+      "expected_source_item_ids": [
+        "p0303"
+      ],
+      "expected_answer_terms": [
+        "go",
+        "opensearch"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0303-q2",
+      "category": "direct",
+      "question": "How do I rebuild the search index?",
+      "expected_source_item_ids": [
+        "p0303"
+      ],
+      "expected_answer_terms": [
+        "reindex",
+        "catalog"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0303-q3",
+      "category": "procedural",
+      "question": "How do I set up search-service locally?",
+      "expected_source_item_ids": [
+        "p0303"
+      ],
+      "expected_answer_terms": [
+        "docker compose",
+        "make"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0303-q4",
+      "category": "paraphrase",
+      "question": "Which endpoint tells me whether the search backend is alive?",
+      "expected_source_item_ids": [
+        "p0303"
+      ],
+      "expected_answer_terms": [
+        "/healthz"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0304-q1",
+      "category": "direct",
+      "question": "What orchestrates the analytics data pipeline?",
+      "expected_source_item_ids": [
+        "p0304"
+      ],
+      "expected_answer_terms": [
+        "airflow"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0304-q2",
+      "category": "direct",
+      "question": "What do the dbt models build into locally?",
+      "expected_source_item_ids": [
+        "p0304"
+      ],
+      "expected_answer_terms": [
+        "duckdb"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0304-q3",
+      "category": "procedural",
+      "question": "How do I run the daily ETL locally?",
+      "expected_source_item_ids": [
+        "p0304"
+      ],
+      "expected_answer_terms": [
+        "daily_etl"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0304-q4",
+      "category": "paraphrase",
+      "question": "Where does local source data for the pipeline come from?",
+      "expected_source_item_ids": [
+        "p0304"
+      ],
+      "expected_answer_terms": [
+        "fixtures"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0305-q1",
+      "category": "direct",
+      "question": "What is the supported Flutter version?",
+      "expected_source_item_ids": [
+        "p0305"
+      ],
+      "expected_answer_terms": [
+        "3.24"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0305-q2",
+      "category": "direct",
+      "question": "Which API does the mobile app target by default?",
+      "expected_source_item_ids": [
+        "p0305"
+      ],
+      "expected_answer_terms": [
+        "staging"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0305-q3",
+      "category": "procedural",
+      "question": "How do I set up the mobile app project?",
+      "expected_source_item_ids": [
+        "p0305"
+      ],
+      "expected_answer_terms": [
+        "flutter doctor"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0305-q4",
+      "category": "paraphrase",
+      "question": "How do we make sure key screens keep rendering exactly the same?",
+      "expected_source_item_ids": [
+        "p0305"
+      ],
+      "expected_answer_terms": [
+        "golden tests"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0306-q1",
+      "category": "direct",
+      "question": "What does the nw CLI do?",
+      "expected_source_item_ids": [
+        "p0306"
+      ],
+      "expected_answer_terms": [
+        "bootstraps"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0306-q2",
+      "category": "direct",
+      "question": "What does nw doctor validate?",
+      "expected_source_item_ids": [
+        "p0306"
+      ],
+      "expected_answer_terms": [
+        "registry auth"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0306-q3",
+      "category": "procedural",
+      "question": "How do I install the nw command-line tool?",
+      "expected_source_item_ids": [
+        "p0306"
+      ],
+      "expected_answer_terms": [
+        "internal mirror"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0306-q4",
+      "category": "paraphrase",
+      "question": "Is there a company tool that checks my environment is healthy?",
+      "expected_source_item_ids": [
+        "p0306"
+      ],
+      "expected_answer_terms": [
+        "doctor"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0401-q1",
+      "category": "direct",
+      "question": "How does a change get deployed to production?",
+      "expected_source_item_ids": [
+        "p0401"
+      ],
+      "expected_answer_terms": [
+        "staging soak"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0401-q2",
+      "category": "direct",
+      "question": "Can we deploy on the weekend?",
+      "expected_source_item_ids": [
+        "p0401"
+      ],
+      "expected_answer_terms": [
+        "freeze",
+        "hotfix"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0401-q3",
+      "category": "procedural",
+      "question": "What are the steps of a production rollout?",
+      "expected_source_item_ids": [
+        "p0401"
+      ],
+      "expected_answer_terms": [
+        "canary"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0401-q4",
+      "category": "paraphrase",
+      "question": "What share of traffic does a new release get at first?",
+      "expected_source_item_ids": [
+        "p0401"
+      ],
+      "expected_answer_terms": [
+        "5%"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0401-q5",
+      "category": "direct",
+      "question": "Who must be named before a rollout starts?",
+      "expected_source_item_ids": [
+        "p0401"
+      ],
+      "expected_answer_terms": [
+        "rollback owner"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0402-q1",
+      "category": "direct",
+      "question": "How do I roll back a bad production release?",
+      "expected_source_item_ids": [
+        "p0402"
+      ],
+      "expected_answer_terms": [
+        "last-stable"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0402-q2",
+      "category": "direct",
+      "question": "Are database migrations safe for rollback?",
+      "expected_source_item_ids": [
+        "p0402"
+      ],
+      "expected_answer_terms": [
+        "backward compatible"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0402-q3",
+      "category": "procedural",
+      "question": "What is the rollback procedure during an incident?",
+      "expected_source_item_ids": [
+        "p0402"
+      ],
+      "expected_answer_terms": [
+        "incident channel"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0402-q4",
+      "category": "paraphrase",
+      "question": "A release broke production - what's the fastest way to restore the previous version?",
+      "expected_source_item_ids": [
+        "p0402"
+      ],
+      "expected_answer_terms": [
+        "last-stable"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0403-q1",
+      "category": "direct",
+      "question": "How are feature flags managed for releases?",
+      "expected_source_item_ids": [
+        "p0403"
+      ],
+      "expected_answer_terms": [
+        "off in production"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0403-q2",
+      "category": "direct",
+      "question": "How are risky flags rolled out?",
+      "expected_source_item_ids": [
+        "p0403"
+      ],
+      "expected_answer_terms": [
+        "internal users",
+        "10%"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0403-q3",
+      "category": "procedural",
+      "question": "What is the lifecycle of a feature flag?",
+      "expected_source_item_ids": [
+        "p0403"
+      ],
+      "expected_answer_terms": [
+        "owner and expiry"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0403-q4",
+      "category": "paraphrase",
+      "question": "After my feature is fully live, what happens to its toggle?",
+      "expected_source_item_ids": [
+        "p0403"
+      ],
+      "expected_answer_terms": [
+        "60 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0404-q1",
+      "category": "direct",
+      "question": "What is the staging environment policy?",
+      "expected_source_item_ids": [
+        "p0404"
+      ],
+      "expected_answer_terms": [
+        "mirrors production"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0404-q2",
+      "category": "direct",
+      "question": "Can I run load tests on staging?",
+      "expected_source_item_ids": [
+        "p0404"
+      ],
+      "expected_answer_terms": [
+        "booking a window"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0404-q3",
+      "category": "procedural",
+      "question": "What do I do after deploying my change to staging?",
+      "expected_source_item_ids": [
+        "p0404"
+      ],
+      "expected_answer_terms": [
+        "smoke"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0404-q4",
+      "category": "paraphrase",
+      "question": "Does staging talk to mocked external services?",
+      "expected_source_item_ids": [
+        "p0404"
+      ],
+      "expected_answer_terms": [
+        "sandboxes"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0405-q1",
+      "category": "direct",
+      "question": "How are customer release notes produced?",
+      "expected_source_item_ids": [
+        "p0405"
+      ],
+      "expected_answer_terms": [
+        "changelog"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0405-q2",
+      "category": "direct",
+      "question": "When are release notes published?",
+      "expected_source_item_ids": [
+        "p0405"
+      ],
+      "expected_answer_terms": [
+        "second wednesday"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0405-q3",
+      "category": "procedural",
+      "question": "What must I do for a customer-facing PR to appear in release notes?",
+      "expected_source_item_ids": [
+        "p0405"
+      ],
+      "expected_answer_terms": [
+        "label"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0405-q4",
+      "category": "paraphrase",
+      "question": "We're shipping a breaking API change - what notice do customers get?",
+      "expected_source_item_ids": [
+        "p0405"
+      ],
+      "expected_answer_terms": [
+        "30 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0501-q1",
+      "category": "direct",
+      "question": "When does the latency alert fire?",
+      "expected_source_item_ids": [
+        "p0501"
+      ],
+      "expected_answer_terms": [
+        "800 ms",
+        "5 minutes"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0501-q2",
+      "category": "direct",
+      "question": "What is the most common cause of high API latency?",
+      "expected_source_item_ids": [
+        "p0501"
+      ],
+      "expected_answer_terms": [
+        "connection pool"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0501-q3",
+      "category": "procedural",
+      "question": "What do I check first during an API latency incident?",
+      "expected_source_item_ids": [
+        "p0501"
+      ],
+      "expected_answer_terms": [
+        "dashboard"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0501-q4",
+      "category": "paraphrase",
+      "question": "API responses are slow - what's the standard first mitigation?",
+      "expected_source_item_ids": [
+        "p0501"
+      ],
+      "expected_answer_terms": [
+        "6 replicas"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0502-q1",
+      "category": "direct",
+      "question": "What happens when a deployment fails health checks?",
+      "expected_source_item_ids": [
+        "p0502"
+      ],
+      "expected_answer_terms": [
+        "halts"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0502-q2",
+      "category": "direct",
+      "question": "Does a failed deploy take down the running version?",
+      "expected_source_item_ids": [
+        "p0502"
+      ],
+      "expected_answer_terms": [
+        "old pods"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0502-q3",
+      "category": "procedural",
+      "question": "How do I investigate a failed deployment?",
+      "expected_source_item_ids": [
+        "p0502"
+      ],
+      "expected_answer_terms": [
+        "pipeline logs"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0502-q4",
+      "category": "paraphrase",
+      "question": "Deployment went red and I'm not sure why - should I debug it live?",
+      "expected_source_item_ids": [
+        "p0502"
+      ],
+      "expected_answer_terms": [
+        "last-stable"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0503-q1",
+      "category": "direct",
+      "question": "What is the database max_connections limit?",
+      "expected_source_item_ids": [
+        "p0503"
+      ],
+      "expected_answer_terms": [
+        "400"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0503-q2",
+      "category": "direct",
+      "question": "How does a connection leak show up?",
+      "expected_source_item_ids": [
+        "p0503"
+      ],
+      "expected_answer_terms": [
+        "idle-in-transaction"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0503-q3",
+      "category": "procedural",
+      "question": "How do I resolve too many connections errors?",
+      "expected_source_item_ids": [
+        "p0503"
+      ],
+      "expected_answer_terms": [
+        "pg_stat_activity"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0503-q4",
+      "category": "paraphrase",
+      "question": "What happens to queries that run longer than half a minute?",
+      "expected_source_item_ids": [
+        "p0503"
+      ],
+      "expected_answer_terms": [
+        "watchdog"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0503-q5",
+      "category": "paraphrase",
+      "question": "What pools client connections in front of Postgres?",
+      "expected_source_item_ids": [
+        "p0503"
+      ],
+      "expected_answer_terms": [
+        "pgbouncer"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0504-q1",
+      "category": "direct",
+      "question": "How to fix a Docker Compose port conflict?",
+      "expected_source_item_ids": [
+        "p0504"
+      ],
+      "expected_answer_terms": [
+        "stale container"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0504-q2",
+      "category": "direct",
+      "question": "How do I free a port held by old containers?",
+      "expected_source_item_ids": [
+        "p0504"
+      ],
+      "expected_answer_terms": [
+        "orphaned"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0504-q3",
+      "category": "procedural",
+      "question": "What are the steps to resolve the port is already allocated error?",
+      "expected_source_item_ids": [
+        "p0504"
+      ],
+      "expected_answer_terms": [
+        "holds the port"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0504-q4",
+      "category": "paraphrase",
+      "question": "Postgres won't start locally because something is squatting on 5432 - now what?",
+      "expected_source_item_ids": [
+        "p0504"
+      ],
+      "expected_answer_terms": [
+        "5432"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0505-q1",
+      "category": "direct",
+      "question": "Why does vector search return no results?",
+      "expected_source_item_ids": [
+        "p0505"
+      ],
+      "expected_answer_terms": [
+        "dimension",
+        "reindex"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0505-q2",
+      "category": "direct",
+      "question": "What must the collection vector size match?",
+      "expected_source_item_ids": [
+        "p0505"
+      ],
+      "expected_answer_terms": [
+        "embedding model dimension"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0505-q3",
+      "category": "procedural",
+      "question": "How do I diagnose an empty semantic search result?",
+      "expected_source_item_ids": [
+        "p0505"
+      ],
+      "expected_answer_terms": [
+        "point count"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0505-q4",
+      "category": "paraphrase",
+      "question": "Semantic queries suddenly come back empty after we switched embedding models - why?",
+      "expected_source_item_ids": [
+        "p0505"
+      ],
+      "expected_answer_terms": [
+        "reindex"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0601-q1",
+      "category": "direct",
+      "question": "How do I get access to our GitHub repositories?",
+      "expected_source_item_ids": [
+        "p0601"
+      ],
+      "expected_answer_terms": [
+        "github teams"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0601-q2",
+      "category": "direct",
+      "question": "What does write access to infra repos require?",
+      "expected_source_item_ids": [
+        "p0601"
+      ],
+      "expected_answer_terms": [
+        "security approval"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0601-q3",
+      "category": "procedural",
+      "question": "What is the flow to join a GitHub team?",
+      "expected_source_item_ids": [
+        "p0601"
+      ],
+      "expected_answer_terms": [
+        "access portal"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0601-q4",
+      "category": "paraphrase",
+      "question": "Can a repo admin just add my personal account directly?",
+      "expected_source_item_ids": [
+        "p0601"
+      ],
+      "expected_answer_terms": [
+        "never to individuals"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0602-q1",
+      "category": "direct",
+      "question": "Where should application secrets be stored?",
+      "expected_source_item_ids": [
+        "p0602"
+      ],
+      "expected_answer_terms": [
+        "hashicorp vault"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0602-q2",
+      "category": "direct",
+      "question": "How often do production secrets rotate?",
+      "expected_source_item_ids": [
+        "p0602"
+      ],
+      "expected_answer_terms": [
+        "90 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0602-q3",
+      "category": "procedural",
+      "question": "How do I read a secret for my service?",
+      "expected_source_item_ids": [
+        "p0602"
+      ],
+      "expected_answer_terms": [
+        "sso token"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0602-q4",
+      "category": "paraphrase",
+      "question": "Is it ever OK to put a password in the repository?",
+      "expected_source_item_ids": [
+        "p0602"
+      ],
+      "expected_answer_terms": [
+        "never committed"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0603-q1",
+      "category": "direct",
+      "question": "Where does CI run and on what runners?",
+      "expected_source_item_ids": [
+        "p0603"
+      ],
+      "expected_answer_terms": [
+        "github actions",
+        "self-hosted"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0603-q2",
+      "category": "direct",
+      "question": "Who can rerun a failed CI job?",
+      "expected_source_item_ids": [
+        "p0603"
+      ],
+      "expected_answer_terms": [
+        "anyone"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0603-q3",
+      "category": "procedural",
+      "question": "How do I rerun a failed CI job?",
+      "expected_source_item_ids": [
+        "p0603"
+      ],
+      "expected_answer_terms": [
+        "actions tab"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0603-q4",
+      "category": "paraphrase",
+      "question": "My pipeline job has been queued forever - what does that usually mean?",
+      "expected_source_item_ids": [
+        "p0603"
+      ],
+      "expected_answer_terms": [
+        "no runner"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0604-q1",
+      "category": "direct",
+      "question": "Where are the dashboards and how do I access them?",
+      "expected_source_item_ids": [
+        "p0604"
+      ],
+      "expected_answer_terms": [
+        "grafana",
+        "sso"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0604-q2",
+      "category": "direct",
+      "question": "Where are logs queried?",
+      "expected_source_item_ids": [
+        "p0604"
+      ],
+      "expected_answer_terms": [
+        "loki"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0604-q3",
+      "category": "procedural",
+      "question": "How do I run an ad-hoc log query?",
+      "expected_source_item_ids": [
+        "p0604"
+      ],
+      "expected_answer_terms": [
+        "explore"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0604-q4",
+      "category": "paraphrase",
+      "question": "I need to follow a request across services - which tool shows traces?",
+      "expected_source_item_ids": [
+        "p0604"
+      ],
+      "expected_answer_terms": [
+        "tempo"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0605-q1",
+      "category": "direct",
+      "question": "How are Jira projects organized?",
+      "expected_source_item_ids": [
+        "p0605"
+      ],
+      "expected_answer_terms": [
+        "short code"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0605-q2",
+      "category": "direct",
+      "question": "What is the ticket workflow?",
+      "expected_source_item_ids": [
+        "p0605"
+      ],
+      "expected_answer_terms": [
+        "backlog",
+        "done"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0605-q3",
+      "category": "procedural",
+      "question": "How do I get access to a Jira board?",
+      "expected_source_item_ids": [
+        "p0605"
+      ],
+      "expected_answer_terms": [
+        "access portal"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0605-q4",
+      "category": "paraphrase",
+      "question": "Two teams share work on one feature - do we move tickets between their projects?",
+      "expected_source_item_ids": [
+        "p0605"
+      ],
+      "expected_answer_terms": [
+        "linked issues"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0701-q1",
+      "category": "direct",
+      "question": "How do I connect to the corporate VPN?",
+      "expected_source_item_ids": [
+        "p0701"
+      ],
+      "expected_answer_terms": [
+        "anyconnect"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0701-q2",
+      "category": "direct",
+      "question": "What if my VPN certificate is invalid?",
+      "expected_source_item_ids": [
+        "p0701"
+      ],
+      "expected_answer_terms": [
+        "reinstall the profile"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0701-q3",
+      "category": "procedural",
+      "question": "What are the steps to recover VPN access?",
+      "expected_source_item_ids": [
+        "p0701"
+      ],
+      "expected_answer_terms": [
+        "mfa push"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0701-q4",
+      "category": "paraphrase",
+      "question": "Do I need the tunnel running for everyday SaaS tools?",
+      "expected_source_item_ids": [
+        "p0701"
+      ],
+      "expected_answer_terms": [
+        "admin networks"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0702-q1",
+      "category": "direct",
+      "question": "How do I re-enroll MFA after getting a new phone?",
+      "expected_source_item_ids": [
+        "p0702"
+      ],
+      "expected_answer_terms": [
+        "video confirmation"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0702-q2",
+      "category": "direct",
+      "question": "How long do I have to enroll the new device after an MFA reset?",
+      "expected_source_item_ids": [
+        "p0702"
+      ],
+      "expected_answer_terms": [
+        "24 hours"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0702-q3",
+      "category": "procedural",
+      "question": "What is the MFA reset process?",
+      "expected_source_item_ids": [
+        "p0702"
+      ],
+      "expected_answer_terms": [
+        "service desk ticket"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0702-q4",
+      "category": "paraphrase",
+      "question": "I lost my phone with the authenticator app - who resets it?",
+      "expected_source_item_ids": [
+        "p0702"
+      ],
+      "expected_answer_terms": [
+        "service desk"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0703-q1",
+      "category": "direct",
+      "question": "How fast are replacement laptops shipped?",
+      "expected_source_item_ids": [
+        "p0703"
+      ],
+      "expected_answer_terms": [
+        "2 business days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0703-q2",
+      "category": "direct",
+      "question": "What must I do if my laptop is lost?",
+      "expected_source_item_ids": [
+        "p0703"
+      ],
+      "expected_answer_terms": [
+        "1 hour"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0703-q3",
+      "category": "procedural",
+      "question": "What is the process for replacing a broken laptop?",
+      "expected_source_item_ids": [
+        "p0703"
+      ],
+      "expected_answer_terms": [
+        "service desk"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0703-q4",
+      "category": "paraphrase",
+      "question": "Is company data exposed if a machine goes missing?",
+      "expected_source_item_ids": [
+        "p0703"
+      ],
+      "expected_answer_terms": [
+        "encrypted"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0704-q1",
+      "category": "direct",
+      "question": "How do I install software outside the standard image?",
+      "expected_source_item_ids": [
+        "p0704"
+      ],
+      "expected_answer_terms": [
+        "self-service portal"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0704-q2",
+      "category": "direct",
+      "question": "Can engineers install developer tools without a ticket?",
+      "expected_source_item_ids": [
+        "p0704"
+      ],
+      "expected_answer_terms": [
+        "without a ticket"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0704-q3",
+      "category": "procedural",
+      "question": "What is the request process for non-standard software?",
+      "expected_source_item_ids": [
+        "p0704"
+      ],
+      "expected_answer_terms": [
+        "business reason"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0704-q4",
+      "category": "paraphrase",
+      "question": "Why won't this random downloaded app run on my laptop?",
+      "expected_source_item_ids": [
+        "p0704"
+      ],
+      "expected_answer_terms": [
+        "blocked"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0705-q1",
+      "category": "direct",
+      "question": "How do I request a distribution list?",
+      "expected_source_item_ids": [
+        "p0705"
+      ],
+      "expected_answer_terms": [
+        "owner"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0705-q2",
+      "category": "direct",
+      "question": "What naming pattern do distribution lists follow?",
+      "expected_source_item_ids": [
+        "p0705"
+      ],
+      "expected_answer_terms": [
+        "northwind.local"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0705-q3",
+      "category": "procedural",
+      "question": "What are the steps to create a new mailing list?",
+      "expected_source_item_ids": [
+        "p0705"
+      ],
+      "expected_answer_terms": [
+        "access portal"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0705-q4",
+      "category": "paraphrase",
+      "question": "What happens when someone outside the company emails an internal list?",
+      "expected_source_item_ids": [
+        "p0705"
+      ],
+      "expected_answer_terms": [
+        "quarantined"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0801-q1",
+      "category": "direct",
+      "question": "How many days of annual leave do employees get?",
+      "expected_source_item_ids": [
+        "p0801"
+      ],
+      "expected_answer_terms": [
+        "25 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0801-q2",
+      "category": "direct",
+      "question": "How much unused leave carries over?",
+      "expected_source_item_ids": [
+        "p0801"
+      ],
+      "expected_answer_terms": [
+        "31 march"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0801-q3",
+      "category": "procedural",
+      "question": "How do I request time off?",
+      "expected_source_item_ids": [
+        "p0801"
+      ],
+      "expected_answer_terms": [
+        "hr portal"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0801-q4",
+      "category": "paraphrase",
+      "question": "Planning a two-week vacation - how early must I ask?",
+      "expected_source_item_ids": [
+        "p0801"
+      ],
+      "expected_answer_terms": [
+        "3 weeks"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0801-q5",
+      "category": "paraphrase",
+      "question": "When do carried-over vacation days expire?",
+      "expected_source_item_ids": [
+        "p0801"
+      ],
+      "expected_answer_terms": [
+        "31 march"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0802-q1",
+      "category": "direct",
+      "question": "What is the hybrid work policy?",
+      "expected_source_item_ids": [
+        "p0802"
+      ],
+      "expected_answer_terms": [
+        "2 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0802-q2",
+      "category": "direct",
+      "question": "What are core collaboration hours?",
+      "expected_source_item_ids": [
+        "p0802"
+      ],
+      "expected_answer_terms": [
+        "10:00 to 16:00"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0802-q3",
+      "category": "procedural",
+      "question": "How do I become fully remote?",
+      "expected_source_item_ids": [
+        "p0802"
+      ],
+      "expected_answer_terms": [
+        "vp approval"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0802-q4",
+      "category": "paraphrase",
+      "question": "I want to work from another country all summer - is that fine?",
+      "expected_source_item_ids": [
+        "p0802"
+      ],
+      "expected_answer_terms": [
+        "tax"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0803-q1",
+      "category": "direct",
+      "question": "What is the on-call compensation?",
+      "expected_source_item_ids": [
+        "p0803"
+      ],
+      "expected_answer_terms": [
+        "stipend"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "hr"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0803-q2",
+      "category": "direct",
+      "question": "What do I get if paged after midnight?",
+      "expected_source_item_ids": [
+        "p0803"
+      ],
+      "expected_answer_terms": [
+        "late start"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "hr"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0803-q3",
+      "category": "procedural",
+      "question": "What should I record during my on-call week?",
+      "expected_source_item_ids": [
+        "p0803"
+      ],
+      "expected_answer_terms": [
+        "night pages"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "hr"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0803-q4",
+      "category": "paraphrase",
+      "question": "Is there extra pay for carrying the pager for a week?",
+      "expected_source_item_ids": [
+        "p0803"
+      ],
+      "expected_answer_terms": [
+        "stipend"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "hr"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0804-q1",
+      "category": "direct",
+      "question": "When do performance reviews run?",
+      "expected_source_item_ids": [
+        "p0804"
+      ],
+      "expected_answer_terms": [
+        "june",
+        "december"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "hr"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0804-q2",
+      "category": "direct",
+      "question": "What inputs go into a performance review?",
+      "expected_source_item_ids": [
+        "p0804"
+      ],
+      "expected_answer_terms": [
+        "self-assessment",
+        "peer"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "hr"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0804-q3",
+      "category": "procedural",
+      "question": "What do I do during the review cycle?",
+      "expected_source_item_ids": [
+        "p0804"
+      ],
+      "expected_answer_terms": [
+        "self-assessment"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "hr"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0804-q4",
+      "category": "paraphrase",
+      "question": "When can promotion cases be submitted?",
+      "expected_source_item_ids": [
+        "p0804"
+      ],
+      "expected_answer_terms": [
+        "december"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "hr"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0805-q1",
+      "category": "direct",
+      "question": "How long do new hires have to enroll in health insurance?",
+      "expected_source_item_ids": [
+        "p0805"
+      ],
+      "expected_answer_terms": [
+        "30 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0805-q2",
+      "category": "direct",
+      "question": "How much of the premium does the company cover?",
+      "expected_source_item_ids": [
+        "p0805"
+      ],
+      "expected_answer_terms": [
+        "100%",
+        "60%"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0805-q3",
+      "category": "procedural",
+      "question": "How do I enroll in benefits?",
+      "expected_source_item_ids": [
+        "p0805"
+      ],
+      "expected_answer_terms": [
+        "benefits portal"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0805-q4",
+      "category": "paraphrase",
+      "question": "I got married - can I change my plan mid-year?",
+      "expected_source_item_ids": [
+        "p0805"
+      ],
+      "expected_answer_terms": [
+        "qualifying life event"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0806-q1",
+      "category": "direct",
+      "question": "How big is the annual learning budget?",
+      "expected_source_item_ids": [
+        "p0806"
+      ],
+      "expected_answer_terms": [
+        "1,500"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0806-q2",
+      "category": "direct",
+      "question": "What is eligible under the learning budget?",
+      "expected_source_item_ids": [
+        "p0806"
+      ],
+      "expected_answer_terms": [
+        "conferences",
+        "certifications"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0806-q3",
+      "category": "procedural",
+      "question": "How do I use my training budget?",
+      "expected_source_item_ids": [
+        "p0806"
+      ],
+      "expected_answer_terms": [
+        "manager approval"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0806-q4",
+      "category": "paraphrase",
+      "question": "If I don't spend my education money this year, do I keep it?",
+      "expected_source_item_ids": [
+        "p0806"
+      ],
+      "expected_answer_terms": [
+        "does not carry over"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0901-q1",
+      "category": "direct",
+      "question": "How do I claim work-related expenses?",
+      "expected_source_item_ids": [
+        "p0901"
+      ],
+      "expected_answer_terms": [
+        "expense tool",
+        "60 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0901-q2",
+      "category": "direct",
+      "question": "When is a receipt mandatory?",
+      "expected_source_item_ids": [
+        "p0901"
+      ],
+      "expected_answer_terms": [
+        "25 eur"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0901-q3",
+      "category": "procedural",
+      "question": "What are the steps to submit an expense?",
+      "expected_source_item_ids": [
+        "p0901"
+      ],
+      "expected_answer_terms": [
+        "receipt",
+        "cost center"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0901-q4",
+      "category": "paraphrase",
+      "question": "Team dinner included a bottle of wine - will that be paid back?",
+      "expected_source_item_ids": [
+        "p0901"
+      ],
+      "expected_answer_terms": [
+        "alcohol"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0902-q1",
+      "category": "direct",
+      "question": "What is required before buying a new SaaS tool?",
+      "expected_source_item_ids": [
+        "p0902"
+      ],
+      "expected_answer_terms": [
+        "security"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0902-q2",
+      "category": "direct",
+      "question": "Who approves purchases over 5,000 EUR?",
+      "expected_source_item_ids": [
+        "p0902"
+      ],
+      "expected_answer_terms": [
+        "finance director"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0902-q3",
+      "category": "procedural",
+      "question": "How do I request a new software purchase?",
+      "expected_source_item_ids": [
+        "p0902"
+      ],
+      "expected_answer_terms": [
+        "business case"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0902-q4",
+      "category": "paraphrase",
+      "question": "We found a new vendor nobody has used before - what's the gate?",
+      "expected_source_item_ids": [
+        "p0902"
+      ],
+      "expected_answer_terms": [
+        "security review"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0903-q1",
+      "category": "direct",
+      "question": "What tags must cloud resources carry?",
+      "expected_source_item_ids": [
+        "p0903"
+      ],
+      "expected_answer_terms": [
+        "environment tags"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0903-q2",
+      "category": "direct",
+      "question": "What happens to untagged resources?",
+      "expected_source_item_ids": [
+        "p0903"
+      ],
+      "expected_answer_terms": [
+        "7 days"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0903-q3",
+      "category": "procedural",
+      "question": "What do I do when a spend anomaly alert fires?",
+      "expected_source_item_ids": [
+        "p0903"
+      ],
+      "expected_answer_terms": [
+        "investigate"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0903-q4",
+      "category": "paraphrase",
+      "question": "Do dev environments run at full size overnight?",
+      "expected_source_item_ids": [
+        "p0903"
+      ],
+      "expected_answer_terms": [
+        "working hours"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0904-q1",
+      "category": "direct",
+      "question": "How are supplier invoices received?",
+      "expected_source_item_ids": [
+        "p0904"
+      ],
+      "expected_answer_terms": [
+        "invoice portal"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0904-q2",
+      "category": "direct",
+      "question": "What are the standard payment terms?",
+      "expected_source_item_ids": [
+        "p0904"
+      ],
+      "expected_answer_terms": [
+        "net 30"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0904-q3",
+      "category": "procedural",
+      "question": "How is an invoice approved for payment?",
+      "expected_source_item_ids": [
+        "p0904"
+      ],
+      "expected_answer_terms": [
+        "purchase order"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0904-q4",
+      "category": "paraphrase",
+      "question": "An invoice doesn't match its order - what happens?",
+      "expected_source_item_ids": [
+        "p0904"
+      ],
+      "expected_answer_terms": [
+        "hold"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0905-q1",
+      "category": "direct",
+      "question": "Give me info about the team budget process",
+      "expected_source_item_ids": [
+        "p0905"
+      ],
+      "expected_answer_terms": [
+        "annually",
+        "quarter"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0905-q2",
+      "category": "direct",
+      "question": "What budget variance requires a written explanation?",
+      "expected_source_item_ids": [
+        "p0905"
+      ],
+      "expected_answer_terms": [
+        "10%"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0905-q3",
+      "category": "procedural",
+      "question": "How do managers track their budget?",
+      "expected_source_item_ids": [
+        "p0905"
+      ],
+      "expected_answer_terms": [
+        "actuals"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p0905-q4",
+      "category": "paraphrase",
+      "question": "Laptops we buy - are they counted like normal monthly spend?",
+      "expected_source_item_ids": [
+        "p0905"
+      ],
+      "expected_answer_terms": [
+        "depreciated"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "finance"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1001-q1",
+      "category": "direct",
+      "question": "What are the data classification levels?",
+      "expected_source_item_ids": [
+        "p1001"
+      ],
+      "expected_answer_terms": [
+        "public",
+        "restricted"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1001-q2",
+      "category": "direct",
+      "question": "Can payment card data be stored in logs?",
+      "expected_source_item_ids": [
+        "p1001"
+      ],
+      "expected_answer_terms": [
+        "never"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1001-q3",
+      "category": "procedural",
+      "question": "How do I apply the classification rules?",
+      "expected_source_item_ids": [
+        "p1001"
+      ],
+      "expected_answer_terms": [
+        "highest class"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1001-q4",
+      "category": "paraphrase",
+      "question": "How should customer PII be treated by default?",
+      "expected_source_item_ids": [
+        "p1001"
+      ],
+      "expected_answer_terms": [
+        "confidential"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1001-q5",
+      "category": "paraphrase",
+      "question": "Which data class applies to payment card numbers?",
+      "expected_source_item_ids": [
+        "p1001"
+      ],
+      "expected_answer_terms": [
+        "restricted"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1002-q1",
+      "category": "direct",
+      "question": "What do I do when I suspect a security incident?",
+      "expected_source_item_ids": [
+        "p1002"
+      ],
+      "expected_answer_terms": [
+        "30 minutes"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1002-q2",
+      "category": "direct",
+      "question": "Can I delete logs after an incident?",
+      "expected_source_item_ids": [
+        "p1002"
+      ],
+      "expected_answer_terms": [
+        "preserve"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1002-q3",
+      "category": "procedural",
+      "question": "What is the incident reporting process?",
+      "expected_source_item_ids": [
+        "p1002"
+      ],
+      "expected_answer_terms": [
+        "security channel"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1002-q4",
+      "category": "paraphrase",
+      "question": "Someone's laptop seems compromised - who coordinates the response?",
+      "expected_source_item_ids": [
+        "p1002"
+      ],
+      "expected_answer_terms": [
+        "security engineer"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1003-q1",
+      "category": "direct",
+      "question": "How often is production access reviewed?",
+      "expected_source_item_ids": [
+        "p1003"
+      ],
+      "expected_answer_terms": [
+        "quarter"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1003-q2",
+      "category": "direct",
+      "question": "What happens if access is not confirmed in time?",
+      "expected_source_item_ids": [
+        "p1003"
+      ],
+      "expected_answer_terms": [
+        "automatically revoked"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1003-q3",
+      "category": "procedural",
+      "question": "What does a manager do in an access review?",
+      "expected_source_item_ids": [
+        "p1003"
+      ],
+      "expected_answer_terms": [
+        "confirm or revoke"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1003-q4",
+      "category": "paraphrase",
+      "question": "Are robot accounts audited like human ones?",
+      "expected_source_item_ids": [
+        "p1003"
+      ],
+      "expected_answer_terms": [
+        "service accounts"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1004-q1",
+      "category": "direct",
+      "question": "How should SQL queries be built safely?",
+      "expected_source_item_ids": [
+        "p1004"
+      ],
+      "expected_answer_terms": [
+        "parameterized"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1004-q2",
+      "category": "direct",
+      "question": "What blocks a merge from dependency scanning?",
+      "expected_source_item_ids": [
+        "p1004"
+      ],
+      "expected_answer_terms": [
+        "high-severity"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1004-q3",
+      "category": "procedural",
+      "question": "What are the baseline secure coding practices?",
+      "expected_source_item_ids": [
+        "p1004"
+      ],
+      "expected_answer_terms": [
+        "parameterized queries"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1004-q4",
+      "category": "paraphrase",
+      "question": "User-supplied text goes straight into a query string - acceptable?",
+      "expected_source_item_ids": [
+        "p1004"
+      ],
+      "expected_answer_terms": [
+        "concatenation"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1005-q1",
+      "category": "direct",
+      "question": "What must new vendors handling customer data provide?",
+      "expected_source_item_ids": [
+        "p1005"
+      ],
+      "expected_answer_terms": [
+        "soc 2 type ii"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1005-q2",
+      "category": "direct",
+      "question": "How is SOC 2 evidence collected?",
+      "expected_source_item_ids": [
+        "p1005"
+      ],
+      "expected_answer_terms": [
+        "continuously"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1005-q3",
+      "category": "procedural",
+      "question": "How do I handle a new vendor's risk review?",
+      "expected_source_item_ids": [
+        "p1005"
+      ],
+      "expected_answer_terms": [
+        "risk register"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "p1005-q4",
+      "category": "paraphrase",
+      "question": "What kind of access do external auditors get?",
+      "expected_source_item_ids": [
+        "p1005"
+      ],
+      "expected_answer_terms": [
+        "read-only"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees",
+          "security"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "att0102-q1",
+      "category": "attachment",
+      "question": "What does the workstation checklist say about Docker memory?",
+      "expected_source_item_ids": [
+        "att0102",
+        "p0102"
+      ],
+      "expected_answer_terms": [
+        "8 gb"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "att0203-q1",
+      "category": "attachment",
+      "question": "What does the coding standards attachment say about Python type checking?",
+      "expected_source_item_ids": [
+        "att0203",
+        "p0203"
+      ],
+      "expected_answer_terms": [
+        "mypy"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "att0301-q1",
+      "category": "attachment",
+      "question": "What does the billing-service readme list as key commands?",
+      "expected_source_item_ids": [
+        "att0301",
+        "p0301"
+      ],
+      "expected_answer_terms": [
+        "alembic"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    },
+    {
+      "case_id": "att0501-q1",
+      "category": "attachment",
+      "question": "What does the condensed latency runbook tell paging engineers to check first?",
+      "expected_source_item_ids": [
+        "att0501",
+        "p0501"
+      ],
+      "expected_answer_terms": [
+        "db pool"
+      ],
+      "user_context": {
+        "user_id": "eval-employee",
+        "email": "employee@example.com",
+        "tenant_id": "local-tenant",
+        "acl_tags": [
+          "public",
+          "employees"
+        ]
+      },
+      "top_k": 5
+    }
+  ],
+  "probes": [
+    {
+      "case_id": "refusal-01",
+      "category": "refusal",
+      "question": "What is the parental leave policy and how long is it?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-02",
+      "category": "refusal",
+      "question": "What are the salary bands for senior engineers?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-03",
+      "category": "refusal",
+      "question": "How does stock option vesting work here?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-04",
+      "category": "refusal",
+      "question": "Is there parking at the office and how do I get a spot?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-05",
+      "category": "refusal",
+      "question": "What is on the cafeteria menu this week?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-06",
+      "category": "refusal",
+      "question": "Does the company sponsor work visas?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-07",
+      "category": "refusal",
+      "question": "Is there a sabbatical program after five years?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-08",
+      "category": "refusal",
+      "question": "What relocation package is offered to new hires?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-09",
+      "category": "refusal",
+      "question": "Can I get a company car through work?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-10",
+      "category": "refusal",
+      "question": "Are dogs allowed in the office?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-11",
+      "category": "refusal",
+      "question": "Is there a dress code for client meetings?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-12",
+      "category": "refusal",
+      "question": "What percentage does the company match into the pension plan?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-13",
+      "category": "refusal",
+      "question": "Is there a gym membership subsidy?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-14",
+      "category": "refusal",
+      "question": "Which tool do we use to book business travel?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-15",
+      "category": "refusal",
+      "question": "How do I set up the office printer?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-16",
+      "category": "refusal",
+      "question": "What is the guest wifi password?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-17",
+      "category": "refusal",
+      "question": "What is the street address of the headquarters?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-18",
+      "category": "refusal",
+      "question": "Which public holidays does the company observe this year?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-19",
+      "category": "refusal",
+      "question": "How much is the employee referral bonus?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-20",
+      "category": "refusal",
+      "question": "How do I replace a lost office badge?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-21",
+      "category": "refusal",
+      "question": "How do I book a meeting room?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-22",
+      "category": "refusal",
+      "question": "What is the policy for jury duty?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-23",
+      "category": "refusal",
+      "question": "How many days of bereavement leave do we get?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-24",
+      "category": "refusal",
+      "question": "How is overtime compensated for non-engineers?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-25",
+      "category": "refusal",
+      "question": "Does the company run a summer internship program?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-26",
+      "category": "refusal",
+      "question": "Is tuition for a part-time master's degree reimbursed?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-27",
+      "category": "refusal",
+      "question": "Does the company match charitable donations?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-28",
+      "category": "refusal",
+      "question": "Is there a mobile phone stipend?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-29",
+      "category": "refusal",
+      "question": "Is home internet reimbursed for remote workers?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-30",
+      "category": "refusal",
+      "question": "Do I need a doctor's note for two sick days?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-31",
+      "category": "refusal",
+      "question": "What is the notice period when resigning?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "refusal-32",
+      "category": "refusal",
+      "question": "How long is the probation period for new employees?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-01",
+      "category": "clarify",
+      "question": "How do I get access?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-02",
+      "category": "clarify",
+      "question": "How do I set up the app?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-03",
+      "category": "clarify",
+      "question": "The service is failing, what should I check?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-04",
+      "category": "clarify",
+      "question": "What's the approval process?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-05",
+      "category": "clarify",
+      "question": "How do I run the tests?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-06",
+      "category": "clarify",
+      "question": "Where do I find the dashboard?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-07",
+      "category": "clarify",
+      "question": "What's the deployment process?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-08",
+      "category": "clarify",
+      "question": "Who approves my request?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-09",
+      "category": "clarify",
+      "question": "How do I reset it?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-10",
+      "category": "clarify",
+      "question": "What port does the service use?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-11",
+      "category": "clarify",
+      "question": "How do I get the secrets?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-12",
+      "category": "clarify",
+      "question": "What's the review process?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-13",
+      "category": "clarify",
+      "question": "How do I report a problem?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-14",
+      "category": "clarify",
+      "question": "What's the budget?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-15",
+      "category": "clarify",
+      "question": "How do I install it?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "clarify-16",
+      "category": "clarify",
+      "question": "I'm getting a connection error, what now?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-01",
+      "category": "hedge",
+      "question": "How are medical claims submitted?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-02",
+      "category": "hedge",
+      "question": "Can I expense a gym membership?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-03",
+      "category": "hedge",
+      "question": "What is the sick leave policy?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-04",
+      "category": "hedge",
+      "question": "How do I rotate my SSH keys?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-05",
+      "category": "hedge",
+      "question": "How do I get access to the Kubernetes cluster?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-06",
+      "category": "hedge",
+      "question": "How do I reset my LDAP password?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-07",
+      "category": "hedge",
+      "question": "What is the database backup schedule?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-08",
+      "category": "hedge",
+      "question": "What are the API rate limits for external clients?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-09",
+      "category": "hedge",
+      "question": "What is the SLA for customer support tickets?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-10",
+      "category": "hedge",
+      "question": "How do I encrypt a USB stick?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-11",
+      "category": "hedge",
+      "question": "What are the rules for creating new Slack channels?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-12",
+      "category": "hedge",
+      "question": "How do we handle GDPR data deletion requests?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-13",
+      "category": "hedge",
+      "question": "What are the password complexity requirements?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-14",
+      "category": "hedge",
+      "question": "When are Windows updates forced on laptops?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-15",
+      "category": "hedge",
+      "question": "Do I need approval to speak at a conference?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    },
+    {
+      "case_id": "hedge-16",
+      "category": "hedge",
+      "question": "How do I transfer to another team internally?",
+      "acl_tags": [
+        "public",
+        "employees"
+      ]
+    }
+  ],
+  "acl_ablation": [
+    {
+      "case_id": "acl-p0803",
+      "question": "What is the on-call compensation stipend?",
+      "target_source_item_id": "p0803",
+      "denied_acl_tags": [
+        "public",
+        "employees"
+      ],
+      "allowed_acl_tags": [
+        "public",
+        "employees",
+        "hr"
+      ]
+    },
+    {
+      "case_id": "acl-p0804",
+      "question": "When does the performance review cycle run?",
+      "target_source_item_id": "p0804",
+      "denied_acl_tags": [
+        "public",
+        "employees"
+      ],
+      "allowed_acl_tags": [
+        "public",
+        "employees",
+        "hr"
+      ]
+    },
+    {
+      "case_id": "acl-p0904",
+      "question": "How are supplier invoices processed and paid?",
+      "target_source_item_id": "p0904",
+      "denied_acl_tags": [
+        "public",
+        "employees"
+      ],
+      "allowed_acl_tags": [
+        "public",
+        "employees",
+        "finance"
+      ]
+    },
+    {
+      "case_id": "acl-p0905",
+      "question": "What is the team budget and forecast process?",
+      "target_source_item_id": "p0905",
+      "denied_acl_tags": [
+        "public",
+        "employees"
+      ],
+      "allowed_acl_tags": [
+        "public",
+        "employees",
+        "finance"
+      ]
+    },
+    {
+      "case_id": "acl-p1002",
+      "question": "What are the steps of the security incident response?",
+      "target_source_item_id": "p1002",
+      "denied_acl_tags": [
+        "public",
+        "employees"
+      ],
+      "allowed_acl_tags": [
+        "public",
+        "employees",
+        "security"
+      ]
+    },
+    {
+      "case_id": "acl-p1003",
+      "question": "How do quarterly access reviews work?",
+      "target_source_item_id": "p1003",
+      "denied_acl_tags": [
+        "public",
+        "employees"
+      ],
+      "allowed_acl_tags": [
+        "public",
+        "employees",
+        "security"
+      ]
+    },
+    {
+      "case_id": "acl-p1005",
+      "question": "How is SOC 2 audit evidence organized?",
+      "target_source_item_id": "p1005",
+      "denied_acl_tags": [
+        "public",
+        "employees"
+      ],
+      "allowed_acl_tags": [
+        "public",
+        "employees",
+        "security"
+      ]
+    }
+  ]
+}

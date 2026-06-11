@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>High API Latency Runbook</title>
+  <style>body { font-family: Aptos, Arial, sans-serif; color: #1f2933; line-height: 1.45; max-width: 900px; margin: 32px auto; padding: 0 24px; }
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.attach { background: #ebf8ff; border-left: 4px solid #2b6cb0; padding: 10px 12px; }</style>
+</head>
+<body>
+  <article>
+    <h1>High API Latency Runbook</h1>
+    <p class="summary">Diagnosing and mitigating elevated API gateway latency.</p>
+    <h2>Summary</h2>
+    <p class="note">High API Latency Runbook is maintained by Platform Team for on-call engineers, support engineers. This runbook diagnosing and mitigating elevated API gateway latency.</p>
+
+    <h2>Key Facts</h2>
+    <ul>
+      <li>The page latency alert fires when p95 exceeds 800 ms for 5 minutes.</li>
+      <li>The most common cause is database connection pool exhaustion.</li>
+      <li>Check the Grafana &#x27;API Overview&#x27; dashboard first, panel &#x27;p95 by route&#x27;.</li>
+      <li>Scaling the API deployment to 6 replicas is the standard first mitigation.</li>
+    </ul>
+
+    <h2>Owner and Systems</h2>
+    <dl>
+      <dt>Owner</dt><dd>Platform Team</dd>
+      <dt>For</dt><dd>on-call engineers, support engineers</dd>
+      <dt>Systems</dt><dd>Grafana, PagerDuty, Kubernetes</dd>
+    </dl>
+
+    <h2>Investigation Steps</h2>
+    <ol>
+      <li>Acknowledge the PagerDuty alert.</li>
+      <li>Open the API Overview dashboard and find the slow route.</li>
+      <li>Check the database connection pool saturation panel.</li>
+      <li>Scale replicas or shed load, then verify p95 recovers.</li>
+    </ol>
+
+    <h2>Commands</h2>
+    <p class="note">Run from a clean shell and keep the output with the setup or incident record.</p>
+    <pre><code class="language-bash">kubectl scale deploy api-gateway --replicas=6 -n platform
+kubectl get hpa -n platform</code></pre>
+
+    <h2>Attachments</h2>
+    <p class="attach">The files below are generated next to this page. Attach them to the OneNote page so their content is indexed and searchable.</p>
+    <ul>
+      <li><strong>api-latency-runbook.md</strong> &mdash; Condensed steps for paging engineers at 3am. <em>(attach this file to the OneNote page)</em></li>
+    </ul>
+
+    <h2>What To Keep</h2>
+    <p>Keep the incident timeline, diagnostic output, fix note, verification result with the related ticket or record.</p>
+  </article>
+</body>
+</html>

@@ -24,7 +24,6 @@ export type TopicCreateRequest = {
   description: string;
   icon?: string | null;
   acl_tags: string[];
-  source_filters: string[];
   retrieval_tags: string[];
   suggested_questions: string[];
   enabled: boolean;

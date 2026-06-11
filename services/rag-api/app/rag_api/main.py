@@ -14,11 +14,15 @@ from rag_api.api import (
     system_router,
     topics_router,
 )
+from rag_api.dependencies import get_document_metadata
 from rag_api.observability import configure_observability
 from rag_api.persistence import AppDataStore
 from rag_api.services.local_auth import LocalAuthService
 from rag_api.services.topic_loader import TopicLoader
 from rag_api.services.topic_service import TopicService
+from rag_api.services.topic_sync import reconcile_topics_from_sources
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(settings: AppSettings | None = None) -> FastAPI:
@@ -33,6 +37,10 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     app_data_store.ensure_schema()
     LocalAuthService(settings=resolved_settings, store=app_data_store).bootstrap_admin()
     TopicService(loader=TopicLoader(resolved_settings.topics_config_path), store=app_data_store)
+    try:
+        reconcile_topics_from_sources(get_document_metadata(resolved_settings), app_data_store, resolved_settings)
+    except Exception:
+        logger.exception("Failed to reconcile topics from indexed source sections during startup.")
     application.state.app_data_store = app_data_store
     configure_observability(application, resolved_settings, default_service_name="rag-api")
     application.include_router(system_router)

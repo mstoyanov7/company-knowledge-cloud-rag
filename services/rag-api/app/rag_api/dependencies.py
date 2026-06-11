@@ -83,6 +83,7 @@ def get_answer_service(
         clarify_enabled=settings.clarify_enabled,
         clarify_closeness_ratio=settings.clarify_closeness_ratio,
         clarify_max_options=settings.clarify_max_options,
+        guard_repair_enabled=settings.answer_guard_repair_enabled,
     )
 
 

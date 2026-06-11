@@ -14,7 +14,7 @@ from graph_connectors.onenote.connector import OneNoteConnector
 from graph_connectors.onenote.auth import MockOneNoteDelegatedAuthProvider
 from graph_connectors.onenote.client import MicrosoftGraphOneNoteClient, MockOneNoteGraphClient
 from graph_connectors.onenote.models import OneNoteNotebook, OneNotePage, OneNoteSection, OneNoteSite
-from sync_worker.ingestion import CompositeFileExtractor, DeterministicEmbedder, TextChunker, UnsupportedFileTypeError
+from sync_worker.ingestion import ChunkEmbedder, CompositeFileExtractor, TextChunker, UnsupportedFileTypeError
 from sync_worker.onenote.normalization import OneNoteDocumentNormalizer
 from sync_worker.onenote.parser import NullOneNoteResourceHook, OneNoteHtmlParser
 from sync_worker.onenote.service import OneNoteSyncService
@@ -266,7 +266,7 @@ def build_service(fake_client: FakeOneNoteGraphClient) -> tuple[OneNoteSyncServi
             chunk_size_chars=settings.onenote_chunk_size_chars,
             chunk_overlap_chars=settings.onenote_chunk_overlap_chars,
         ),
-        embedder=DeterministicEmbedder(settings),
+        embedder=ChunkEmbedder(settings),
         metadata_store=metadata_store,
         vector_store=vector_store,
         resource_hook=NullOneNoteResourceHook(),
@@ -383,8 +383,22 @@ def test_onenote_parser_preserves_br_separated_command_lines() -> None:
     assert "sudo apt update sudo apt install" not in parsed.text
 
 
-def test_onenote_normalizer_attaches_topic_metadata_from_config() -> None:
-    settings = AppSettings(app_env="test", topics_config_path="config/topics.json")
+def test_onenote_normalizer_attaches_topic_metadata_from_config(tmp_path) -> None:
+    topics_path = tmp_path / "topics.json"
+    topics_path.write_text(
+        """
+        [
+          {
+            "id": "hr",
+            "name": "HR Questions",
+            "description": "Employee benefits and leave policy.",
+            "retrieval_tags": ["paid leave", "benefits", "enrollment"]
+          }
+        ]
+        """,
+        encoding="utf-8",
+    )
+    settings = AppSettings(app_env="test", topics_config_path=str(topics_path))
     page = make_page("page-benefits", section_name="Benefits", title="Paid leave benefits checklist")
     site = OneNoteSite(
         id="site-1",
@@ -617,6 +631,43 @@ def test_onenote_incremental_lookback_reindexes_content_when_graph_timestamp_doe
     assert report.items_changed == 1
     assert "Updated content that Graph did not timestamp." in metadata_store.documents["onenote:page-1"].content_text
     assert "onenote:page-1" in vector_store.upserts
+
+
+def _document_with_acl_tags(acl_tags: list[str]) -> SourceDocument:
+    return SourceDocument(
+        tenant_id="local-tenant",
+        source_system="onenote",
+        source_container="sites/onboarding/Team Notebook",
+        source_item_id="onenote:page-1",
+        source_url="https://contoso.example.test/sites/onboarding/page-1",
+        title="Welcome checklist",
+        file_name="Welcome checklist.one",
+        file_extension="one",
+        mime_type="text/html",
+        section_path="Team Notebook / Orientation",
+        last_modified_utc=datetime(2026, 4, 24, 9, 0, tzinfo=UTC),
+        acl_tags=acl_tags,
+        content_hash="same-hash",
+        content_text="identical body",
+        tags=["onenote"],
+        metadata={"section_id": "section-1", "notebook_id": "notebook-1", "page_order": 0},
+    )
+
+
+def test_onenote_document_changed_detects_acl_tag_mapping_change() -> None:
+    service, _metadata_store, _vector_store = build_service(
+        FakeOneNoteGraphClient(
+            inventory_pages=[make_page("page-1")],
+            content_by_url={"mock://onenote/page-1": "<html><body><p>Body.</p></body></html>"},
+        )
+    )
+    existing = _document_with_acl_tags(["employees"])
+    # Same content, only the access-tag mapping changed: must still re-index so
+    # the page does not keep stale ACL tags until its text next changes.
+    relabeled = _document_with_acl_tags(["employees", "hr-restricted"])
+
+    assert service._document_changed(existing, relabeled) is True
+    assert service._document_changed(existing, _document_with_acl_tags(["employees"])) is False
 
 
 def test_onenote_incremental_initializes_schema_before_checkpoint_lookup() -> None:

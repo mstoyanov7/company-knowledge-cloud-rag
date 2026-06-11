@@ -1,0 +1,158 @@
+{
+  "name": "company-knowledge-eval-v1",
+  "description": "Answerable cases for the answer-level harness, run against eval_corpus.json (set MOCK_CORPUS_PATH). Each case targets a single page the persona is allowed to see; refusal, clarification and access-denial behaviour is measured separately in behavior_eval.json.",
+  "cases": [
+    {
+      "case_id": "onb-day-one-accounts",
+      "question": "What accounts and access do I get set up on my first day?",
+      "expected_source_item_ids": ["ek-onb-002"],
+      "expected_answer_terms": ["email", "multi-factor", "password"],
+      "user_context": {"user_id": "eval-employee", "email": "employee@example.com", "tenant_id": "local-tenant", "acl_tags": ["public", "employees"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "onb-first-week-engineer",
+      "question": "What should a new engineer do during the first week?",
+      "expected_source_item_ids": ["ek-onb-001"],
+      "expected_answer_terms": ["workstation", "VPN", "handbook"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "it-vpn-connect",
+      "question": "How do I connect to the VPN and what do I do if it fails?",
+      "expected_source_item_ids": ["ek-it-001"],
+      "expected_answer_terms": ["VPN", "single sign-on", "ticket"],
+      "user_context": {"user_id": "eval-employee", "email": "employee@example.com", "tenant_id": "local-tenant", "acl_tags": ["public", "employees"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "it-mfa-new-phone",
+      "question": "How do I move multi-factor authentication to a new phone?",
+      "expected_source_item_ids": ["ek-it-002"],
+      "expected_answer_terms": ["authenticator", "register", "identity"],
+      "user_context": {"user_id": "eval-employee", "email": "employee@example.com", "tenant_id": "local-tenant", "acl_tags": ["public", "employees"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "it-laptop-broken",
+      "question": "What do I do if my laptop is broken and needs replacement?",
+      "expected_source_item_ids": ["ek-it-003"],
+      "expected_answer_terms": ["hardware", "replacement", "backup"],
+      "user_context": {"user_id": "eval-employee", "email": "employee@example.com", "tenant_id": "local-tenant", "acl_tags": ["public", "employees"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "hr-pto-request",
+      "question": "How do I request paid time off?",
+      "expected_source_item_ids": ["ek-hr-001"],
+      "expected_answer_terms": ["leave", "approval", "carry over"],
+      "user_context": {"user_id": "eval-employee", "email": "employee@example.com", "tenant_id": "local-tenant", "acl_tags": ["public", "employees"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "hr-benefits-enroll",
+      "question": "What benefits should I enroll in during onboarding?",
+      "expected_source_item_ids": ["ek-hr-002"],
+      "expected_answer_terms": ["health", "insurance", "wellness"],
+      "user_context": {"user_id": "eval-employee", "email": "employee@example.com", "tenant_id": "local-tenant", "acl_tags": ["public", "employees"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "eng-github-access",
+      "question": "How do I get repository access on GitHub?",
+      "expected_source_item_ids": ["ek-eng-001"],
+      "expected_answer_terms": ["team", "single sign-on", "contribution"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "eng-pr-workflow",
+      "question": "What is the pull request workflow for merging changes?",
+      "expected_source_item_ids": ["ek-eng-002"],
+      "expected_answer_terms": ["feature branch", "review", "continuous integration"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "eng-code-review",
+      "question": "What do reviewers check during code review?",
+      "expected_source_item_ids": ["ek-eng-003"],
+      "expected_answer_terms": ["correctness", "readability", "test coverage"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "rel-release-process",
+      "question": "How does the production release process work?",
+      "expected_source_item_ids": ["ek-rel-001"],
+      "expected_answer_terms": ["release candidate", "staging", "feature flag"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "rel-rollback",
+      "question": "How do I roll back a release that degrades production?",
+      "expected_source_item_ids": ["ek-rel-002"],
+      "expected_answer_terms": ["release tag", "feature flag", "incident"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "run-api-latency",
+      "question": "What should I check when API latency spikes?",
+      "expected_source_item_ids": ["ek-run-001"],
+      "expected_answer_terms": ["load balancer", "database", "index"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "run-db-connection",
+      "question": "How do I fix database connection refused errors?",
+      "expected_source_item_ids": ["ek-run-002"],
+      "expected_answer_terms": ["pool", "secret", "failover"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "sec-secrets-vault",
+      "question": "Where should application secrets be stored?",
+      "expected_source_item_ids": ["ek-sec-001"],
+      "expected_answer_terms": ["vault", "token", "rotate"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "sec-data-classification",
+      "question": "How is company data classified and protected?",
+      "expected_source_item_ids": ["ek-sec-002"],
+      "expected_answer_terms": ["confidential", "restricted", "encrypted"],
+      "user_context": {"user_id": "eval-employee", "email": "employee@example.com", "tenant_id": "local-tenant", "acl_tags": ["public", "employees"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "fin-expense-reimburse",
+      "question": "How do I submit an expense for reimbursement?",
+      "expected_source_item_ids": ["ek-fin-001"],
+      "expected_answer_terms": ["receipts", "cost center", "payroll"],
+      "user_context": {"user_id": "eval-employee", "email": "employee@example.com", "tenant_id": "local-tenant", "acl_tags": ["public", "employees"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "fin-cloud-cost",
+      "question": "How is cloud cost tracked for each team?",
+      "expected_source_item_ids": ["ek-fin-003"],
+      "expected_answer_terms": ["cost allocation", "report", "right size"],
+      "user_context": {"user_id": "eval-engineer", "email": "engineer@example.com", "tenant_id": "local-tenant", "acl_tags": ["employees", "engineering"]},
+      "top_k": 3
+    },
+    {
+      "case_id": "att-vpn-checklist",
+      "question": "What steps are in the VPN troubleshooting checklist?",
+      "expected_source_item_ids": ["ek-att-001"],
+      "expected_answer_terms": ["client version", "diagnostic log", "certificate"],
+      "user_context": {"user_id": "eval-employee", "email": "employee@example.com", "tenant_id": "local-tenant", "acl_tags": ["public", "employees"]},
+      "top_k": 3
+    }
+  ]
+}

@@ -15,7 +15,7 @@ The root `.env` file is for local development only and is ignored by Git.
 
 For shared, staging, or production environments:
 
-- store `GRAPH_CLIENT_SECRET`, `MICROSOFT_CLIENT_SECRET`, `WEBUI_SECRET_KEY`, and any provider API keys in a managed secret store
+- store `GRAPH_CLIENT_SECRET` and any provider API keys in a managed secret store
 - inject secrets through the platform, for example Docker secrets, Kubernetes secrets, GitHub Actions secrets, Azure Key Vault, or equivalent
 - keep `.env.example` limited to placeholder values and non-secret defaults
 - rotate secrets after demos, accidental exposure, or membership changes

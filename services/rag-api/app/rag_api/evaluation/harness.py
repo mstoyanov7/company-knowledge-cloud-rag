@@ -15,6 +15,7 @@ from shared_schemas import (
 )
 
 from rag_api.dependencies import get_answer_service
+from rag_api.evaluation.metrics import ndcg_at_k, reciprocal_rank
 
 
 class RagEvaluationHarness:
@@ -46,6 +47,8 @@ class RagEvaluationHarness:
                 else 1.0
             )
             groundedness = _answer_term_score(response.answer, case.expected_answer_terms)
+            rank_rr = reciprocal_rank(retrieved_source_ids, expected_sources)
+            rank_ndcg = ndcg_at_k(retrieved_source_ids, expected_sources, k=case.top_k)
 
             results.append(
                 EvaluationCaseResult(
@@ -57,6 +60,8 @@ class RagEvaluationHarness:
                     citation_correctness=citation_correctness,
                     document_recall=document_recall,
                     retrieval_hit=bool(expected_sources.intersection(retrieved_sources)),
+                    reciprocal_rank=rank_rr,
+                    ndcg=rank_ndcg,
                     groundedness=groundedness,
                     latency_ms=latency_ms,
                     metadata={
@@ -75,6 +80,8 @@ class RagEvaluationHarness:
                 retrieval_hit_rate=_mean([1.0 if result.retrieval_hit else 0.0 for result in results]),
                 mean_document_recall=_mean([result.document_recall for result in results]),
                 mean_citation_correctness=_mean([result.citation_correctness for result in results]),
+                mean_reciprocal_rank=_mean([result.reciprocal_rank for result in results]),
+                mean_ndcg=_mean([result.ndcg for result in results]),
                 mean_groundedness=_mean([result.groundedness for result in results]),
                 mean_latency_ms=_mean([float(result.latency_ms) for result in results]),
             ),

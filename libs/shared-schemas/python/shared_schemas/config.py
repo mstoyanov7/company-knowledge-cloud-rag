@@ -26,9 +26,6 @@ class AppSettings(BaseSettings):
     postgres_user: str = "cloudrag"
     postgres_password: SecretStr = SecretStr("cloudrag")
 
-    redis_host: str = "redis"
-    redis_port: int = 6379
-
     qdrant_host: str = "qdrant"
     qdrant_port: int = 6333
 
@@ -44,7 +41,6 @@ class AppSettings(BaseSettings):
     graph_onenote_site_hostname: str = ""
     graph_onenote_site_scope: str = ""
     graph_onenote_notebook_scope: str = ""
-    graph_onenote_scope: str = ""
     onenote_page_page_size: int = 100
     onenote_chunk_size_chars: int = 2000
     onenote_chunk_overlap_chars: int = 300
@@ -52,9 +48,18 @@ class AppSettings(BaseSettings):
     rag_context_max_chars: int = 10000
     onenote_vector_collection: str = "onenote_chunks"
     onenote_token_cache_path: str = ".cache/onenote_token_cache.json"
-    onenote_retry_attempts: int = 3
-    onenote_retry_backoff_seconds: float = 1.0
-    onenote_incremental_lookback_seconds: int = 0
+    onenote_retry_attempts: int = 6
+    onenote_retry_backoff_seconds: float = 2.0
+    # Proactive pacing between Graph requests to avoid OneNote 429 throttling
+    # (error 20166). 0 disables pacing; ~0.3-0.5s noticeably reduces throttling
+    # during a bootstrap of many pages.
+    onenote_request_delay_seconds: float = 0.0
+    # Sliding look-back applied to the incremental cursor. Graph can report
+    # lastModifiedDateTime slightly out of order, so re-checking a small window
+    # behind the cursor guards against missing a page whose timestamp lagged.
+    # Pages re-fetched in the window cost only a content-hash compare when
+    # unchanged, so a few minutes is cheap insurance. 0 disables the window.
+    onenote_incremental_lookback_seconds: int = 300
     attachment_storage_dir: str = ".cache/attachments"
 
     ops_job_max_attempts: int = 5
@@ -70,10 +75,20 @@ class AppSettings(BaseSettings):
 
     onenote_sync_interval_seconds: int = 900
     worker_poll_interval_seconds: int = 30
-    embedding_vector_size: int = 32
+    # Must match the embedding model's output dimension. nomic-embed-text = 768.
+    # The token-hash fallback works at any size. A mismatch with the live model is
+    # detected at startup and forces a Qdrant collection rebuild.
+    embedding_vector_size: int = 768
 
     default_llm_provider: str = "mock"
-    default_embedding_provider: str = "token-hash-v1"
+    # "ollama" = real semantic embeddings (nomic-embed-text); "token-hash-v1" =
+    # offline lexical fallback used by the test suite. See shared_schemas.embeddings.
+    default_embedding_provider: str = "ollama"
+    embedding_model_name: str = "nomic-embed-text"
+    # Optional dedicated embedding endpoint/key; empty falls back to the LLM
+    # OpenAI-compatible settings so a single Ollama instance serves both.
+    embedding_base_url: str = ""
+    embedding_api_key: SecretStr = SecretStr("")
     default_model_name: str = "mock-onboarding-assistant"
     llm_openai_base_url: str = "http://host.docker.internal:11434/v1"
     llm_openai_api_key: SecretStr = SecretStr("ollama")
@@ -82,6 +97,10 @@ class AppSettings(BaseSettings):
     llm_max_tokens: int = 1400
     mock_api_key: SecretStr = SecretStr("cloudrag-local-key")
     mock_top_k: int = 3
+    # Optional path to a JSON corpus the mock retriever loads instead of its
+    # built-in 3-document sample. Used by the evaluation harness to run against a
+    # richer offline corpus; unset keeps the deterministic sample used by tests.
+    mock_corpus_path: str = ""
     rag_api_key: SecretStr = SecretStr("")
     topics_config_path: str = "config/topics.json"
     retrieval_provider: str = "mock"
@@ -100,6 +119,9 @@ class AppSettings(BaseSettings):
     clarify_enabled: bool = True
     clarify_closeness_ratio: float = 0.6
     clarify_max_options: int = 5
+    # One corrective regeneration when the answer guard rejects a model draft,
+    # before falling back to an extractive (source-formatted) answer.
+    answer_guard_repair_enabled: bool = True
     rerank_enabled: bool = True
     rag_debug_enabled: bool = False
     app_database_url: str = "sqlite:///./.cache/rag_api.sqlite3"
@@ -128,8 +150,6 @@ class AppSettings(BaseSettings):
     security_audit_enabled: bool = True
     security_audit_log_to_db: bool = True
 
-    openwebui_port: int = 3000
-
     @computed_field
     @property
     def postgres_dsn(self) -> str:
@@ -141,13 +161,19 @@ class AppSettings(BaseSettings):
 
     @computed_field
     @property
-    def redis_url(self) -> str:
-        return f"redis://{self.redis_host}:{self.redis_port}/0"
+    def qdrant_url(self) -> str:
+        return f"http://{self.qdrant_host}:{self.qdrant_port}"
 
     @computed_field
     @property
-    def qdrant_url(self) -> str:
-        return f"http://{self.qdrant_host}:{self.qdrant_port}"
+    def resolved_embedding_base_url(self) -> str:
+        return self.embedding_base_url or self.llm_openai_base_url
+
+    @computed_field
+    @property
+    def resolved_embedding_api_key(self) -> str:
+        configured = self.embedding_api_key.get_secret_value()
+        return configured or self.llm_openai_api_key.get_secret_value()
 
     @computed_field
     @property

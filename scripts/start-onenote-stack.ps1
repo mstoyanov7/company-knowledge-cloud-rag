@@ -4,14 +4,11 @@ param(
     [switch]$SkipSync,
     [switch]$SkipOpsWorker,
     [switch]$SkipCompanyKnowledgeUI,
-    [switch]$IncludeOpenWebUI,
-    [switch]$SkipOpenWebUI,
     [switch]$NoBrowser,
     [switch]$NoEnvUpdate,
     [switch]$ApplyLocalDefaults,
     [int]$HealthTimeoutSeconds = 120,
-    [int]$CompanyKnowledgeUITimeoutSeconds = 180,
-    [int]$OpenWebUITimeoutSeconds = 300
+    [int]$CompanyKnowledgeUITimeoutSeconds = 180
 )
 
 $ErrorActionPreference = "Stop"
@@ -151,6 +148,16 @@ try {
 
     Invoke-Checked docker info | Out-Null
 
+    if (Get-Command ollama -ErrorAction SilentlyContinue) {
+        Write-Step "Ensuring Ollama embedding model nomic-embed-text is available"
+        & ollama pull nomic-embed-text
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Warning: 'ollama pull nomic-embed-text' failed. Semantic retrieval needs this model." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "Ollama CLI not found. Pull the embedding model on the Ollama host: ollama pull nomic-embed-text" -ForegroundColor Yellow
+    }
+
     if (-not (Test-Path $EnvPath)) {
         if (-not (Test-Path $EnvExamplePath)) {
             throw ".env is missing and .env.example was not found."
@@ -171,7 +178,9 @@ try {
             GRAPH_ONENOTE_SITE_SCOPE       = ""
             DEFAULT_LLM_PROVIDER           = "ollama"
             DEFAULT_MODEL_NAME             = "gpt-oss:120b-cloud"
-            DEFAULT_EMBEDDING_PROVIDER     = "token-hash-v1"
+            DEFAULT_EMBEDDING_PROVIDER     = "ollama"
+            EMBEDDING_MODEL_NAME           = "nomic-embed-text"
+            EMBEDDING_VECTOR_SIZE          = "768"
             LLM_OPENAI_BASE_URL            = "http://host.docker.internal:11434/v1"
             LLM_OPENAI_API_KEY             = "ollama"
             LLM_MAX_TOKENS                 = "1400"
@@ -182,8 +191,6 @@ try {
             AUTH_DEFAULT_ACL_TAGS          = "public,employees"
             TOPICS_CONFIG_PATH             = "config/topics.json"
             COMPANY_KNOWLEDGE_UI_PORT      = "5173"
-            ENABLE_PERSISTENT_CONFIG       = "false"
-            ENABLE_OLLAMA_API              = "false"
         }
     } else {
         Write-Host "Preserving existing .env values"
@@ -202,10 +209,8 @@ try {
 
     $ragApiPort = Get-Setting $envValues "RAG_API_PORT" "8080"
     $companyKnowledgeUiPort = Get-Setting $envValues "COMPANY_KNOWLEDGE_UI_PORT" "5173"
-    $openWebUiPort = Get-Setting $envValues "OPENWEBUI_PORT" "3000"
     $ragApiUrl = "http://localhost:$ragApiPort"
     $companyKnowledgeUiUrl = "http://localhost:$companyKnowledgeUiPort"
-    $openWebUiUrl = "http://localhost:$openWebUiPort"
 
     Write-Step "Starting PostgreSQL, Redis, and Qdrant"
     Invoke-Checked docker compose up -d postgres redis qdrant
@@ -265,31 +270,11 @@ try {
         }
     }
 
-    if ($IncludeOpenWebUI -and -not $SkipOpenWebUI) {
-        Write-Step "Starting legacy Open WebUI"
-        Invoke-Checked docker compose --profile legacy-openwebui up -d --force-recreate openwebui
-
-        Write-Step "Waiting for Open WebUI at $openWebUiUrl"
-        try {
-            Wait-Http -Url $openWebUiUrl -TimeoutSeconds $OpenWebUITimeoutSeconds
-        } catch {
-            Show-ComposeDiagnostics -Services @("rag-api", "openwebui")
-            throw
-        }
-
-        if (-not $NoBrowser) {
-            Start-Process $openWebUiUrl
-        }
-    }
-
     Write-Step "Ready"
     Write-Host "RAG API:              $ragApiUrl"
     Write-Host "API docs:             $ragApiUrl/docs"
     if (-not $SkipCompanyKnowledgeUI) {
         Write-Host "Company Knowledge UI: $companyKnowledgeUiUrl"
-    }
-    if ($IncludeOpenWebUI -and -not $SkipOpenWebUI) {
-        Write-Host "Legacy Open WebUI:    $openWebUiUrl"
     }
     Write-Host ""
     Write-Host "Default run uses incremental sync. For the first real OneNote import, run:"

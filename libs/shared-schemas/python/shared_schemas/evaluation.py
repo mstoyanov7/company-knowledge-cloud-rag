@@ -27,6 +27,8 @@ class EvaluationCaseResult(BaseModel):
     citation_correctness: float
     document_recall: float
     retrieval_hit: bool
+    reciprocal_rank: float = 0.0
+    ndcg: float = 0.0
     groundedness: float
     latency_ms: int
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -39,6 +41,8 @@ class EvaluationSummary(BaseModel):
     retrieval_hit_rate: float
     mean_document_recall: float
     mean_citation_correctness: float
+    mean_reciprocal_rank: float = 0.0
+    mean_ndcg: float = 0.0
     mean_groundedness: float
     mean_latency_ms: float
     generated_at_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))

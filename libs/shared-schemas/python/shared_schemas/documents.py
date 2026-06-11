@@ -170,6 +170,7 @@ class RetrievalRequest(BaseModel):
     user_context: UserContext = Field(default_factory=UserContext)
     top_k: int = 3
     source_filters: list[str] = Field(default_factory=list)
+    section_filters: list[str] = Field(default_factory=list)
     access_scope: AccessScope | None = None
     topic_id: str | None = None
     topic_tags: list[str] = Field(default_factory=list)
@@ -186,6 +187,7 @@ class RetrievalMetadata(BaseModel):
     returned_count: int
     filtered_count: int
     source_filters: list[str] = Field(default_factory=list)
+    section_filters: list[str] = Field(default_factory=list)
     collections_queried: list[str] = Field(default_factory=list)
     payload_filter: dict[str, Any] = Field(default_factory=dict)
     reranker: str | None = None

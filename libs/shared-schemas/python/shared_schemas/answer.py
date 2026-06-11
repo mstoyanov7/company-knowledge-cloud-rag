@@ -37,6 +37,10 @@ class AnswerMetadata(BaseModel):
     completion_latency_ms: int = 0
     freshness_delay_ms: int | None = None
     citation_count: int = 0
+    # Coarse outcome of the answer pipeline, for evaluation/guardrail accounting:
+    # "answered" (model answer kept), "extractive" (model answer replaced by a
+    # source extract by the 4.3.3 guard), "hedged", "clarify", or "refusal".
+    answer_kind: str | None = None
 
 
 class ConversationTurn(BaseModel):

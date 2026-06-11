@@ -1,7 +1,9 @@
 import hashlib
+import json
 import re
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Iterable
 
 from shared_schemas import AccessScope, AppSettings, ChunkDocument, RetrievalMetadata, RetrievalRequest, RetrievalResult
@@ -42,6 +44,8 @@ class MockRetriever:
         question_tokens = _tokenize(request.question)
         allowed_acl_tags = set(access_scope.allowed_acl_tags)
         source_filters = set(access_scope.source_filters)
+        section_filters = list(dict.fromkeys(value.strip() for value in request.section_filters if value.strip()))
+        section_filter_set = set(section_filters)
         focus_ids = set(request.focus_source_item_ids)
 
         scored: list[ChunkDocument] = []
@@ -53,6 +57,10 @@ class MockRetriever:
                     filtered_count += 1
                     continue
             if source_filters and document.source_system not in source_filters:
+                filtered_count += 1
+                continue
+            section_name = str((document.metadata or {}).get("section_name") or "")
+            if section_filter_set and section_name not in section_filter_set:
                 filtered_count += 1
                 continue
 
@@ -92,12 +100,14 @@ class MockRetriever:
                 returned_count=len(chunks),
                 filtered_count=filtered_count,
                 source_filters=access_scope.source_filters,
+                section_filters=section_filters,
                 collections_queried=["mock"],
                 duration_ms=duration_ms,
                 payload_filter={
                     "tenant_id": access_scope.tenant_id,
                     "acl_tags": access_scope.allowed_acl_tags,
                     "source_system": access_scope.source_filters,
+                    "section_filters": section_filters,
                     "topic_id": request.topic_id,
                     "topic_tags": request.topic_tags,
                 },
@@ -110,6 +120,11 @@ class MockRetriever:
         return True
 
     def _build_corpus(self) -> tuple[ChunkDocument, ...]:
+        corpus_path = getattr(self.settings, "mock_corpus_path", "")
+        if corpus_path:
+            loaded = self._load_corpus_file(corpus_path)
+            if loaded:
+                return loaded
         documents = (
             self._document(
                 source_system="onenote",
@@ -185,6 +200,36 @@ class MockRetriever:
             ),
         )
         return documents
+
+    def _load_corpus_file(self, corpus_path: str) -> tuple[ChunkDocument, ...]:
+        """Load a richer evaluation corpus from JSON.
+
+        Each entry carries the same fields as :meth:`_document`. Missing optional
+        fields fall back to sensible defaults so the eval corpus stays compact.
+        """
+        path = Path(corpus_path)
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        entries = raw.get("documents", raw) if isinstance(raw, dict) else raw
+        documents: list[ChunkDocument] = []
+        for entry in entries:
+            documents.append(
+                self._document(
+                    source_system=entry.get("source_system", "onenote"),
+                    source_container=entry.get("source_container", ""),
+                    source_item_id=entry["source_item_id"],
+                    source_url=entry.get("source_url", f"onenote://{entry['source_item_id']}"),
+                    title=entry["title"],
+                    section_path=entry.get("section_path", ""),
+                    acl_tags=entry.get("acl_tags", ["public"]),
+                    chunk_index=entry.get("chunk_index", 0),
+                    chunk_text=entry["chunk_text"],
+                    tags=entry.get("tags", []),
+                    metadata=entry.get("metadata"),
+                )
+            )
+        return tuple(documents)
 
     def _document(
         self,

@@ -245,6 +245,9 @@ class MicrosoftGraphOneNoteClient(GraphOneNoteClient):
             merged_headers.update(headers)
 
         last_error: Exception | None = None
+        delay = self.settings.onenote_request_delay_seconds
+        if delay > 0:
+            time.sleep(delay)
         for attempt in range(1, self.settings.onenote_retry_attempts + 1):
             try:
                 response = self.http_client.request(method, url, params=params, headers=merged_headers)

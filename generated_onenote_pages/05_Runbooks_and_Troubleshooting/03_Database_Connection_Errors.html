@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Database Connection Errors</title>
+  <style>body { font-family: Aptos, Arial, sans-serif; color: #1f2933; line-height: 1.45; max-width: 900px; margin: 32px auto; padding: 0 24px; }
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.attach { background: #ebf8ff; border-left: 4px solid #2b6cb0; padding: 10px 12px; }</style>
+</head>
+<body>
+  <article>
+    <h1>Database Connection Errors</h1>
+    <p class="summary">Resolving &#x27;too many connections&#x27; and timeout errors from PostgreSQL.</p>
+    <h2>Context</h2>
+    <p>Database Connection Errors is maintained by Data Team for on-call engineers, support engineers. This runbook resolving &#x27;too many connections&#x27; and timeout errors from PostgreSQL.</p>
+
+    <h2>Owner and Systems</h2>
+    <dl>
+      <dt>Owner</dt><dd>Data Team</dd>
+      <dt>For</dt><dd>on-call engineers, support engineers</dd>
+      <dt>Systems</dt><dd>PostgreSQL, pgbouncer, Grafana</dd>
+    </dl>
+
+    <h2>Investigation Steps</h2>
+    <ol>
+      <li>Query pg_stat_activity for idle-in-transaction sessions.</li>
+      <li>Identify the owning service.</li>
+      <li>Restart that service to clear leaks.</li>
+      <li>File a bug to fix the leak at the source.</li>
+    </ol>
+
+    <h2>Key Facts</h2>
+    <ul>
+      <li>The primary database max_connections is 400; pgbouncer pools at 1000 client connections.</li>
+      <li>A connection leak usually shows as steadily rising idle-in-transaction sessions.</li>
+      <li>Restarting the leaking service clears leaked connections immediately.</li>
+      <li>Long-running queries over 30 seconds are killed by a watchdog.</li>
+    </ul>
+
+    <h2>Commands</h2>
+    <p class="note">Run from a clean shell and keep the output with the setup or incident record.</p>
+    <pre><code class="language-bash">SELECT state, count(*) FROM pg_stat_activity GROUP BY state;
+SELECT pid, now()-query_start AS age, query FROM pg_stat_activity WHERE state=&#x27;active&#x27; ORDER BY age DESC LIMIT 10;</code></pre>
+
+    <h2>Systems Involved</h2>
+    <p>This work touches PostgreSQL, pgbouncer, Grafana.</p>
+  </article>
+</body>
+</html>

@@ -473,13 +473,33 @@ export function KnowledgeShell({
   }
 
   function toggleConversationPin(conversation: Conversation) {
-    const item: PinnedItem = { id: conversation.id, question: conversation.title, topicId: conversation.topicId };
+    const item: PinnedItem = { id: conversation.id, title: conversation.title, topicId: conversation.topicId };
     const next = togglePin(pins, item);
     persistPins(next);
-    toast(isPinned(pins, conversation.id) ? "Removed from pinned." : "Pinned to your saved answers.", "ok");
+    toast(isPinned(pins, conversation.id) ? "Unpinned chat." : "Pinned chat.", "ok");
   }
 
-  function askPinned(item: { question: string; topicId: string }) {
+  function openPinnedConversation(item: PinnedItem) {
+    const conversation = conversations.find((candidate) => candidate.id === item.id);
+    if (!conversation) {
+      persistPins(pins.filter((pin) => pin.id !== item.id));
+      toast("Pinned chat no longer exists.", "err");
+      return;
+    }
+    if (conversation.topicId !== selectedTopic?.id) {
+      skipNextAutoChatTopicIdRef.current = conversation.topicId;
+      onSelectTopic(conversation.topicId);
+    }
+    setActiveConversationId(conversation.id);
+    setPanelSource(null);
+  }
+
+  function unpinPinnedConversation(item: PinnedItem) {
+    persistPins(pins.filter((pin) => pin.id !== item.id));
+    toast("Unpinned chat.", "ok");
+  }
+
+  function askSuggestedQuestion(item: { question: string; topicId: string }) {
     const topic = topics.find((candidate) => candidate.id === item.topicId);
     if (!topic) {
       return;
@@ -508,7 +528,8 @@ export function KnowledgeShell({
         onSelectConversation={selectConversation}
         onDeleteConversation={removeConversation}
         onTogglePin={toggleConversationPin}
-        onAskPinned={askPinned}
+        onOpenPinnedConversation={openPinnedConversation}
+        onUnpinPinnedConversation={unpinPinnedConversation}
         onOpenSearch={() => setIsPaletteOpen(true)}
         isProfileMenuOpen={isProfileMenuOpen}
         profileButtonRef={profileButtonRef}
@@ -545,7 +566,7 @@ export function KnowledgeShell({
               userName={user.name}
               topics={topics}
               onSelectTopic={onSelectTopic}
-              onAsk={askPinned}
+              onAsk={askSuggestedQuestion}
               onOpenDocument={openDocumentSource}
             />
           )}

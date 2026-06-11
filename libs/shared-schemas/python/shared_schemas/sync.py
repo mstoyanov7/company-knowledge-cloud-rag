@@ -46,5 +46,6 @@ class SyncReport(BaseModel):
     items_changed: int = 0
     items_skipped: int = 0
     items_deleted: int = 0
+    items_failed: int = 0
     chunks_written: int = 0
     checkpoint: OneNoteCheckpoint | None = None

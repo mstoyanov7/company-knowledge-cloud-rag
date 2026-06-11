@@ -14,6 +14,7 @@ class Topic(BaseModel):
 class TopicConfig(Topic):
     acl_tags: list[str] = Field(default_factory=list)
     source_filters: list[str] = Field(default_factory=list)
+    section_filters: list[str] = Field(default_factory=list)
     retrieval_tags: list[str] = Field(default_factory=list)
 
     def public_view(self) -> Topic:
@@ -27,6 +28,8 @@ class TopicConfig(Topic):
 
 
 class TopicAdmin(TopicConfig):
+    section_key: str | None = None
+    auto_managed: bool = False
     enabled: bool = True
     created_at_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -40,6 +43,7 @@ class TopicCreateRequest(BaseModel):
     icon: str | None = Field(default=None, max_length=80)
     acl_tags: list[str] = Field(default_factory=list)
     source_filters: list[str] = Field(default_factory=list)
+    section_filters: list[str] = Field(default_factory=list)
     retrieval_tags: list[str] = Field(default_factory=list)
     suggested_questions: list[str] = Field(default_factory=list)
     enabled: bool = True
@@ -51,6 +55,7 @@ class TopicUpdateRequest(BaseModel):
     icon: str | None = Field(default=None, max_length=80)
     acl_tags: list[str] | None = None
     source_filters: list[str] | None = None
+    section_filters: list[str] | None = None
     retrieval_tags: list[str] | None = None
     suggested_questions: list[str] | None = None
     enabled: bool | None = None

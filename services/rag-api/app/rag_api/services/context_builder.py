@@ -71,7 +71,10 @@ def build_answer_context(
 
     accumulated_norm = ""
     for chunk, citation in ordered_pairs:
-        content = _trim_chunk_text(chunk.chunk_text, max_chars=max(400, min(3200, max_chars // 2)))
+        content = _trim_chunk_text(
+            chunk.chunk_text,
+            max_chars=_chunk_text_budget(question_analysis, chunk.chunk_text, max_chars=max_chars),
+        )
         normalized_content = re.sub(r"\s+", " ", content).strip()
         # Skip section chunks already fully covered by the combined procedure chunk.
         if normalized_content and normalized_content in accumulated_norm:
@@ -112,11 +115,12 @@ def _render_block(question_analysis: QuestionAnalysis, block: AnswerContextBlock
     lines: list[str] = []
     if block.is_attachment:
         # Label attachment content as part of its OneNote page so the model
-        # synthesizes page body and attached file into one answer.
-        lines.append(f"Page: {block.parent_title or block.title}")
+        # synthesizes page body and attached file into one answer. The leading
+        # [n] marker tells the model which citation index to use for this block.
+        lines.append(f"[{block.citation_index}] Page: {block.parent_title or block.title}")
         lines.append(f"Attached file: {block.attachment_file_name or block.title}")
     else:
-        lines.append(f"Source title: {block.title}")
+        lines.append(f"[{block.citation_index}] Source title: {block.title}")
     lines.extend(
         [
             f"Section: {block.section_path or 'N/A'}",
@@ -127,6 +131,52 @@ def _render_block(question_analysis: QuestionAnalysis, block: AnswerContextBlock
         ]
     )
     return "\n".join(lines)
+
+
+_CLOCK_TIME = re.compile(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b")
+
+
+def _chunk_text_budget(question_analysis: QuestionAnalysis, chunk_text: str, *, max_chars: int) -> int:
+    base_budget = max(400, min(4200, max_chars // 2))
+    if _wants_complete_structured_context(question_analysis) and len(_CLOCK_TIME.findall(chunk_text)) >= 3:
+        return max(base_budget, min(max_chars, 7000))
+    return base_budget
+
+
+def _wants_complete_structured_context(question_analysis: QuestionAnalysis) -> bool:
+    text = " ".join(
+        [
+            question_analysis.original_question,
+            question_analysis.search_text,
+            " ".join(question_analysis.key_phrases),
+            " ".join(question_analysis.important_entities),
+        ]
+    )
+    normalized = _normalized_words(text)
+    return bool(
+        re.search(r"\b(hour by hour|hourly|schedule|agenda|timeline|orientation|first day|day one)\b", normalized)
+        or re.search(r"\b(what to expect|what should expect|what happen|expected on first day)\b", normalized)
+        or (
+            re.search(r"\b(full|complete|entire|all|everything|overview|walk through)\b", normalized)
+            and re.search(r"\b(day|schedule|agenda|timeline|orientation|expect|happen)\b", normalized)
+        )
+    )
+
+
+def _normalized_words(value: str) -> str:
+    return " ".join(_normalize_token(token) for token in re.findall(r"[^\W_]+", value.lower()))
+
+
+def _normalize_token(token: str) -> str:
+    if len(token) > 5 and token.endswith("ies"):
+        return f"{token[:-3]}y"
+    if len(token) > 5 and token.endswith("ing"):
+        return token[:-3]
+    if len(token) > 4 and token.endswith("es"):
+        return token[:-2]
+    if len(token) > 4 and token.endswith("s") and not token.endswith(("ss", "us", "is")):
+        return token[:-1]
+    return token
 
 
 def _trim_chunk_text(value: str, *, max_chars: int) -> str:

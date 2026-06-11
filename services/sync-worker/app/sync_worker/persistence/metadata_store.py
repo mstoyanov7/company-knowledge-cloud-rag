@@ -412,6 +412,49 @@ class PostgresMetadataStore:
                     )
             connection.commit()
 
+    def list_chunks(self, scope_key: str, *, source_system: str = "onenote") -> list[ChunkDocument]:
+        """Read back persisted chunks so they can be re-embedded into the vector
+        store without re-crawling the source. Used by the embedding re-index job."""
+        with psycopg.connect(self.settings.postgres_dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT tenant_id, source_system, source_container, source_item_id, source_url, title,
+                           section_path, last_modified_utc, acl_tags_json, content_hash, chunk_id, chunk_index,
+                           chunk_text, embedding_model, language, tags_json, metadata_json
+                    FROM chunk_documents
+                    WHERE scope_key = %s AND source_system = %s
+                    ORDER BY source_item_id ASC, chunk_index ASC
+                    """,
+                    (scope_key, source_system),
+                )
+                rows = cursor.fetchall()
+        chunks: list[ChunkDocument] = []
+        for row in rows:
+            chunks.append(
+                ChunkDocument(
+                    tenant_id=row[0],
+                    source_system=row[1],
+                    source_container=row[2],
+                    source_item_id=row[3],
+                    source_url=row[4],
+                    title=row[5],
+                    section_path=row[6],
+                    last_modified_utc=row[7],
+                    acl_tags=json.loads(row[8]),
+                    acl_bindings=[],
+                    content_hash=row[9],
+                    chunk_id=row[10],
+                    chunk_index=row[11],
+                    chunk_text=row[12],
+                    embedding_model=row[13],
+                    language=row[14],
+                    tags=json.loads(row[15]),
+                    metadata=json.loads(row[16]),
+                )
+            )
+        return chunks
+
     def list_active_source_documents(self, scope_key: str, source_system: str) -> list[SourceDocument]:
         with psycopg.connect(self.settings.postgres_dsn) as connection:
             with connection.cursor() as cursor:

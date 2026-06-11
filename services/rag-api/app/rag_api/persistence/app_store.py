@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterator
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine, func, inspect, select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine, delete, func, inspect, select, text
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from shared_schemas import AppSettings
 
@@ -93,8 +93,11 @@ class AppTopicRecord(Base):
     icon: Mapped[str | None] = mapped_column(String(80), nullable=True)
     acl_tags_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     source_filters_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    section_filters_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     retrieval_tags_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     suggested_questions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    section_key: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
+    auto_managed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", index=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1", index=True)
     created_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -379,6 +382,14 @@ class AppDataStore:
                 statement = statement.where(AppTopicRecord.enabled.is_(True))
             return list(session.scalars(statement))
 
+    def delete_topic_records(self, topic_ids: list[str]) -> int:
+        ids = [topic_id for topic_id in dict.fromkeys(topic_ids) if topic_id]
+        if not ids:
+            return 0
+        with self.session() as session:
+            result = session.execute(delete(AppTopicRecord).where(AppTopicRecord.topic_id.in_(ids)))
+            return int(result.rowcount or 0)
+
     def get_topic_record(self, topic_id: str, *, enabled_only: bool = False) -> AppTopicRecord | None:
         with self.session() as session:
             record = session.get(AppTopicRecord, topic_id)
@@ -406,8 +417,11 @@ class AppDataStore:
                     icon=updates.get("icon"),
                     acl_tags_json=updates.get("acl_tags_json", "[]"),
                     source_filters_json=updates.get("source_filters_json", "[]"),
+                    section_filters_json=updates.get("section_filters_json", "[]"),
                     retrieval_tags_json=updates.get("retrieval_tags_json", "[]"),
                     suggested_questions_json=updates.get("suggested_questions_json", "[]"),
+                    section_key=updates.get("section_key"),
+                    auto_managed=bool(updates.get("auto_managed", False)),
                     enabled=bool(updates.get("enabled", True)),
                     created_at_utc=now,
                     updated_at_utc=now,
@@ -422,8 +436,11 @@ class AppDataStore:
                         "icon",
                         "acl_tags_json",
                         "source_filters_json",
+                        "section_filters_json",
                         "retrieval_tags_json",
                         "suggested_questions_json",
+                        "section_key",
+                        "auto_managed",
                         "enabled",
                     }:
                         setattr(record, key, value)
@@ -504,27 +521,39 @@ class AppDataStore:
     def _ensure_compat_columns(self) -> None:
         inspector = inspect(self.engine)
         table_names = set(inspector.get_table_names())
-        if "app_users" not in table_names:
-            return
-        existing = {column["name"] for column in inspector.get_columns("app_users")}
         datetime_type = "TIMESTAMP WITH TIME ZONE" if self.engine.dialect.name == "postgresql" else "DATETIME"
-        additions = {
-            "status": "ALTER TABLE app_users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'pending'",
-            "app_role": "ALTER TABLE app_users ADD COLUMN app_role VARCHAR(32) NOT NULL DEFAULT 'user'",
-            "approved_by_user_id": "ALTER TABLE app_users ADD COLUMN approved_by_user_id VARCHAR(64)",
-            "approved_at_utc": f"ALTER TABLE app_users ADD COLUMN approved_at_utc {datetime_type}",
-            "last_login_at_utc": f"ALTER TABLE app_users ADD COLUMN last_login_at_utc {datetime_type}",
-            "updated_by_user_id": "ALTER TABLE app_users ADD COLUMN updated_by_user_id VARCHAR(64)",
-        }
         with self.engine.begin() as connection:
-            added_status = False
-            for column_name, ddl in additions.items():
-                if column_name in existing:
-                    continue
-                connection.execute(text(ddl))
-                added_status = added_status or column_name == "status"
-            if added_status:
-                connection.execute(text("UPDATE app_users SET status = 'active' WHERE status = 'pending'"))
+            if "app_users" in table_names:
+                existing = {column["name"] for column in inspector.get_columns("app_users")}
+                additions = {
+                    "status": "ALTER TABLE app_users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'pending'",
+                    "app_role": "ALTER TABLE app_users ADD COLUMN app_role VARCHAR(32) NOT NULL DEFAULT 'user'",
+                    "approved_by_user_id": "ALTER TABLE app_users ADD COLUMN approved_by_user_id VARCHAR(64)",
+                    "approved_at_utc": f"ALTER TABLE app_users ADD COLUMN approved_at_utc {datetime_type}",
+                    "last_login_at_utc": f"ALTER TABLE app_users ADD COLUMN last_login_at_utc {datetime_type}",
+                    "updated_by_user_id": "ALTER TABLE app_users ADD COLUMN updated_by_user_id VARCHAR(64)",
+                }
+                added_status = False
+                for column_name, ddl in additions.items():
+                    if column_name in existing:
+                        continue
+                    _add_compat_column(connection, ddl)
+                    added_status = added_status or column_name == "status"
+                if added_status:
+                    connection.execute(text("UPDATE app_users SET status = 'active' WHERE status = 'pending'"))
+
+            if "app_topics" in table_names:
+                existing = {column["name"] for column in inspector.get_columns("app_topics")}
+                false_default = "FALSE" if self.engine.dialect.name == "postgresql" else "0"
+                additions = {
+                    "section_filters_json": "ALTER TABLE app_topics ADD COLUMN section_filters_json TEXT NOT NULL DEFAULT '[]'",
+                    "section_key": "ALTER TABLE app_topics ADD COLUMN section_key VARCHAR(200)",
+                    "auto_managed": f"ALTER TABLE app_topics ADD COLUMN auto_managed BOOLEAN NOT NULL DEFAULT {false_default}",
+                }
+                for column_name, ddl in additions.items():
+                    if column_name in existing:
+                        continue
+                    _add_compat_column(connection, ddl)
 
 
 def json_dumps(values: list[str]) -> str:
@@ -540,4 +569,14 @@ def _json_list(value: str | None) -> list[str]:
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _add_compat_column(connection, ddl: str) -> None:
+    try:
+        connection.execute(text(ddl))
+    except OperationalError as error:
+        message = str(error).lower()
+        if "duplicate column" in message or "already exists" in message:
+            return
+        raise
 

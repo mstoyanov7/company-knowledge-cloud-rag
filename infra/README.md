@@ -13,7 +13,6 @@ Services started locally:
 - `rag-api`
 - `sync-worker`
 - `onenote-poller`
-- Open WebUI
 
 Operational tables are created lazily by the services in PostgreSQL:
 

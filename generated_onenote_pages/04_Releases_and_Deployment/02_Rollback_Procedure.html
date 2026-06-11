@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Rollback Procedure</title>
+  <style>body { font-family: Aptos, Arial, sans-serif; color: #1f2933; line-height: 1.45; max-width: 900px; margin: 32px auto; padding: 0 24px; }
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.attach { background: #ebf8ff; border-left: 4px solid #2b6cb0; padding: 10px 12px; }</style>
+</head>
+<body>
+  <article>
+    <h1>Rollback Procedure</h1>
+    <p class="summary">How to roll back a bad production release quickly.</p>
+    <h2>Summary</h2>
+    <p class="note">Rollback Procedure is maintained by Release Management for release managers, on-call engineers, team leads. This release process how to roll back a bad production release quickly.</p>
+
+    <h2>Key Facts</h2>
+    <ul>
+      <li>Rollback is a one-command redeploy of the previous known-good image tag.</li>
+      <li>The rollback target is always the image tagged last-stable.</li>
+      <li>Database migrations are backward compatible for at least one release to make rollback safe.</li>
+      <li>If a migration is not reversible, a forward-fix is used instead of rollback.</li>
+    </ul>
+
+    <h2>Owner and Systems</h2>
+    <dl>
+      <dt>Owner</dt><dd>Release Management</dd>
+      <dt>For</dt><dd>release managers, on-call engineers, team leads</dd>
+      <dt>Systems</dt><dd>CD Pipeline, Grafana, PagerDuty</dd>
+    </dl>
+
+    <h2>Deployment Process</h2>
+    <ol>
+      <li>Declare a rollback in the incident channel.</li>
+      <li>Run the rollback command to last-stable.</li>
+      <li>Confirm error rate returns to baseline.</li>
+      <li>Open a follow-up to forward-fix the root cause.</li>
+    </ol>
+
+    <h2>Commands</h2>
+    <p class="note">Run from a clean shell and keep the output with the setup or incident record.</p>
+    <pre><code class="language-bash">nw deploy rollback --service &lt;service&gt; --to last-stable
+nw deploy status --service &lt;service&gt;</code></pre>
+
+    <h2>What To Keep</h2>
+    <p>Keep the release ticket, approval record, rollback owner, monitoring link with the related ticket or record.</p>
+  </article>
+</body>
+</html>

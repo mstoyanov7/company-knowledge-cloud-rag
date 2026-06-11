@@ -1,5 +1,5 @@
 from sync_worker.ingestion.chunking import TextChunker
-from sync_worker.ingestion.embeddings import DeterministicEmbedder
+from sync_worker.ingestion.embeddings import ChunkEmbedder, DeterministicEmbedder
 from sync_worker.ingestion.extraction import (
     CompositeFileExtractor,
     DOWNLOADABLE_ATTACHMENT_EXTENSIONS,
@@ -11,6 +11,7 @@ from sync_worker.ingestion.extraction import (
 from sync_worker.ingestion.hashing import compute_bytes_hash, compute_content_hash
 
 __all__ = [
+    "ChunkEmbedder",
     "CompositeFileExtractor",
     "DOWNLOADABLE_ATTACHMENT_EXTENSIONS",
     "DeterministicEmbedder",

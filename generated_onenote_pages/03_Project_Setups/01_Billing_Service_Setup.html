@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Billing Service Setup</title>
+  <style>body { font-family: Aptos, Arial, sans-serif; color: #1f2933; line-height: 1.45; max-width: 900px; margin: 32px auto; padding: 0 24px; }
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.attach { background: #ebf8ff; border-left: 4px solid #2b6cb0; padding: 10px 12px; }</style>
+</head>
+<body>
+  <article>
+    <h1>Billing Service Setup</h1>
+    <p class="summary">Local setup for the billing-service backend (Python/FastAPI).</p>
+    <h2>Context</h2>
+    <p>Billing Service Setup is maintained by Payments Team for software engineers joining a project. This project setup record local setup for the billing-service backend (Python/FastAPI).</p>
+
+    <h2>Owner and Systems</h2>
+    <dl>
+      <dt>Owner</dt><dd>Payments Team</dd>
+      <dt>For</dt><dd>software engineers joining a project</dd>
+      <dt>Systems</dt><dd>GitHub, PostgreSQL, Secrets Vault, Stripe</dd>
+    </dl>
+
+    <h2>Setup Process</h2>
+    <ol>
+      <li>Clone the repo and create a virtualenv.</li>
+      <li>Pull Stripe test secrets from the vault.</li>
+      <li>Start dependencies with docker compose.</li>
+      <li>Run migrations and the smoke test.</li>
+    </ol>
+
+    <h2>Key Facts</h2>
+    <ul>
+      <li>billing-service is a FastAPI app backed by PostgreSQL and Stripe.</li>
+      <li>It runs locally on port 8020 and uses a seeded test database.</li>
+      <li>Stripe test keys are pulled from the Secrets Vault path secret/billing/stripe-test.</li>
+      <li>The smoke test creates a test invoice and asserts a paid webhook is received.</li>
+    </ul>
+
+    <h2>Commands</h2>
+    <p class="note">Run from a clean shell and keep the output with the setup or incident record.</p>
+    <pre><code class="language-bash">git clone ssh://git.northwind.local/payments/billing-service.git
+cd billing-service &amp;&amp; python -m venv .venv &amp;&amp; . .venv/bin/activate
+pip install -e &#x27;.[dev]&#x27;
+nw vault read secret/billing/stripe-test &gt; .env.local
+docker compose up -d postgres
+alembic upgrade head &amp;&amp; pytest tests/smoke</code></pre>
+
+    <h2>Attachments</h2>
+    <p class="attach">The files below are generated next to this page. Attach them to the OneNote page so their content is indexed and searchable.</p>
+    <ul>
+      <li><strong>billing-service-readme.md</strong> &mdash; Quick reference for running billing-service locally. <em>(attach this file to the OneNote page)</em></li>
+      <li><strong>billing-architecture-overview.docx</strong> &mdash; How billing-service fits into the platform. <em>(attach this file to the OneNote page)</em></li>
+    </ul>
+
+    <h2>Systems Involved</h2>
+    <p>This work touches GitHub, PostgreSQL, Secrets Vault, Stripe.</p>
+  </article>
+</body>
+</html>

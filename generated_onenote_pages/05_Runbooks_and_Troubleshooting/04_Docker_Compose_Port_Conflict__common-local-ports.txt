@@ -1,0 +1,12 @@
+Common Local Ports
+==================
+
+Default host ports used by local services, to spot conflicts fast.
+
+* 5432 - PostgreSQL
+* 6379 - Redis
+* 6333 - Qdrant
+* 8020 - billing-service
+* 8040 - search-service
+* 5173 - web-app dev server
+* 8080 - Airflow / generic app

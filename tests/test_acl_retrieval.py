@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from shared_schemas import AccessScope
+import asyncio
+
+from shared_schemas import AccessScope, AppSettings, RetrievalRequest, UserContext
 
 from datetime import UTC, datetime
 
 from shared_schemas import ChunkDocument
 
+from rag_api.adapters.retrieval.mock import MockRetriever
 from rag_api.adapters.retrieval.qdrant import QdrantAclRetriever, lexical_relevance_score
 
 
@@ -18,7 +21,10 @@ def test_qdrant_acl_filter_includes_tenant_acl_and_source_scope() -> None:
         source_filters=["onenote"],
     )
 
-    payload_filter = QdrantAclRetriever.build_payload_filter(access_scope).model_dump(
+    payload_filter = QdrantAclRetriever.build_payload_filter(
+        access_scope,
+        section_filters=["Benefits", "First day"],
+    ).model_dump(
         mode="json",
         by_alias=True,
         exclude_none=True,
@@ -27,6 +33,27 @@ def test_qdrant_acl_filter_includes_tenant_acl_and_source_scope() -> None:
     assert payload_filter["must"][0] == {"key": "tenant_id", "match": {"value": "tenant-1"}}
     assert payload_filter["must"][1] == {"key": "acl_tags", "match": {"any": ["public", "engineering"]}}
     assert payload_filter["must"][2] == {"key": "source_system", "match": {"any": ["onenote"]}}
+    assert payload_filter["must"][3] == {"key": "metadata.section_name", "match": {"any": ["Benefits", "First day"]}}
+
+
+def test_mock_retriever_filters_by_section_name() -> None:
+    retriever = MockRetriever(AppSettings(app_env="test", mock_top_k=10))
+
+    result = asyncio.run(
+        retriever.retrieve(
+            RetrievalRequest(
+                question="benefits engineering employees",
+                user_context=UserContext(acl_tags=["public", "employees", "engineering"]),
+                top_k=10,
+                section_filters=["Benefits"],
+            )
+        )
+    )
+
+    assert result.chunks
+    assert {chunk.metadata["section_name"] for chunk in result.chunks} == {"Benefits"}
+    assert result.metadata.section_filters == ["Benefits"]
+    assert result.metadata.payload_filter["section_filters"] == ["Benefits"]
 
 
 def _chunk(title: str, text: str) -> ChunkDocument:

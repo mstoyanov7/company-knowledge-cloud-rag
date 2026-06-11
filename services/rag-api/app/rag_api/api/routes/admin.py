@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from shared_schemas import (
     AdminUserUpdate,
+    AppSettings,
     TopicAdmin,
     TopicCreateRequest,
     TopicUpdateRequest,
@@ -11,9 +12,17 @@ from shared_schemas import (
     UserProfile,
 )
 
-from rag_api.dependencies import RequestAuthContext, get_app_data_store, get_local_auth_service, get_request_auth_context
+from rag_api.dependencies import (
+    RequestAuthContext,
+    get_app_data_store,
+    get_document_metadata,
+    get_local_auth_service,
+    get_request_auth_context,
+    get_runtime_settings,
+)
 from rag_api.persistence.app_store import AppDataStore, AppTopicRecord, UiSettingsRecord, json_dumps
 from rag_api.services.local_auth import LocalAuthError, LocalAuthService
+from rag_api.services.topic_sync import reconcile_topics_from_sources
 
 router = APIRouter(prefix="/api/v1", tags=["admin"])
 
@@ -120,6 +129,16 @@ async def create_topic(
     return _topic_admin_from_record(record)
 
 
+@router.post("/admin/topics/refresh-from-sources", response_model=list[TopicAdmin])
+async def refresh_topics_from_sources(
+    _admin: UserProfile = Depends(_require_system_admin),
+    store: AppDataStore = Depends(get_app_data_store),
+    settings: AppSettings = Depends(get_runtime_settings),
+) -> list[TopicAdmin]:
+    records = reconcile_topics_from_sources(get_document_metadata(settings), store, settings)
+    return [_topic_admin_from_record(record) for record in records]
+
+
 @router.patch("/admin/topics/{topic_id}", response_model=TopicAdmin)
 async def update_topic(
     topic_id: str,
@@ -181,6 +200,7 @@ def _topic_updates(values: dict) -> dict:
     for request_key, store_key in {
         "acl_tags": "acl_tags_json",
         "source_filters": "source_filters_json",
+        "section_filters": "section_filters_json",
         "retrieval_tags": "retrieval_tags_json",
         "suggested_questions": "suggested_questions_json",
     }.items():
@@ -197,8 +217,11 @@ def _topic_admin_from_record(record: AppTopicRecord) -> TopicAdmin:
         icon=record.icon,
         acl_tags=_json_list(record.acl_tags_json),
         source_filters=_json_list(record.source_filters_json),
+        section_filters=_json_list(record.section_filters_json),
         retrieval_tags=_json_list(record.retrieval_tags_json),
         suggested_questions=_json_list(record.suggested_questions_json),
+        section_key=record.section_key,
+        auto_managed=record.auto_managed,
         enabled=record.enabled,
         created_at_utc=record.created_at_utc,
         updated_at_utc=record.updated_at_utc,

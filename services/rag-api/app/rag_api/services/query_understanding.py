@@ -20,6 +20,10 @@ class QuestionAnalysis:
     avoid_concepts: tuple[str, ...]
     expected_evidence_type: str
     specificity: str
+    # Self-contained sub-questions (facets) of a complex question. Empty for a
+    # single-intent question. Each facet is retrieved separately so the answer
+    # can be synthesized from several pages.
+    sub_questions: tuple[str, ...] = ()
 
     @property
     def main_intent(self) -> str | None:
@@ -56,6 +60,7 @@ class QuestionAnalysis:
                 [
                     self.original_question,
                     self.rewritten_question,
+                    *self.sub_questions,
                     *self.key_phrases,
                     *self.keyword_queries,
                     *self.semantic_queries,
@@ -203,7 +208,58 @@ def analyze_question(question: str) -> QuestionAnalysis:
         avoid_concepts=(),
         expected_evidence_type=expected_evidence_type,
         specificity=specificity,
+        sub_questions=tuple(_split_facets(question)),
     )
+
+
+_FACET_SPLIT = re.compile(r"\s+(?:and|&)\s+|;\s+|,\s+and\s+", re.IGNORECASE)
+_INTERROGATIVE_LEAD = re.compile(
+    r"^(how\s+(?:do(?:es)?|can|to|should)(?:\s+\w+)?|what\s+(?:is|are|do(?:es)?)|where\s+(?:is|are|do(?:es)?|can)|"
+    r"when\s+(?:is|are|do(?:es)?|can)|who\s+(?:is|are|do(?:es)?)|which|why|can\s+\w+|do\s+\w+|is\s+there|are\s+there)\b[^?]*?",
+    re.IGNORECASE,
+)
+
+
+def _split_facets(question: str) -> list[str]:
+    """Heuristic decomposition of a multi-intent question into facets.
+
+    Splits on conjunctions and keeps the parts only when they look like
+    distinct intents (enough content tokens, low mutual overlap). The lead-in
+    of the original question ("How do I ...") is carried over to fragments
+    that lack their own interrogative start, so each facet retrieves well on
+    its own. Returns an empty list for single-intent questions.
+    """
+    cleaned = question.strip().rstrip("?")
+    parts = [part.strip() for part in _FACET_SPLIT.split(cleaned) if part.strip()]
+    if len(parts) < 2:
+        return []
+
+    lead_match = _INTERROGATIVE_LEAD.match(cleaned)
+    lead = ""
+    if lead_match:
+        lead_tokens = lead_match.group(0).split()
+        lead = " ".join(lead_tokens[: min(4, len(lead_tokens))])
+
+    facets: list[str] = []
+    facet_token_sets: list[set[str]] = []
+    for part in parts:
+        tokens = {
+            _normalize_token(token)
+            for token in re.findall(r"[^\W_]+", part.lower())
+            if len(token) > 2 and token not in _STOP_WORDS
+        }
+        if len(tokens) < 2:
+            return []
+        for seen in facet_token_sets:
+            union = tokens | seen
+            if union and len(tokens & seen) / len(union) >= 0.5:
+                return []
+        facet_token_sets.append(tokens)
+        if lead and not _INTERROGATIVE_LEAD.match(part):
+            facets.append(f"{lead} {part}?")
+        else:
+            facets.append(part if part.endswith("?") else f"{part}?")
+    return facets[:3] if len(facets) >= 2 else []
 
 
 def understand_query(question: str) -> QuestionAnalysis:
@@ -279,6 +335,17 @@ def _merge_llm_plan(base: QuestionAnalysis, payload: dict[str, Any]) -> Question
         )[:8]
     )
     avoid_concepts = tuple(_dedupe_preserving_order(_coerce_string_list(payload.get("avoid_concepts")))[:8])
+    # Prefer LLM-provided facets, fall back to the heuristic split.
+    sub_questions = tuple(
+        _dedupe_preserving_order(
+            [
+                *_coerce_string_list(payload.get("sub_questions")),
+                *base.sub_questions,
+            ]
+        )[:3]
+    )
+    if len(sub_questions) < 2:
+        sub_questions = base.sub_questions
 
     return QuestionAnalysis(
         original_question=base.original_question,
@@ -293,6 +360,7 @@ def _merge_llm_plan(base: QuestionAnalysis, payload: dict[str, Any]) -> Question
         avoid_concepts=avoid_concepts,
         expected_evidence_type=expected_evidence_type,
         specificity=_specificity(_normalized_words(base.original_question), answer_type),
+        sub_questions=sub_questions,
     )
 
 

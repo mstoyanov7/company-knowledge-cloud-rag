@@ -50,6 +50,10 @@ export function suspendUser(userId: string): Promise<UserProfile> {
   return apiRequest<UserProfile>(`/api/v1/admin/users/${encodeURIComponent(userId)}/suspend`, { method: "POST" });
 }
 
+export function activateUser(userId: string): Promise<UserProfile> {
+  return updateAdminUser(userId, { status: "active" });
+}
+
 export function fetchAdminTopics(): Promise<TopicAdmin[]> {
   return apiRequest<TopicAdmin[]>("/api/v1/admin/topics");
 }

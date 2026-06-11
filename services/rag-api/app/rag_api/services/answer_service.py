@@ -1,6 +1,6 @@
 import time
 from contextlib import nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 import json
 import logging
@@ -30,7 +30,17 @@ from rag_api.services.retrieval_ranking import (
     is_procedure_question,
     rank_chunks_by_question_analysis,
 )
+from rag_api.services.answer_support import _freshness_delay_ms, _metadata_string
+from rag_api.services.inventory import answer_inventory_question
 from rag_api.services.security_audit import SecurityAuditLogger
+from rag_api.services.text_analysis import (
+    _contains_phrase,
+    _content_tokens,
+    _normalize_token,
+    _normalized_words,
+    _phrase_variants,
+    _STOP_WORDS,
+)
 from rag_api.services.topic_service import AnswerTopicScope, TopicService
 from shared_schemas import (
     AccessScope,
@@ -138,14 +148,6 @@ def _chunk_in_focus(chunk, focus_ids: set[str]) -> bool:
     return chunk.source_item_id in focus_ids or _chunk_parent_page_id(chunk) in focus_ids
 
 
-@dataclass(frozen=True, slots=True)
-class InventoryRequestMatch:
-    mode: str
-    target_tokens: tuple[str, ...]
-    target_label: str
-    section_inventory: bool = False
-
-
 class AnswerService:
     def __init__(
         self,
@@ -166,6 +168,7 @@ class AnswerService:
         clarify_enabled: bool = True,
         clarify_closeness_ratio: float = 0.6,
         clarify_max_options: int = 5,
+        guard_repair_enabled: bool = True,
     ) -> None:
         self.llm = llm
         self.prompt_builder = prompt_builder
@@ -183,6 +186,7 @@ class AnswerService:
         self.clarify_enabled = clarify_enabled
         self.clarify_closeness_ratio = clarify_closeness_ratio
         self.clarify_max_options = max(2, clarify_max_options)
+        self.guard_repair_enabled = guard_repair_enabled
         self.tracer = trace.get_tracer("rag_api.answer") if trace else None
         self.answer_latency_ms = (
             metrics.get_meter("rag_api.answer").create_histogram("rag_answer_latency_ms") if metrics else None
@@ -194,10 +198,43 @@ class AnswerService:
         self.citation_count = meter.create_histogram("rag_citation_count") if meter else None
 
     async def answer(self, request: AnswerRequest) -> AnswerResponse:
+        primary = await self._answer_once(request, allow_clarification=True)
+        topic_selected = request.topic_id is not None and self.topic_service is not None
+        if not topic_selected or primary.clarification is not None or _is_confident_response(primary):
+            return primary
+        # Nothing confident was found inside the selected topic. Widen the
+        # search across every section before giving up, so content filed under
+        # a different topic (for example an attached cheat sheet in another
+        # notebook section) is still surfaced instead of a flat "no information"
+        # reply for a question the notes can actually answer.
+        fallback = await self._answer_once(request, allow_clarification=False, ignore_topic=True)
+        if not _is_confident_response(fallback):
+            return primary
+        topic_name = self.topic_service.require_topic(request.topic_id).name
+        self._debug_event(
+            "cross_topic_fallback",
+            selected_topic=topic_name,
+            citations=[citation.title for citation in fallback.citations],
+        )
+        return _annotate_cross_topic_answer(
+            fallback, topic_name, suggested_questions=primary.suggested_questions
+        )
+
+    async def _answer_once(
+        self,
+        request: AnswerRequest,
+        *,
+        allow_clarification: bool = True,
+        ignore_topic: bool = False,
+    ) -> AnswerResponse:
         started = time.perf_counter()
         span = self.tracer.start_as_current_span("rag.answer") if self.tracer else nullcontext()
         with span:
-            topic_scope = self.topic_service.scope_answer_request(request) if self.topic_service else None
+            topic_scope = (
+                None
+                if ignore_topic
+                else (self.topic_service.scope_answer_request(request) if self.topic_service else None)
+            )
             effective_request = _request_with_topic_scope(request, topic_scope)
             suggested_questions = list(topic_scope.topic.suggested_questions) if topic_scope else []
             access_scope = self.access_scope_resolver.resolve(
@@ -214,7 +251,8 @@ class AnswerService:
                 topic_id=topic_scope.topic.id if topic_scope else None,
                 plan=_question_analysis_debug_payload(question_analysis),
             )
-            inventory_response = self._answer_inventory_question(
+            inventory_response = answer_inventory_question(
+                metadata=self.metadata,
                 request=effective_request,
                 question_analysis=question_analysis,
                 topic_scope=topic_scope,
@@ -227,6 +265,8 @@ class AnswerService:
             candidate_top_k = request.top_k
             if self.reranker:
                 candidate_top_k = max(request.top_k, request.top_k * self.retrieval_candidate_multiplier)
+            if _wants_complete_structured_context(question_analysis):
+                candidate_top_k = max(candidate_top_k, min(10, max(request.top_k * 2, 8)))
             retrieval_started = time.perf_counter()
             retrieval_result = await self._retrieve_for_question_analysis(
                 question_analysis=question_analysis,
@@ -258,7 +298,21 @@ class AnswerService:
                 retrieval_result.metadata.requested_top_k = request.top_k
             chunks = self._filter_relevant_chunks(question_analysis, chunks)
             chunks = _prioritize_topic_chunks(chunks, topic_scope)
-            chunks = rank_chunks_by_question_analysis(question_analysis, chunks, top_k=request.top_k)
+            ranked_top_k = _ranked_context_limit(question_analysis, request.top_k)
+            candidate_chunks = chunks
+            chunks = rank_chunks_by_question_analysis(question_analysis, chunks, top_k=ranked_top_k)
+            chunks = _expand_complete_context_chunks(
+                question_analysis,
+                selected_chunks=chunks,
+                candidate_chunks=candidate_chunks,
+                max_chunks=ranked_top_k,
+            )
+            chunks = _ensure_facet_coverage(
+                question_analysis,
+                selected_chunks=chunks,
+                candidate_chunks=candidate_chunks,
+                max_chunks=max(ranked_top_k, len(question_analysis.sub_questions)),
+            )
             self._debug_event(
                 "reranked_chunks",
                 chunks=_chunk_debug_payload(chunks),
@@ -279,6 +333,19 @@ class AnswerService:
             )
             graded_chunks = chunks
             chunks = list(evidence_assessment.selected_chunks)
+            valid_answer_chunk_ids = {
+                grade.chunk_id
+                for grade in evidence_assessment.grades
+                if grade.relevance == "direct" or (grade.relevance == "partial" and grade.answers_question)
+            }
+            eligible_context_chunks = [chunk for chunk in graded_chunks if chunk.chunk_id in valid_answer_chunk_ids]
+            chunks = _expand_complete_context_chunks(
+                question_analysis,
+                selected_chunks=chunks,
+                candidate_chunks=eligible_context_chunks,
+                max_chunks=ranked_top_k,
+            )
+            chunks = _drop_metadata_chunks_for_complete_context(question_analysis, chunks)
             retrieval_result.metadata.returned_count = len(chunks)
             retrieval_result.metadata.evidence_sufficiency = evidence_assessment.sufficiency
             retrieval_result.metadata.relevance_grades = [
@@ -290,7 +357,7 @@ class AnswerService:
                 }
                 for grade in evidence_assessment.grades
             ]
-            if self.clarify_enabled and not request.focus_source_item_ids:
+            if self.clarify_enabled and allow_clarification and not request.focus_source_item_ids:
                 clarification = detect_clarification(
                     question_analysis,
                     graded_chunks,
@@ -352,6 +419,7 @@ class AnswerService:
                         completion_latency_ms=0,
                         freshness_delay_ms=None,
                         citation_count=0,
+                        answer_kind="refusal",
                     ),
                     suggested_questions=suggested_questions,
                 )
@@ -386,7 +454,7 @@ class AnswerService:
             )
             completion_started = time.perf_counter()
             generation = await self.llm.generate(prompt)
-            answer_text, citations = self._guard_generated_answer(
+            answer_text, citations, guard_kind = self._guard_generated_answer(
                 question=effective_question,
                 question_analysis=question_analysis,
                 answer_text=generation.answer_text,
@@ -394,15 +462,37 @@ class AnswerService:
                 citations=citations,
                 evidence_assessment=evidence_assessment,
             )
+            if guard_kind == "extractive" and self.guard_repair_enabled:
+                # One corrective regeneration before falling back to a raw
+                # extract: ask the model to fix grounding/coverage instead of
+                # reverting to source-formatted text.
+                repaired = await self._repair_generated_answer(
+                    prompt=prompt,
+                    draft_answer=generation.answer_text,
+                    question=effective_question,
+                    question_analysis=question_analysis,
+                    chunks=chunks,
+                    citations=self._build_citations(chunks),
+                    evidence_assessment=evidence_assessment,
+                )
+                if repaired is not None:
+                    answer_text, citations, guard_kind = repaired
+                    self._debug_event("guard_repaired", kind=guard_kind)
             answer_text = _strip_inline_citation_markers(answer_text)
             answer_text = _strip_trailing_source_line(answer_text)
+            answer_text = _normalize_markdown_tables(answer_text)
+            answer_text = _merge_adjacent_code_fences(answer_text)
+            answer_text = _dedupe_repeated_markdown_headings(answer_text)
+            answer_text = _collapse_excess_blank_lines(answer_text)
             answer_text = _normalize_no_information_text(answer_text)
             validation_passed = _final_answer_is_valid(answer_text, citations, evidence_assessment)
             self._debug_event("final_answer_validation", passed=validation_passed, answer_preview=answer_text[:300])
             downloads: list[DownloadLink] = []
+            answer_kind = guard_kind
             if not validation_passed:
                 answer_text = NO_INFORMATION_ANSWER
                 citations = []
+                answer_kind = "refusal"
             else:
                 downloads = self._downloads_for_answer(question_analysis, chunks, citations)
                 answer_text = _append_downloads_section(answer_text, downloads)
@@ -442,6 +532,7 @@ class AnswerService:
                     completion_latency_ms=completion_latency_ms,
                     freshness_delay_ms=freshness_delay_ms,
                     citation_count=len(citations),
+                    answer_kind=answer_kind,
                 ),
                 suggested_questions=suggested_questions,
             )
@@ -493,6 +584,7 @@ class AnswerService:
                 completion_latency_ms=0,
                 freshness_delay_ms=_freshness_delay_ms(used_citations),
                 citation_count=len(used_citations),
+                answer_kind="hedged",
             ),
             suggested_questions=suggested_questions,
         )
@@ -531,6 +623,7 @@ class AnswerService:
                 completion_latency_ms=0,
                 freshness_delay_ms=None,
                 citation_count=0,
+                answer_kind="clarify",
             ),
             suggested_questions=suggested_questions,
             clarification=clarification,
@@ -540,44 +633,6 @@ class AnswerService:
         if not self.debug_enabled:
             return
         logger.info("rag_debug %s", json.dumps({"event": event, **fields}, default=str, ensure_ascii=False))
-
-    def _answer_inventory_question(
-        self,
-        *,
-        request: AnswerRequest,
-        question_analysis: QuestionAnalysis,
-        topic_scope: AnswerTopicScope | None,
-        access_scope,
-        suggested_questions: list[str],
-        started: float,
-    ) -> AnswerResponse | None:
-        match = _inventory_request_match(question_analysis, topic_scope)
-        if match is None or self.metadata is None:
-            return None
-
-        documents = _allowed_inventory_documents(self.metadata.list_documents(), access_scope)
-        matched_documents = _matching_inventory_documents(documents, match)
-        if not matched_documents:
-            return _inventory_response(
-                answer=_no_inventory_answer(match),
-                documents=[],
-                request=request,
-                access_scope=access_scope,
-                candidate_count=len(documents),
-                started=started,
-                suggested_questions=suggested_questions,
-            )
-
-        answer = _format_inventory_answer(match, matched_documents)
-        return _inventory_response(
-            answer=answer,
-            documents=matched_documents,
-            request=request,
-            access_scope=access_scope,
-            candidate_count=len(documents),
-            started=started,
-            suggested_questions=suggested_questions,
-        )
 
     async def _retrieve_for_question_analysis(
         self,
@@ -598,6 +653,7 @@ class AnswerService:
                 user_context=request.user_context,
                 top_k=top_k,
                 source_filters=request.source_filters,
+                section_filters=list(topic_scope.section_filters) if topic_scope else [],
                 access_scope=access_scope,
                 topic_id=topic_scope.topic.id if topic_scope else None,
                 topic_tags=list(topic_scope.retrieval_terms) if topic_scope else [],
@@ -624,6 +680,53 @@ class AnswerService:
         relevant.sort(key=lambda item: (-item[0], -item[1].score, item[1].title, item[1].chunk_index))
         return [chunk for _relevance_score, chunk in relevant]
 
+    async def _repair_generated_answer(
+        self,
+        *,
+        prompt,
+        draft_answer: str,
+        question: str,
+        question_analysis: QuestionAnalysis,
+        chunks: list,
+        citations: list[Citation],
+        evidence_assessment: EvidenceAssessment | None = None,
+    ):
+        """One corrective regeneration after a guard rejection.
+
+        Returns the re-guarded ``(answer, citations, kind)`` when the repaired
+        answer is accepted, otherwise ``None`` so the caller keeps the original
+        extractive fallback.
+        """
+        repair_instruction = (
+            " REPAIR MODE: your previous draft was rejected by automated grounding checks. "
+            "Rewrite the answer so that every fact, number, command, identifier and file path "
+            "comes verbatim from the retrieved context blocks; cover the directly relevant facts "
+            "from every block that answers the question; append the [n] marker of each block you "
+            "use; keep the synthesis in your own words but introduce no terms absent from the "
+            f"context. Rejected draft: <<<{shorten(draft_answer, width=900, placeholder=' ...')}>>>"
+        )
+        try:
+            repaired_prompt = replace(
+                prompt,
+                system_instruction=f"{prompt.system_instruction}{repair_instruction}",
+            )
+            regeneration = await self.llm.generate(repaired_prompt)
+        except Exception:  # pragma: no cover - defensive: keep the fallback
+            return None
+        if not regeneration.answer_text or regeneration.answer_text.strip() == draft_answer.strip():
+            return None
+        answer_text, used_citations, guard_kind = self._guard_generated_answer(
+            question=question,
+            question_analysis=question_analysis,
+            answer_text=regeneration.answer_text,
+            chunks=chunks,
+            citations=citations,
+            evidence_assessment=evidence_assessment,
+        )
+        if guard_kind == "answered":
+            return answer_text, used_citations, guard_kind
+        return None
+
     def _guard_generated_answer(
         self,
         *,
@@ -633,22 +736,36 @@ class AnswerService:
         chunks: list,
         citations: list[Citation],
         evidence_assessment: EvidenceAssessment | None = None,
-    ) -> tuple[str, list[Citation]]:
+    ) -> tuple[str, list[Citation], str]:
         normalized_answer = answer_text.strip()
         retrieval_question = question_analysis.search_text
         if _is_no_information_text(normalized_answer):
             if citations:
-                return _extractive_response(question_analysis, chunks, citations)
-            return NO_INFORMATION_ANSWER, []
+                return (*_extractive_response(question_analysis, chunks, citations), "extractive")
+            return NO_INFORMATION_ANSWER, [], "refusal"
         if not citations:
-            return NO_INFORMATION_ANSWER, []
+            return NO_INFORMATION_ANSWER, [], "refusal"
+
+        # Hard groundedness gate: numbers, commands, identifiers, paths and
+        # similar verbatim-critical values in the answer must literally exist in
+        # the supplied context (or the question). This is never relaxed.
+        context_text = " ".join(
+            " ".join([chunk.title, chunk.section_path or "", chunk.chunk_text])
+            for chunk in chunks
+        )
+        invented_values = _unsupported_critical_values(
+            normalized_answer,
+            f"{question} {retrieval_question} {context_text}",
+        )
+        if invented_values:
+            return (*_extractive_response(question_analysis, chunks, citations), "extractive")
 
         cited_indexes = {int(index) for index in re.findall(r"\[(\d+)\]", normalized_answer)}
         valid_indexes = {citation.index for citation in citations}
         used_indexes = cited_indexes.intersection(valid_indexes)
         if not used_indexes:
             if not _answer_matches_current_question(question_analysis, normalized_answer, chunks):
-                return _extractive_response(question_analysis, chunks, citations)
+                return (*_extractive_response(question_analysis, chunks, citations), "extractive")
             if _answer_is_grounded_enough(retrieval_question, normalized_answer, chunks) and _answer_covers_selected_context(
                 retrieval_question,
                 normalized_answer,
@@ -658,35 +775,47 @@ class AnswerService:
                 return _ensure_markdown_answer(
                     _append_missing_citation(normalized_answer, selected_citations),
                     selected_citations,
-                ), selected_citations
-            return _extractive_response(question_analysis, chunks, citations)
+                ), selected_citations, "answered"
+            return (*_extractive_response(question_analysis, chunks, citations), "extractive")
 
         chunks_by_index = {index: chunk for index, chunk in enumerate(chunks, start=1)}
         cited_chunks = [chunks_by_index[index] for index in sorted(used_indexes) if index in chunks_by_index]
         if _is_title_only_answer(normalized_answer, cited_chunks):
-            return _extractive_response(question_analysis, chunks, citations)
+            return (*_extractive_response(question_analysis, chunks, citations), "extractive")
         if not _answer_matches_current_question(question_analysis, normalized_answer, chunks):
-            return _extractive_response(question_analysis, chunks, citations)
+            return (*_extractive_response(question_analysis, chunks, citations), "extractive")
 
+        # Soft (prose) groundedness: the model saw every context block, so any
+        # block may legitimately contribute wording, and the question analysis
+        # paraphrases are legitimate rewordings too. Synthesis in the model's
+        # own words must not be punished — only materially unsupported prose.
         allowed_tokens = _content_tokens(question)
         allowed_tokens.update(_content_tokens(retrieval_question))
-        for chunk in cited_chunks:
+        allowed_tokens.update(_content_tokens(" ".join(question_analysis.semantic_queries)))
+        allowed_tokens.update(_content_tokens(" ".join(question_analysis.key_phrases)))
+        for chunk in chunks:
             allowed_tokens.update(_content_tokens(chunk.title))
             allowed_tokens.update(_content_tokens(chunk.section_path or ""))
             allowed_tokens.update(_content_tokens(chunk.chunk_text))
             allowed_tokens.update(_content_tokens(" ".join(chunk.tags)))
 
+        cited_source_count = len({chunk.source_item_id for chunk in cited_chunks})
         answer_tokens = _content_tokens(re.sub(r"\[\d+\]", "", normalized_answer))
         unsupported_tokens = answer_tokens.difference(allowed_tokens)
-        if _has_material_unsupported_content(unsupported_tokens, answer_tokens):
-            return _extractive_response(question_analysis, chunks, citations)
+        # A multi-source synthesis that passed the critical-value gate is the
+        # desired behaviour; never revert it to a single-page extract over
+        # prose-level token mismatches.
+        if cited_source_count < 2 and _has_material_unsupported_content(unsupported_tokens, answer_tokens):
+            return (*_extractive_response(question_analysis, chunks, citations), "extractive")
         if _answer_lacks_expected_value(retrieval_question, normalized_answer, chunks):
-            return _extractive_response(question_analysis, chunks, citations)
-        if _answer_is_too_narrow_for_structured_question(retrieval_question, normalized_answer, cited_chunks):
-            return _extractive_response(question_analysis, chunks, citations)
+            return (*_extractive_response(question_analysis, chunks, citations), "extractive")
+        if cited_source_count < 2 and _answer_is_too_narrow_for_structured_question(
+            retrieval_question, normalized_answer, chunks
+        ):
+            return (*_extractive_response(question_analysis, chunks, citations), "extractive")
 
         used_citations = [citation for citation in citations if citation.index in used_indexes]
-        return _ensure_markdown_answer(normalized_answer, used_citations), used_citations
+        return _ensure_markdown_answer(normalized_answer, used_citations), used_citations, "answered"
 
     def _build_citations(self, chunks: list) -> list[Citation]:
         citations: list[Citation] = []
@@ -813,6 +942,40 @@ class AnswerService:
             )
 
 
+def _is_confident_response(response: AnswerResponse) -> bool:
+    """True when a response is a real, grounded answer (not a clarification,
+    a hedge, or the bare "no information" reply). Used to decide whether a
+    topic-scoped answer is good enough or a wider cross-topic retry is warranted."""
+    if response.clarification is not None:
+        return False
+    if not response.citations:
+        return False
+    answer = response.answer.strip()
+    if not answer or _is_no_information_text(answer) or answer == NO_INFORMATION_ANSWER:
+        return False
+    if answer.startswith(HEDGED_ANSWER_PREAMBLE):
+        return False
+    return True
+
+
+def _annotate_cross_topic_answer(
+    response: AnswerResponse,
+    topic_name: str | None,
+    *,
+    suggested_questions: list[str] | None = None,
+) -> AnswerResponse:
+    """Prefix a confident cross-topic answer with a short note so the user knows
+    it came from outside the topic they had selected."""
+    if topic_name:
+        note = f"I couldn't find this in **{topic_name}**, but here's what I found elsewhere in the notes:"
+    else:
+        note = "Here's what I found elsewhere in the notes:"
+    updates: dict[str, object] = {"answer": f"{note}\n\n{response.answer}"}
+    if suggested_questions is not None:
+        updates["suggested_questions"] = suggested_questions
+    return response.model_copy(update=updates)
+
+
 def _safe_question_hash(question: str) -> str:
     import hashlib
 
@@ -856,318 +1019,6 @@ def _grade_debug_payload(grade: EvidenceGrade) -> dict[str, object]:
         "confidence": grade.confidence,
         "reason": grade.reason,
     }
-
-
-_INVENTORY_TRIGGER_NOUNS = {
-    "benefit",
-    "document",
-    "guide",
-    "note",
-    "page",
-    "policy",
-    "project",
-    "section",
-    "setup",
-    "topic",
-}
-
-_INVENTORY_GENERIC_TERMS = {
-    "accessible",
-    "all",
-    "available",
-    "base",
-    "company",
-    "count",
-    "document",
-    "exist",
-    "existing",
-    "found",
-    "knowledge",
-    "list",
-    "many",
-    "note",
-    "number",
-    "page",
-    "section",
-    "show",
-    "there",
-    "total",
-}
-
-
-def _inventory_request_match(
-    question_analysis: QuestionAnalysis,
-    topic_scope: AnswerTopicScope | None,
-) -> InventoryRequestMatch | None:
-    normalized = _normalized_words(question_analysis.original_question)
-    raw_tokens = set(normalized.split())
-    tokens = _content_tokens(question_analysis.original_question)
-    has_inventory_noun = bool(tokens.intersection(_INVENTORY_TRIGGER_NOUNS) or raw_tokens.intersection(_INVENTORY_TRIGGER_NOUNS))
-    has_count_trigger = bool(re.search(r"\b(how many|number of|count|total)\b", normalized))
-    has_list_trigger = bool(re.search(r"\b(list|which|what are|show)\b", normalized))
-    has_available_trigger = bool(re.search(r"\b(available|exist|there are|there is|do we have)\b", normalized))
-    is_inventory = (
-        (has_count_trigger and has_inventory_noun)
-        or (has_list_trigger and has_inventory_noun and has_available_trigger)
-        or (has_list_trigger and tokens.intersection({"project", "benefit", "policy", "setup"}))
-        or (question_analysis.answer_type == "list" and has_inventory_noun and has_available_trigger)
-    )
-    if not is_inventory:
-        return None
-
-    target_tokens = tuple(
-        token
-        for token in tokens
-        if token not in _INVENTORY_GENERIC_TERMS and token not in {"available", "many", "total"}
-    )
-    if not target_tokens and topic_scope:
-        target_tokens = tuple(
-            token
-            for token in _content_tokens(" ".join([topic_scope.topic.name, *topic_scope.retrieval_terms]))
-            if token not in _INVENTORY_GENERIC_TERMS
-        )
-    target_tokens = tuple(dict.fromkeys(target_tokens))
-    section_inventory = "section" in raw_tokens and not tokens.intersection({"project", "benefit", "policy", "setup"})
-    mode = "count" if has_count_trigger else "list"
-    return InventoryRequestMatch(
-        mode=mode,
-        target_tokens=target_tokens,
-        target_label=_target_label(target_tokens, section_inventory=section_inventory),
-        section_inventory=section_inventory,
-    )
-
-
-def _allowed_inventory_documents(documents: list[SourceDocument], access_scope: AccessScope) -> list[SourceDocument]:
-    allowed_acl_tags = set(access_scope.allowed_acl_tags)
-    allowed: list[SourceDocument] = []
-    for document in documents:
-        if document.tenant_id != access_scope.tenant_id:
-            continue
-        if access_scope.source_filters and document.source_system not in access_scope.source_filters:
-            continue
-        document_acl_tags = set(document.acl_tags)
-        if document_acl_tags and not document_acl_tags.intersection(allowed_acl_tags):
-            continue
-        allowed.append(document)
-    return allowed
-
-
-def _matching_inventory_documents(
-    documents: list[SourceDocument],
-    match: InventoryRequestMatch,
-) -> list[SourceDocument]:
-    if not match.target_tokens:
-        return _dedupe_documents(documents)
-    scored: list[tuple[int, str, SourceDocument]] = []
-    target = set(match.target_tokens)
-    required_overlap = 2 if len(target) > 1 else 1
-    for document in documents:
-        section_text = _document_section_text(document)
-        title_text = document.title
-        metadata_text = _document_metadata_text(document)
-        tag_text = " ".join(document.tags)
-        section_tokens = _content_tokens(section_text)
-        title_tokens = _content_tokens(title_text)
-        metadata_tokens = _content_tokens(metadata_text)
-        tag_tokens = _content_tokens(tag_text)
-        overlap = target.intersection(section_tokens | title_tokens | metadata_tokens | tag_tokens)
-        phrase_score = _inventory_phrase_score(" ".join(match.target_tokens), section_text, title_text, metadata_text, tag_text)
-        if len(overlap) < required_overlap and phrase_score <= 0:
-            continue
-        score = len(overlap)
-        score += len(target.intersection(section_tokens)) * 3
-        score += len(target.intersection(title_tokens)) * 2
-        score += len(target.intersection(tag_tokens))
-        score += phrase_score
-        scored.append((score, f"{document.section_path or ''}/{document.title}".lower(), document))
-    scored.sort(key=lambda item: (-item[0], item[1]))
-    return _dedupe_documents([document for _score, _sort_key, document in scored])
-
-
-def _inventory_phrase_score(target_phrase: str, *values: str) -> int:
-    if not target_phrase:
-        return 0
-    score = 0
-    for index, value in enumerate(values):
-        if _contains_phrase(value, target_phrase):
-            score += 8 if index == 0 else 4
-    return score
-
-
-def _dedupe_documents(documents: list[SourceDocument]) -> list[SourceDocument]:
-    deduped: dict[str, SourceDocument] = {}
-    for document in documents:
-        existing = deduped.get(document.source_item_id)
-        if existing is None or document.last_modified_utc > existing.last_modified_utc:
-            deduped[document.source_item_id] = document
-    return sorted(deduped.values(), key=lambda document: ((document.section_path or "").lower(), document.title.lower()))
-
-
-def _format_inventory_answer(match: InventoryRequestMatch, documents: list[SourceDocument]) -> str:
-    if match.section_inventory:
-        return _format_section_inventory_answer(documents)
-
-    count = len(documents)
-    noun = _inventory_noun(match.target_tokens, count=count)
-    section_label = _common_section_label(documents)
-    heading = match.target_label if match.target_label != "Pages" else "Available Pages"
-    location = f" in {section_label}" if section_label and match.target_tokens else ""
-    lead = f"There {'is' if count == 1 else 'are'} {count} accessible {noun}{location}."
-    listed_documents = documents[:25]
-    lines = [f"### {heading}", "", lead]
-    if listed_documents:
-        lines.extend(["", "Page titles:"])
-        lines.extend(f"- {document.title}" for document in listed_documents)
-        if count > len(listed_documents):
-            lines.append(f"- ...and {count - len(listed_documents)} more pages.")
-    return "\n".join(lines)
-
-
-def _format_section_inventory_answer(documents: list[SourceDocument]) -> str:
-    sections: dict[str, int] = {}
-    for document in documents:
-        section = _document_section_text(document) or "Unsectioned"
-        sections[section] = sections.get(section, 0) + 1
-    items = sorted(sections.items(), key=lambda item: item[0].lower())
-    lines = ["### Available Sections", "", f"There {'is' if len(items) == 1 else 'are'} {len(items)} accessible sections."]
-    if items:
-        lines.extend(["", "Sections:"])
-        lines.extend(f"- {section} ({count} {'page' if count == 1 else 'pages'})" for section, count in items[:25])
-        if len(items) > 25:
-            lines.append(f"- ...and {len(items) - 25} more sections.")
-    return "\n".join(lines)
-
-
-def _no_inventory_answer(match: InventoryRequestMatch) -> str:
-    noun = _inventory_noun(match.target_tokens)
-    return f"I could not find any accessible {noun} in the indexed OneNote source titles or sections."
-
-
-def _inventory_response(
-    *,
-    answer: str,
-    documents: list[SourceDocument],
-    request: AnswerRequest,
-    access_scope: AccessScope,
-    candidate_count: int,
-    started: float,
-    suggested_questions: list[str],
-) -> AnswerResponse:
-    citations = [_citation_from_source_document(index, document) for index, document in enumerate(documents[:25], start=1)]
-    duration_ms = int((time.perf_counter() - started) * 1000)
-    retrieval_meta = RetrievalMetadata(
-        strategy="metadata-inventory",
-        access_scope=access_scope,
-        requested_top_k=request.top_k,
-        candidate_count=candidate_count,
-        returned_count=len(documents),
-        filtered_count=0,
-        source_filters=access_scope.source_filters,
-        collections_queried=[],
-        payload_filter={},
-        duration_ms=duration_ms,
-        topic_id=request.topic_id,
-        answer_type="inventory",
-    )
-    return AnswerResponse(
-        answer=answer,
-        citations=citations,
-        retrieval_meta=retrieval_meta,
-        metadata=AnswerMetadata(
-            provider="metadata-inventory",
-            model="source-title-index",
-            retrieval_strategy="metadata-inventory",
-            retrieved_chunk_count=len(citations),
-            source_systems=sorted({document.source_system for document in documents}),
-            duration_ms=duration_ms,
-            retrieval_latency_ms=duration_ms,
-            completion_latency_ms=0,
-            freshness_delay_ms=_freshness_delay_ms(citations),
-            citation_count=len(citations),
-        ),
-        suggested_questions=suggested_questions,
-    )
-
-
-def _citation_from_source_document(index: int, document: SourceDocument) -> Citation:
-    return Citation(
-        index=index,
-        chunk_id=f"inventory:{document.source_item_id}",
-        source_item_id=document.source_item_id,
-        chunk_index=0,
-        title=document.title,
-        source_system=document.source_system,
-        source_container=document.source_container,
-        source_url=document.source_url,
-        section_path=document.section_path,
-        snippet=f"Page title: {document.title}. Section: {_document_section_text(document) or 'N/A'}.",
-        last_modified_utc=document.last_modified_utc,
-        last_edited_by=_metadata_string(
-            document.metadata,
-            "last_edited_by",
-            "lastEditedBy",
-            "last_modified_by",
-            "lastModifiedBy",
-        ),
-        client_url=_metadata_string(document.metadata, "client_url", "oneNoteClientUrl", "onenote_client_url"),
-        metadata={**document.metadata, "inventory_source": True},
-    )
-
-
-def _target_label(target_tokens: tuple[str, ...], *, section_inventory: bool) -> str:
-    if section_inventory:
-        return "Available Sections"
-    if not target_tokens:
-        return "Pages"
-    if "project" in target_tokens:
-        return "Projects"
-    if "benefit" in target_tokens:
-        return "Company Benefits"
-    if "policy" in target_tokens:
-        return "Company Policies"
-    return " ".join(target_tokens).title()
-
-
-def _inventory_noun(target_tokens: tuple[str, ...], *, count: int | None = None) -> str:
-    if "project" in target_tokens:
-        return "project" if count == 1 else "projects"
-    if "benefit" in target_tokens:
-        return "benefit page" if count == 1 else "benefit pages"
-    if "policy" in target_tokens:
-        return "policy page" if count == 1 else "policy pages"
-    if "setup" in target_tokens:
-        return "setup page" if count == 1 else "setup pages"
-    if "guide" in target_tokens:
-        return "guide page" if count == 1 else "guide pages"
-    return "page" if count == 1 else "pages"
-
-
-def _common_section_label(documents: list[SourceDocument]) -> str:
-    sections = {_document_section_name(document) for document in documents}
-    sections.discard("")
-    return next(iter(sections)) if len(sections) == 1 else ""
-
-
-def _document_section_text(document: SourceDocument) -> str:
-    return document.section_path or str(document.metadata.get("section_name") or "").strip()
-
-
-def _document_section_name(document: SourceDocument) -> str:
-    metadata_section = str(document.metadata.get("section_name") or "").strip()
-    if metadata_section:
-        return metadata_section
-    if document.section_path:
-        return document.section_path.rsplit("/", maxsplit=1)[-1].strip()
-    return ""
-
-
-def _document_metadata_text(document: SourceDocument) -> str:
-    values = [
-        document.metadata.get("notebook_name"),
-        document.metadata.get("section_name"),
-        document.metadata.get("page_id"),
-    ]
-    return " ".join(str(value) for value in values if value)
 
 
 def _final_answer_is_valid(
@@ -1217,14 +1068,16 @@ def _merge_retrieval_results(
         )
     )
     primary = results[0].metadata
+    result_limit = min(len(chunks), _ranked_context_limit(question_analysis, top_k))
     metadata = RetrievalMetadata(
         strategy=f"{primary.strategy}+multi-query",
         access_scope=primary.access_scope,
         requested_top_k=top_k,
         candidate_count=sum(result.metadata.candidate_count for result in results),
-        returned_count=min(len(chunks), top_k),
+        returned_count=result_limit,
         filtered_count=sum(result.metadata.filtered_count for result in results),
         source_filters=primary.source_filters,
+        section_filters=primary.section_filters,
         collections_queried=sorted(
             {
                 collection
@@ -1239,7 +1092,7 @@ def _merge_retrieval_results(
         answer_type=question_analysis.required_answer_type,
         duration_ms=sum(result.metadata.duration_ms for result in results),
     )
-    return RetrievalResult(chunks=chunks[:top_k], metadata=metadata)
+    return RetrievalResult(chunks=chunks[:result_limit], metadata=metadata)
 
 
 def _request_with_topic_scope(request: AnswerRequest, topic_scope: AnswerTopicScope | None) -> AnswerRequest:
@@ -1289,6 +1142,167 @@ def _context_budget_for_depth(answer_depth: str) -> int:
     return 7000
 
 
+def _ranked_context_limit(question_analysis: QuestionAnalysis, requested_top_k: int) -> int:
+    if _wants_complete_structured_context(question_analysis):
+        return max(requested_top_k, 8)
+    return requested_top_k
+
+
+def _wants_complete_structured_context(question_analysis: QuestionAnalysis | str) -> bool:
+    if isinstance(question_analysis, QuestionAnalysis):
+        text = " ".join(
+            [
+                question_analysis.original_question,
+                question_analysis.search_text,
+                " ".join(question_analysis.key_phrases),
+                " ".join(question_analysis.important_entities),
+            ]
+        )
+    else:
+        text = question_analysis
+    normalized = _normalized_words(text)
+    return bool(
+        re.search(r"\b(hour by hour|hourly|schedule|agenda|timeline|orientation|first day|day one)\b", normalized)
+        or re.search(r"\b(what to expect|what should expect|what happen|expected on first day)\b", normalized)
+        or (
+            re.search(r"\b(full|complete|entire|all|everything|overview|walk through)\b", normalized)
+            and re.search(r"\b(day|schedule|agenda|timeline|orientation|expect|happen)\b", normalized)
+        )
+    )
+
+
+def _ensure_facet_coverage(
+    question_analysis: QuestionAnalysis,
+    *,
+    selected_chunks: list,
+    candidate_chunks: list,
+    max_chunks: int,
+) -> list:
+    """Guarantee every facet of a multi-intent question is represented.
+
+    For each sub-question without a matching selected chunk, the best-matching
+    candidate is added (or swapped in for the weakest selected chunk when at
+    the limit), so a complex answer can be synthesized from several pages
+    instead of collapsing onto the single page that dominated ranking.
+    """
+    facets = question_analysis.sub_questions
+    if not facets or not candidate_chunks:
+        return selected_chunks
+
+    def _facet_score(facet_tokens: set[str], chunk) -> float:
+        if not facet_tokens:
+            return 0.0
+        chunk_tokens = _content_tokens(
+            " ".join([chunk.title, chunk.section_path or "", chunk.chunk_text, " ".join(chunk.tags)])
+        )
+        return len(facet_tokens & chunk_tokens) / len(facet_tokens)
+
+    selected = list(selected_chunks)
+    selected_ids = {chunk.chunk_id for chunk in selected}
+    for facet in facets:
+        facet_tokens = _content_tokens(facet)
+        if not facet_tokens:
+            continue
+        if any(_facet_score(facet_tokens, chunk) >= 0.34 for chunk in selected):
+            continue
+        best = max(
+            (chunk for chunk in candidate_chunks if chunk.chunk_id not in selected_ids),
+            key=lambda chunk: _facet_score(facet_tokens, chunk),
+            default=None,
+        )
+        if best is None or _facet_score(facet_tokens, best) < 0.34:
+            continue
+        if len(selected) >= max_chunks and selected:
+            selected.pop()  # drop the weakest (last-ranked) chunk
+        selected.append(best)
+        selected_ids.add(best.chunk_id)
+    return selected
+
+
+def _expand_complete_context_chunks(
+    question_analysis: QuestionAnalysis,
+    *,
+    selected_chunks: list,
+    candidate_chunks: list,
+    max_chunks: int,
+) -> list:
+    if not _wants_complete_structured_context(question_analysis) or not selected_chunks:
+        return selected_chunks
+
+    source_order = list(dict.fromkeys(_chunk_parent_page_id(chunk) for chunk in selected_chunks))
+    selected_ids = {chunk.chunk_id for chunk in selected_chunks}
+    additions = [
+        chunk
+        for chunk in candidate_chunks
+        if chunk.chunk_id not in selected_ids
+        and _chunk_parent_page_id(chunk) in source_order
+        and not _is_metadata_only_chunk(chunk)
+    ]
+    if not additions:
+        return _order_complete_context_chunks(selected_chunks, source_order)[:max_chunks]
+    combined = [*selected_chunks, *additions]
+    return _order_complete_context_chunks(combined, source_order)[:max_chunks]
+
+
+def _drop_metadata_chunks_for_complete_context(question_analysis: QuestionAnalysis, chunks: list) -> list:
+    if not _wants_complete_structured_context(question_analysis):
+        return chunks
+    body_sources = {
+        _chunk_parent_page_id(chunk)
+        for chunk in chunks
+        if not _is_metadata_only_chunk(chunk) and _body_text_without_headings(chunk.chunk_text).strip()
+    }
+    if not body_sources:
+        return chunks
+    filtered = [
+        chunk
+        for chunk in chunks
+        if not (
+            (_is_metadata_only_chunk(chunk) or _is_complete_context_noise_chunk(chunk))
+            and _chunk_parent_page_id(chunk) in body_sources
+        )
+    ]
+    return filtered or chunks
+
+
+def _is_complete_context_noise_chunk(chunk) -> bool:
+    normalized = _normalized_words(" ".join([_heading_text(chunk.chunk_text), chunk.chunk_text]))
+    if re.search(r"\b(page metadata|export metadata|quality review|generated date|layout style|onenote html)\b", normalized):
+        return True
+    if re.search(r"\b(owner confirmed|employee facing wording checked|start date dependency reviewed)\b", normalized):
+        return True
+    body = _body_text_without_headings(chunk.chunk_text)
+    lines = [line.strip(" -*\t") for line in body.splitlines() if line.strip()]
+    if not lines:
+        return False
+    metadata_like = sum(
+        1
+        for line in lines
+        if re.match(r"^(generated date|format|layout style|section|source|owner)\s*[:|]", line, re.IGNORECASE)
+    )
+    return metadata_like >= 2 and metadata_like / len(lines) >= 0.5
+
+
+def _order_complete_context_chunks(chunks: list, source_order: list[str]) -> list:
+    order_by_source = {source_id: index for index, source_id in enumerate(source_order)}
+    return sorted(
+        chunks,
+        key=lambda chunk: (
+            order_by_source.get(_chunk_parent_page_id(chunk), len(order_by_source)),
+            chunk.chunk_index,
+            -chunk.score,
+            chunk.title,
+        ),
+    )
+
+
+def _is_metadata_only_chunk(chunk) -> bool:
+    if chunk_kind_of(chunk) == "metadata":
+        return True
+    body_text = _body_text_without_headings(chunk.chunk_text)
+    return not body_text.strip() and bool(_heading_text(chunk.chunk_text).strip())
+
+
 _FENCE_BLOCK = re.compile(r"(```.*?```)", re.DOTALL)
 
 
@@ -1318,6 +1332,68 @@ def _strip_trailing_source_line(answer_text: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _merge_adjacent_code_fences(answer_text: str) -> str:
+    """Join consecutive fenced code blocks of the same language into one block.
+
+    Fragmented per-page code blocks read poorly; when two fences of the same
+    language are separated only by blank lines, they belong together.
+    """
+    pattern = re.compile(
+        r"```([A-Za-z0-9_+-]*)\n(.*?)\n```\s*\n\s*\n?```\1\n",
+        re.DOTALL,
+    )
+    merged = answer_text
+    while True:
+        replaced = pattern.sub(lambda m: f"```{m.group(1)}\n{m.group(2)}\n", merged, count=1)
+        if replaced == merged:
+            return merged
+        merged = replaced
+
+
+def _normalize_markdown_tables(answer_text: str) -> str:
+    lines = answer_text.splitlines()
+    normalized: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped == "|" and normalized and _looks_like_table_row(normalized[-1]):
+            if not normalized[-1].rstrip().endswith("|"):
+                normalized[-1] = f"{normalized[-1].rstrip()} |"
+            continue
+        if _looks_like_table_row(line) and not line.rstrip().endswith("|"):
+            line = f"{line.rstrip()} |"
+        normalized.append(line)
+    return "\n".join(normalized).strip()
+
+
+def _looks_like_table_row(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith("|") and stripped.count("|") >= 1
+
+
+def _dedupe_repeated_markdown_headings(answer_text: str) -> str:
+    seen: set[str] = set()
+    lines: list[str] = []
+    for line in answer_text.splitlines():
+        match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+        if match:
+            key = _normalized_words(match.group(2))
+            if key in seen:
+                replacement_key = "additional detail"
+                if replacement_key in seen:
+                    continue
+                line = f"{match.group(1)} Additional Details"
+                seen.add(replacement_key)
+                lines.append(line)
+                continue
+            seen.add(key)
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def _collapse_excess_blank_lines(answer_text: str) -> str:
+    return re.sub(r"\n{3,}", "\n\n", answer_text).strip()
+
+
 def _is_no_information_text(answer_text: str) -> bool:
     normalized = _normalized_words(answer_text)
     return normalized in {
@@ -1332,86 +1408,7 @@ def _normalize_no_information_text(answer_text: str) -> str:
     return answer_text
 
 
-_STOP_WORDS = {
-    "a",
-    "an",
-    "and",
-    "any",
-    "are",
-    "as",
-    "at",
-    "be",
-    "by",
-    "can",
-    "could",
-    "do",
-    "does",
-    "for",
-    "from",
-    "how",
-    "i",
-    "info",
-    "information",
-    "in",
-    "is",
-    "it",
-    "me",
-    "my",
-    "of",
-    "on",
-    "or",
-    "should",
-    "the",
-    "there",
-    "to",
-    "what",
-    "when",
-    "where",
-    "which",
-    "who",
-    "why",
-    "with",
-    "about",
-    "give",
-    "tell",
-    "whate",
-    "whats",
-    "based",
-    "company",
-    "following",
-    "means",
-    "note",
-    "notes",
-    "page",
-    "provided",
-    "says",
-    "source",
-    "states",
-    "that",
-    "this",
-    "you",
-    "your",
-}
-
-
-def _content_tokens(value: str) -> set[str]:
-    return {
-        _normalize_token(token)
-        for token in re.findall(r"[^\W_]+", value.lower())
-        if len(token) > 2 and token not in _STOP_WORDS
-    }
-
-
-def _normalize_token(token: str) -> str:
-    if len(token) > 5 and token.endswith("ies"):
-        return f"{token[:-3]}y"
-    if len(token) > 5 and token.endswith("ing"):
-        return token[:-3]
-    if len(token) > 4 and token.endswith("es"):
-        return token[:-2]
-    if len(token) > 4 and token.endswith("s") and not token.endswith(("ss", "us", "is")):
-        return token[:-1]
-    return token
+# _STOP_WORDS, _content_tokens, and _normalize_token now live in text_analysis.
 
 
 def _chunk_relevance_score(question: str, chunk) -> float:
@@ -1463,31 +1460,7 @@ def _question_key_phrase(question: str) -> str:
     return " ".join(tokens[-4:])
 
 
-def _contains_phrase(value: str, phrase: str) -> bool:
-    if not phrase:
-        return False
-    normalized_value = _normalized_words(value)
-    return any(variant in normalized_value for variant in _phrase_variants(phrase))
-
-
-def _phrase_variants(phrase: str) -> list[str]:
-    normalized_phrase = _normalized_words(phrase)
-    tokens = normalized_phrase.split()
-    if len(tokens) <= 2:
-        return [normalized_phrase] if normalized_phrase else []
-    variants = [normalized_phrase]
-    for size in range(min(3, len(tokens)), 1, -1):
-        suffix = " ".join(tokens[-size:])
-        if suffix not in variants:
-            variants.append(suffix)
-        prefix = " ".join(tokens[:size])
-        if prefix not in variants:
-            variants.append(prefix)
-    return variants
-
-
-def _normalized_words(value: str) -> str:
-    return " ".join(_normalize_token(token) for token in re.findall(r"[^\W_]+", value.lower()))
+# _contains_phrase, _phrase_variants, and _normalized_words now live in text_analysis.
 
 
 def _line_with_phrase_has_label(value: str, phrase: str) -> bool:
@@ -1575,6 +1548,21 @@ def _answer_matches_current_question(question_analysis: QuestionAnalysis, answer
     answer_body = _answer_without_source_lines(answer_text)
     if _missing_context_backed_focus_token(question_analysis, answer_body, chunks):
         return False
+    # Multi-facet questions: the answer addresses the question when most
+    # facets are covered jointly, even if no single facet dominates the
+    # original wording overlap.
+    if question_analysis.sub_questions:
+        answer_tokens = _content_tokens(answer_body)
+        covered = 0
+        for facet in question_analysis.sub_questions:
+            facet_tokens = _content_tokens(facet)
+            if not facet_tokens:
+                continue
+            overlap = len(facet_tokens & answer_tokens) / len(facet_tokens)
+            if overlap >= 0.3:
+                covered += 1
+        if covered * 2 >= len(question_analysis.sub_questions):
+            return True
     if _answer_directly_addresses_question(question_analysis.original_question, answer_body):
         return True
     if _is_value_question(question_analysis.search_text) and _value_signal_present(answer_body):
@@ -1681,8 +1669,11 @@ def _answer_covers_selected_context(question: str, answer_text: str, chunks: lis
     if not fallback_citations:
         return True
     chunks_by_id = {chunk.chunk_id: chunk for chunk in chunks}
+    # Coverage is measured against the union of all supporting chunks, not
+    # only the single best one: an answer synthesized evenly from several
+    # pages must not be rejected for "missing" parts of page one.
     selected_tokens: set[str] = set()
-    for citation in fallback_citations[:1]:
+    for citation in fallback_citations:
         chunk = chunks_by_id.get(citation.chunk_id)
         if chunk is None:
             continue
@@ -1692,10 +1683,25 @@ def _answer_covers_selected_context(question: str, answer_text: str, chunks: lis
         return True
     answer_tokens = _content_tokens(re.sub(r"\[\d+\]", "", answer_text))
     coverage = len(answer_tokens.intersection(selected_tokens)) / len(selected_tokens)
-    return coverage >= 0.6
+    threshold = 0.6 if len(fallback_citations) == 1 else 0.4
+    return coverage >= threshold
 
 
 def _answer_is_too_narrow_for_structured_question(question: str, answer_text: str, chunks: list) -> bool:
+    if _wants_complete_structured_context(question):
+        context_time_lines: list[str] = []
+        for chunk in chunks:
+            if _chunk_relevance_score(question, chunk) <= 0:
+                continue
+            context_time_lines.extend(
+                line for line in _best_supported_segments(question, chunk) if _clock_time_count(line) > 0
+            )
+        if len(context_time_lines) >= 3:
+            answer_time_count = _clock_time_count(answer_text)
+            latest_time = _latest_clock_time(context_time_lines)
+            return answer_time_count < min(3, len(context_time_lines)) or (
+                bool(latest_time) and latest_time not in answer_text
+            )
     if not _is_value_question(question):
         return False
     context_value_lines: list[str] = []
@@ -1711,12 +1717,68 @@ def _answer_is_too_narrow_for_structured_question(question: str, answer_text: st
     return len(answer_value_lines) < min(2, len(context_value_lines))
 
 
+def _latest_clock_time(lines: list[str]) -> str:
+    latest_minutes = -1
+    latest_value = ""
+    for line in lines:
+        for value in _CLOCK_TIME.findall(line):
+            hour, minute = value.split(":", maxsplit=1)
+            minutes = (int(hour) * 60) + int(minute)
+            if minutes > latest_minutes:
+                latest_minutes = minutes
+                latest_value = value
+    return latest_value
+
+
 def _has_material_unsupported_content(unsupported_tokens: set[str], answer_tokens: set[str]) -> bool:
+    """Ratio-based prose check.
+
+    The old rule (more than two unsupported tokens) rejected any answer the
+    model rephrased in its own words, which forced extractive fallbacks that
+    mirror the source formatting. Verbatim-critical values (numbers, commands,
+    identifiers) are enforced separately by ``_unsupported_critical_values``,
+    so prose only fails when a substantial share of it has no support at all.
+    """
     if not unsupported_tokens:
         return False
-    if len(unsupported_tokens) <= 2 and len(unsupported_tokens) / max(len(answer_tokens), 1) <= 0.25:
-        return False
-    return True
+    return len(unsupported_tokens) / max(len(answer_tokens), 1) > 0.35
+
+
+_CRITICAL_VALUE_PATTERNS = (
+    # numbers incl. decimals, percentages, versions and clock times
+    re.compile(r"\b\d+(?:[.,:]\d+)*%?\b"),
+    # environment-variable style identifiers
+    re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b"),
+    # file paths, URLs and dotted/slashed identifiers (api.dev.example, a/b/c)
+    re.compile(r"\b[\w.-]+(?:/[\w.-]+)+\b"),
+    re.compile(r"\bhttps?://\S+", re.IGNORECASE),
+    # dotted identifiers such as module.name or area.flag-name
+    re.compile(r"\b[a-z][\w-]*\.[a-z][\w.-]+\b"),
+)
+
+# Numbers that commonly appear as list enumeration or generic phrasing; these
+# never count as invented values on their own.
+_TRIVIAL_CRITICAL_VALUES = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "0"}
+
+
+def _critical_value_tokens(value: str) -> set[str]:
+    """Verbatim-critical tokens: values that must never be paraphrased into existence."""
+    without_markers = re.sub(r"\[\d+\]", " ", value)
+    found: set[str] = set()
+    for pattern in _CRITICAL_VALUE_PATTERNS:
+        for match in pattern.findall(without_markers):
+            token = match.strip().strip(".,;:!?")
+            if token and token.lower() not in _TRIVIAL_CRITICAL_VALUES:
+                found.add(token.lower())
+    return found
+
+
+def _unsupported_critical_values(answer_text: str, source_text: str) -> set[str]:
+    answer_values = _critical_value_tokens(answer_text)
+    if not answer_values:
+        return set()
+    haystack = source_text.lower()
+    return {value for value in answer_values if value not in haystack}
 
 
 def _append_missing_citation(answer_text: str, citations: list[Citation]) -> str:
@@ -1945,7 +2007,10 @@ def _select_fallback_citations(question: str, chunks: list, citations: list[Cita
     if not candidates:
         return citations[:1]
     candidates.sort(key=lambda item: (-item[0], item[1].index))
-    limit = 2 if value_question else 3
+    if _wants_complete_structured_context(question):
+        limit = 6
+    else:
+        limit = 2 if value_question else 3
     return [citation for _score, citation in candidates[:limit]]
 
 
@@ -1954,7 +2019,8 @@ def _extractive_answer(question: str, chunks: list, citations: list[Citation]) -
         return NO_INFORMATION_ANSWER
     chunks_by_id = {chunk.chunk_id: chunk for chunk in chunks}
     blocks = []
-    for citation in citations[:3]:
+    citation_limit = 6 if _wants_complete_structured_context(question) else 3
+    for citation in citations[:citation_limit]:
         chunk = chunks_by_id.get(citation.chunk_id)
         lines = _best_supported_segments(question, chunk) if chunk is not None else [citation.snippet.strip()]
         title = _best_supported_heading(question, chunk, citation.title) if chunk is not None else citation.title
@@ -2086,11 +2152,61 @@ def _segment_window(segments: list[tuple[str, bool]], start_index: int) -> str:
     return "\n".join(_segment_window_segments(segments, start_index, include_following=True))
 
 
+_CLOCK_TIME = re.compile(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b")
+
+
+def _clock_time_count(value: str) -> int:
+    return len(_CLOCK_TIME.findall(value))
+
+
+def _has_schedule_like_segments(segments: list[tuple[str, bool]]) -> bool:
+    text_segments = [segment for segment, is_heading in segments if not is_heading]
+    if sum(1 for segment in text_segments if _clock_time_count(segment) > 0) >= 3:
+        return True
+    combined = " ".join(segment for segment, _is_heading in segments)
+    normalized = _normalized_words(combined)
+    return _clock_time_count(combined) >= 3 and bool(
+        re.search(r"\b(schedule|agenda|timeline|orientation|first day|day one)\b", normalized)
+    )
+
+
+def _complete_structured_segments(segments: list[tuple[str, bool]]) -> list[str]:
+    selected: list[str] = []
+    total_chars = 0
+    started = False
+    for segment, is_heading in segments:
+        if is_heading:
+            if selected and started:
+                break
+            started = started or bool(
+                re.search(r"\b(schedule|agenda|timeline|orientation|first day|day one)\b", _normalized_words(segment))
+            )
+            continue
+        if _metadata_or_breadcrumb_segment(segment):
+            continue
+        if not started and _clock_time_count(segment) == 0:
+            continue
+        started = True
+        selected.append(segment)
+        total_chars += len(segment)
+        if len(selected) >= 30 or total_chars >= 6000:
+            break
+    if selected:
+        return selected
+    return [
+        segment
+        for segment, is_heading in segments
+        if not is_heading and not _metadata_or_breadcrumb_segment(segment)
+    ][:12]
+
+
 def _best_supported_segments(question: str, chunk) -> list[str]:
     question_tokens = _content_tokens(question)
     segments = _split_content_segments(chunk.chunk_text)
     if not segments:
         return [chunk.chunk_text.strip()] if chunk.chunk_text.strip() else []
+    if _wants_complete_structured_context(question) and _has_schedule_like_segments(segments):
+        return _complete_structured_segments(segments)
     if not question_tokens:
         return _segment_window_segments(segments, 0, include_following=True)
 
@@ -2197,6 +2313,15 @@ def _heading_is_subtitle_of_fallback(heading: str, fallback_title: str) -> bool:
 def _format_markdown_block(title: str, lines: list[str], citation_index: int, *, question: str) -> str:
     text_lines = [_clean_answer_line(line) for line in lines if not _is_code_segment(line)]
     text_lines = _filter_answer_lines(question, [line for line in text_lines if line])
+    schedule_rows = _schedule_rows(text_lines)
+    if _wants_complete_structured_context(question) and len(schedule_rows) >= 3:
+        heading = title.strip() or "Answer"
+        table = _format_schedule_table(schedule_rows)
+        notes = _schedule_note_lines(text_lines, schedule_rows)
+        if notes:
+            rendered_notes = "\n".join(_format_markdown_bullet(note, citation_index) for note in notes)
+            return f"### {heading}\n\n{table}\n\nAdditional notes:\n\n{rendered_notes}"
+        return f"### {heading}\n\n{table}"
     allowed_text = set(text_lines)
 
     parts: list[str] = []
@@ -2216,6 +2341,53 @@ def _format_markdown_block(title: str, lines: list[str], citation_index: int, *,
         return ""
     heading = title.strip() or "Answer"
     return f"### {heading}\n\n" + "\n".join(parts)
+
+
+_SCHEDULE_ROW = re.compile(
+    r"^\s*(?P<time>(?:[01]?\d|2[0-3]):[0-5]\d(?:\s*(?:-|–|—|to)\s*(?:[01]?\d|2[0-3]):[0-5]\d)?)"
+    r"\s*(?:[-–—:|]\s*)?(?P<body>.+?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _schedule_rows(lines: list[str]) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    for line in lines:
+        match = _SCHEDULE_ROW.match(line)
+        if not match:
+            continue
+        body = match.group("body").strip(" -–—:|")
+        if not body:
+            continue
+        rows.append((_normalize_time_range(match.group("time")), body.rstrip(".!?")))
+    return rows
+
+
+def _normalize_time_range(value: str) -> str:
+    return re.sub(r"\s*(?:-|–|—|to)\s*", " - ", value.strip(), flags=re.IGNORECASE)
+
+
+def _format_schedule_table(rows: list[tuple[str, str]]) -> str:
+    rendered = ["| Time | What happens |", "| --- | --- |"]
+    for time_value, activity in rows:
+        rendered.append(f"| {_escape_table_cell(time_value)} | {_escape_table_cell(activity)} |")
+    return "\n".join(rendered)
+
+
+def _escape_table_cell(value: str) -> str:
+    return value.replace("|", "\\|").strip()
+
+
+def _schedule_note_lines(lines: list[str], rows: list[tuple[str, str]]) -> list[str]:
+    row_bodies = {body for _time_value, body in rows}
+    notes: list[str] = []
+    for line in lines:
+        if _SCHEDULE_ROW.match(line):
+            continue
+        if line in row_bodies or _metadata_or_breadcrumb_segment(line):
+            continue
+        notes.append(line)
+    return notes[:6]
 
 
 def _code_lang(fence_block: str) -> str:
@@ -2297,13 +2469,6 @@ def _body_text_without_headings(value: str) -> str:
 def _heading_text(value: str) -> str:
     heading_segments = [segment for segment, is_heading in _split_content_segments(value) if is_heading]
     return " ".join(heading_segments)
-
-
-def _freshness_delay_ms(citations: list[Citation]) -> int | None:
-    if not citations:
-        return None
-    newest_source_timestamp = max(citation.last_modified_utc.astimezone(UTC) for citation in citations)
-    return max(0, int((datetime.now(UTC) - newest_source_timestamp).total_seconds() * 1000))
 
 
 def _related_attachment_refs(question: str, chunk) -> list[dict]:
@@ -2419,11 +2584,4 @@ def _int_value(value) -> int:
         return 0
 
 
-def _metadata_string(metadata: dict, *keys: str) -> str | None:
-    for key in keys:
-        value = metadata.get(key)
-        if isinstance(value, dict):
-            value = value.get("displayName") or value.get("user", {}).get("displayName")
-        if value:
-            return str(value).strip()
-    return None
+# _freshness_delay_ms and _metadata_string now live in answer_support.

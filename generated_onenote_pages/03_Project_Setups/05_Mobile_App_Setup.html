@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Mobile App Setup</title>
+  <style>body { font-family: Aptos, Arial, sans-serif; color: #1f2933; line-height: 1.45; max-width: 900px; margin: 32px auto; padding: 0 24px; }
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.attach { background: #ebf8ff; border-left: 4px solid #2b6cb0; padding: 10px 12px; }</style>
+</head>
+<body>
+  <article>
+    <h1>Mobile App Setup</h1>
+    <p class="summary">Local setup for the Northwind mobile app (Flutter).</p>
+    <h2>Context</h2>
+    <p>Mobile App Setup is maintained by Mobile Team for software engineers joining a project. This project setup record local setup for the Northwind mobile app (Flutter).</p>
+
+    <h2>Owner and Systems</h2>
+    <dl>
+      <dt>Owner</dt><dd>Mobile Team</dd>
+      <dt>For</dt><dd>software engineers joining a project</dd>
+      <dt>Systems</dt><dd>GitHub, Flutter SDK, Firebase</dd>
+    </dl>
+
+    <h2>Setup Process</h2>
+    <ol>
+      <li>Install Flutter 3.24 and run flutter doctor.</li>
+      <li>Fetch packages and run the analyzer.</li>
+      <li>Run the app against staging and execute tests.</li>
+    </ol>
+
+    <h2>Key Facts</h2>
+    <ul>
+      <li>The mobile app is built with Flutter and targets iOS and Android.</li>
+      <li>Flutter 3.24 is the supported version; mismatched versions fail CI.</li>
+      <li>The app points at the staging API by default via --dart-define.</li>
+      <li>Golden tests verify key screens render pixel-consistently.</li>
+    </ul>
+
+    <h2>Commands</h2>
+    <p class="note">Run from a clean shell and keep the output with the setup or incident record.</p>
+    <pre><code class="language-bash">git clone ssh://git.northwind.local/mobile/northwind-app.git
+cd northwind-app &amp;&amp; flutter pub get
+flutter analyze &amp;&amp; flutter test
+flutter run --dart-define=ENV=staging</code></pre>
+
+    <h2>Systems Involved</h2>
+    <p>This work touches GitHub, Flutter SDK, Firebase.</p>
+  </article>
+</body>
+</html>

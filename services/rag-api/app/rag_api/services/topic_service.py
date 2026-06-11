@@ -9,6 +9,11 @@ from rag_api.services.topic_loader import TopicLoader
 
 NO_ALLOWED_SOURCE_FILTER = "__no_allowed_source__"
 
+# Actors that mark a topic as system-seeded from config (current or legacy
+# cleanup passes) rather than created by an admin. Seed rows whose id is no
+# longer in the config are pruned so emptying topics.json clears old statics.
+_LEGACY_SEED_ACTORS = {"seed", "topic-cleanup"}
+
 
 class TopicNotFoundError(ValueError):
     pass
@@ -19,6 +24,7 @@ class AnswerTopicScope:
     topic: TopicConfig
     user_context: UserContext
     source_filters: list[str]
+    section_filters: list[str]
     retrieval_terms: tuple[str, ...]
 
 
@@ -28,8 +34,33 @@ class TopicService:
         self._store = store
         topics = loader.load() if loader is not None else []
         self._topics = {topic.id: topic for topic in topics}
-        if self._store is not None and topics:
-            self._store.seed_topics_if_empty([_record_from_topic(topic) for topic in topics])
+        if self._store is not None:
+            if topics:
+                self._store.seed_topics_if_empty([_record_from_topic(topic) for topic in topics])
+            self._prune_orphaned_seed_topics()
+
+    def _prune_orphaned_seed_topics(self) -> None:
+        """Remove system-seeded topics that are no longer in the config.
+
+        Auto-managed section topics are owned by topic-sync and left untouched
+        here; admin-created topics use a real user id and are preserved. Only
+        legacy seed/cleanup rows that the current config no longer defines are
+        deleted, so clearing topics.json clears the old static topics too.
+        """
+        if self._store is None or self._loader is None:
+            # Without a loader we do not know the real config, so we must not
+            # delete seed rows we cannot account for.
+            return
+        config_ids = set(self._topics)
+        stale = [
+            record.topic_id
+            for record in self._store.list_topic_records(enabled_only=False)
+            if not record.auto_managed
+            and record.topic_id not in config_ids
+            and record.updated_by_user_id in _LEGACY_SEED_ACTORS
+        ]
+        if stale:
+            self._store.delete_topic_records(stale)
 
     def list_topics(self, user_context: UserContext | None = None) -> list[Topic]:
         topics = self._topic_configs(enabled_only=True)
@@ -63,6 +94,7 @@ class TopicService:
             topic=topic,
             user_context=user_context,
             source_filters=source_filters,
+            section_filters=_unique_clean_values(topic.section_filters),
             retrieval_terms=retrieval_terms,
         )
 
@@ -108,6 +140,10 @@ def _topic_retrieval_terms(topic: TopicConfig) -> tuple[str, ...]:
     return tuple(dict.fromkeys(value.strip() for value in values if value.strip()))
 
 
+def _unique_clean_values(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(value.strip() for value in values if value.strip()))
+
+
 def _normalized_set(values: list[str]) -> set[str]:
     return {value.strip().lower() for value in values if value.strip()}
 
@@ -123,8 +159,11 @@ def _record_from_topic(topic: TopicConfig) -> AppTopicRecord:
         icon=topic.icon,
         acl_tags_json=json_dumps(topic.acl_tags),
         source_filters_json=json_dumps(topic.source_filters),
+        section_filters_json=json_dumps(topic.section_filters),
         retrieval_tags_json=json_dumps(topic.retrieval_tags),
         suggested_questions_json=json_dumps(topic.suggested_questions),
+        section_key=None,
+        auto_managed=False,
         enabled=True,
         created_at_utc=now,
         updated_at_utc=now,
@@ -140,6 +179,7 @@ def _topic_from_record(record: AppTopicRecord) -> TopicConfig:
         icon=record.icon,
         acl_tags=_json_list(record.acl_tags_json),
         source_filters=_json_list(record.source_filters_json),
+        section_filters=_json_list(record.section_filters_json),
         retrieval_tags=_json_list(record.retrieval_tags_json),
         suggested_questions=_json_list(record.suggested_questions_json),
     )

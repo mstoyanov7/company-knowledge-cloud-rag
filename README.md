@@ -9,14 +9,14 @@ The primary user interface is now a custom topic-first frontend under
 - a FastAPI `rag-api` service
 - `/api/v1/topics` for company knowledge areas
 - `/api/v1/answer` for topic-aware, ACL-aware structured answers
-- an OpenAI-compatible `/v1` API kept for legacy Open WebUI reference
+- an OpenAI-compatible `/v1` chat-completions API
 - an OpenAI-compatible outbound LLM adapter for Ollama-compatible models
 - a OneNote ingestion pipeline with delegated Microsoft Graph authentication
 - scheduled OneNote polling, lookback-based content hash checks, and reconciliation
 - shared Pydantic schemas and environment-driven settings
 - PostgreSQL metadata storage, Redis, Qdrant vector storage, and the custom frontend via Docker Compose
 - ACL-aware retrieval and answer assembly with source-title citations
-- Microsoft Entra ID / OIDC configuration for Open WebUI SSO and backend token validation
+- Microsoft Entra ID / OIDC backend token validation
 - secure audit logging, OpenTelemetry hooks, evaluation datasets, and performance-test assets
 
 ## Quick Start
@@ -53,12 +53,6 @@ the RAG API, background workers, OneNote polling, and the Company Knowledge UI:
 - Company Knowledge UI: `http://localhost:5173`
 - RAG API docs: `http://localhost:8080/docs`
 - Qdrant: `http://localhost:6333/dashboard`
-
-Open WebUI is no longer started by default. To start it as a legacy/reference UI:
-
-```bash
-docker compose --profile legacy-openwebui up openwebui
-```
 
 ## Local Commands
 
@@ -143,7 +137,6 @@ curl -X POST http://localhost:8080/v1/chat/completions ^
 
 ## Repository Shape
 
-- `apps/openwebui`: frontend-only notes and local wiring
 - `apps/company-knowledge-ui`: React + TypeScript topic-first frontend
 - `services/rag-api`: FastAPI API and OpenAI-compatible shim
 - `services/sync-worker`: OneNote sync, polling, reconciliation, and indexing
@@ -205,7 +198,7 @@ The Company Knowledge UI keeps the topic-first flow:
 
 1. Choose a knowledge topic.
 2. Work inside a topic-specific assistant workspace.
-3. Ask questions with `Ctrl+Enter`; normal `Enter` adds a new line.
+3. Ask questions with `Enter`; use `Shift+Enter` to add a new line.
 4. Review answers as Markdown knowledge cards with compact citations.
 
 The chat workspace includes:
@@ -214,7 +207,7 @@ The chat workspace includes:
 - per-topic conversation history stored in browser `localStorage`
 - new chat, chat switching, chat deletion, and conversation search
 - right-aligned user bubbles and left-aligned assistant bubbles
-- a bottom composer with multiline input and `Ctrl+Enter` send
+- a bottom composer with multiline input, `Enter` send, and `Shift+Enter` newline
 - a light/dark theme toggle stored in browser `localStorage`
 - suggested follow-up chips before the first message and after assistant answers
 - collapsible source citations under assistant answers
@@ -248,7 +241,6 @@ Freshness is handled through OneNote polling and reconciliation:
 
 ## Security and Evaluation
 
-- Open WebUI can be configured for Microsoft Entra ID sign-in.
 - Backend auth validates Microsoft identity platform JWTs when `AUTH_ENABLED=true`.
 - `groups` and `roles` claims map to backend ACL tags through `AUTH_GROUP_SCOPE_MAP_JSON` and `AUTH_ROLE_SCOPE_MAP_JSON`.
 - Security audit events cover authentication, authorization, retrieval denials, and cited-source access.

@@ -1,0 +1,204 @@
+{
+  "name": "company-knowledge-eval-corpus-v1",
+  "description": "Richer offline corpus for the answer-level harness, mirroring the topic areas in generated_onenote_pages/. Loaded by the mock retriever via MOCK_CORPUS_PATH. ACL tags are deliberately varied so access control is exercised: 'public'/'employees' are broadly visible, while 'hr', 'finance' and 'security' gate sensitive pages.",
+  "documents": [
+    {
+      "source_item_id": "ek-onb-001",
+      "title": "First week plan for new engineers",
+      "section_path": "Onboarding / First week",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "During the first week new engineers set up their workstation, connect to the VPN, complete payroll forms, read the engineering handbook, and meet their onboarding buddy. By Friday they should have committed a small change through the standard pull request workflow.",
+      "tags": ["onboarding", "engineering", "first-week"],
+      "metadata": {"notebook_name": "Onboarding", "section_name": "First week", "last_edited_by": "People Ops"}
+    },
+    {
+      "source_item_id": "ek-onb-002",
+      "title": "Accounts and access on day one",
+      "section_path": "Onboarding / Day one",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "On day one IT provisions the company email account, single sign-on, and the password manager. New hires enable multi-factor authentication, request access to the team chat, and confirm their laptop is enrolled in device management.",
+      "tags": ["onboarding", "access", "it", "day-one"],
+      "metadata": {"notebook_name": "Onboarding", "section_name": "Day one", "last_edited_by": "IT Service Desk"}
+    },
+    {
+      "source_item_id": "ek-it-001",
+      "title": "VPN access and recovery",
+      "section_path": "IT Support / Network",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "To reach internal services off site, install the VPN client and sign in with single sign-on. If the VPN fails to connect, restart the client, confirm the network profile, and if it still fails open an IT support ticket to have the certificate reissued.",
+      "tags": ["it", "vpn", "network", "access", "recovery"],
+      "metadata": {"notebook_name": "IT Support", "section_name": "Network", "last_edited_by": "IT Service Desk"}
+    },
+    {
+      "source_item_id": "ek-it-002",
+      "title": "MFA device replacement",
+      "section_path": "IT Support / Identity",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "When you replace a phone you must move multi-factor authentication to the new device. Remove the old authenticator registration in the identity portal, register the new device, and verify a test sign in before discarding the old phone.",
+      "tags": ["it", "mfa", "identity", "security", "device"],
+      "metadata": {"notebook_name": "IT Support", "section_name": "Identity", "last_edited_by": "IT Service Desk"}
+    },
+    {
+      "source_item_id": "ek-it-003",
+      "title": "Laptop replacement and repair",
+      "section_path": "IT Support / Hardware",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "For a broken or lost laptop, open a hardware ticket with the asset tag. IT ships a replacement within two business days, restores files from the backup profile, and reassigns device management so company applications reinstall automatically.",
+      "tags": ["it", "laptop", "hardware", "repair"],
+      "metadata": {"notebook_name": "IT Support", "section_name": "Hardware", "last_edited_by": "IT Service Desk"}
+    },
+    {
+      "source_item_id": "ek-hr-001",
+      "title": "Paid time off policy",
+      "section_path": "People and HR / Leave",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "Employees accrue paid time off each month and request it through the leave portal at least two weeks in advance. Manager approval is required, and unused days carry over up to a capped balance at the end of the year.",
+      "tags": ["hr", "leave", "pto", "policy"],
+      "metadata": {"notebook_name": "People and HR", "section_name": "Leave", "last_edited_by": "People Ops"}
+    },
+    {
+      "source_item_id": "ek-hr-002",
+      "title": "Health insurance and benefits enrollment",
+      "section_path": "People and HR / Benefits",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "Benefits enrollment opens in the first month. Employees pick a health insurance plan, set up the wellness portal, and nominate beneficiaries. Changes outside the window are only allowed after a qualifying life event.",
+      "tags": ["hr", "benefits", "health", "insurance", "enrollment"],
+      "metadata": {"notebook_name": "People and HR", "section_name": "Benefits", "last_edited_by": "Benefits Team"}
+    },
+    {
+      "source_item_id": "ek-hr-003",
+      "title": "On-call compensation rules",
+      "section_path": "People and HR / Compensation",
+      "acl_tags": ["hr"],
+      "chunk_text": "On-call engineers receive a fixed weekly stipend plus an hourly rate for incidents handled outside working hours. Payments are processed in the following month's payroll. These compensation figures are confidential and managed by HR.",
+      "tags": ["hr", "on-call", "compensation", "payroll", "confidential"],
+      "metadata": {"notebook_name": "People and HR", "section_name": "Compensation", "last_edited_by": "HR Compensation"}
+    },
+    {
+      "source_item_id": "ek-eng-001",
+      "title": "GitHub access and teams",
+      "section_path": "Internal Tools / Source control",
+      "acl_tags": ["employees", "engineering"],
+      "chunk_text": "Repository access is granted through GitHub teams. Request membership in the team that owns the repository, sign the contribution agreement, and enable single sign-on for the organization. Direct collaborator access outside a team is not allowed.",
+      "tags": ["engineering", "github", "access", "source-control", "repository"],
+      "metadata": {"notebook_name": "Internal Tools", "section_name": "Source control", "last_edited_by": "Engineering Enablement"}
+    },
+    {
+      "source_item_id": "ek-eng-002",
+      "title": "Git branching and pull request workflow",
+      "section_path": "Engineering Handbook / Workflow",
+      "acl_tags": ["employees", "engineering"],
+      "chunk_text": "Create a feature branch from main, keep commits small, and open a pull request early. Every pull request needs one approving review and a green continuous integration run before it can merge. Squash merges keep the main history linear.",
+      "tags": ["engineering", "git", "branching", "pull-request", "workflow"],
+      "metadata": {"notebook_name": "Engineering Handbook", "section_name": "Workflow", "last_edited_by": "Engineering Enablement"}
+    },
+    {
+      "source_item_id": "ek-eng-003",
+      "title": "Code review standards",
+      "section_path": "Engineering Handbook / Quality",
+      "acl_tags": ["employees", "engineering"],
+      "chunk_text": "Reviewers check correctness, readability, and test coverage. Leave actionable comments, approve only when blocking concerns are resolved, and aim to respond to a review request within one business day to keep changes flowing.",
+      "tags": ["engineering", "code-review", "quality", "standards"],
+      "metadata": {"notebook_name": "Engineering Handbook", "section_name": "Quality", "last_edited_by": "Engineering Enablement"}
+    },
+    {
+      "source_item_id": "ek-rel-001",
+      "title": "Production release process",
+      "section_path": "Releases and Deployment / Process",
+      "acl_tags": ["employees", "engineering"],
+      "chunk_text": "A production release starts with a release candidate cut from main, a staging soak, and sign off from the on-call engineer. The release is rolled out gradually behind a feature flag while error rates and latency are watched.",
+      "tags": ["release", "deployment", "production", "process"],
+      "metadata": {"notebook_name": "Releases and Deployment", "section_name": "Process", "last_edited_by": "Release Management"}
+    },
+    {
+      "source_item_id": "ek-rel-002",
+      "title": "Rollback procedure",
+      "section_path": "Releases and Deployment / Recovery",
+      "acl_tags": ["employees", "engineering"],
+      "chunk_text": "If a release degrades production, roll back by redeploying the previous release tag and disabling the new feature flag. Confirm recovery on the dashboards, then open an incident review to capture the root cause before retrying.",
+      "tags": ["release", "rollback", "recovery", "incident", "deployment"],
+      "metadata": {"notebook_name": "Releases and Deployment", "section_name": "Recovery", "last_edited_by": "Release Management"}
+    },
+    {
+      "source_item_id": "ek-run-001",
+      "title": "High API latency runbook",
+      "section_path": "Runbooks and Troubleshooting / Performance",
+      "acl_tags": ["employees", "engineering"],
+      "chunk_text": "When API latency spikes, check the load balancer saturation, inspect slow database queries, and look for a recent deployment. Scale out the affected service, and if a query is the cause add the missing index and clear the cache.",
+      "tags": ["runbook", "latency", "performance", "incident", "api"],
+      "metadata": {"notebook_name": "Runbooks and Troubleshooting", "section_name": "Performance", "last_edited_by": "On-Call Engineering"}
+    },
+    {
+      "source_item_id": "ek-run-002",
+      "title": "Database connection errors",
+      "section_path": "Runbooks and Troubleshooting / Database",
+      "acl_tags": ["employees", "engineering"],
+      "chunk_text": "Connection refused errors usually mean the database pool is exhausted or credentials rotated. Verify the secret, restart the connection pool, and raise the pool size if traffic is high. Persistent failures point to a failover in progress.",
+      "tags": ["runbook", "database", "connection", "errors", "troubleshooting"],
+      "metadata": {"notebook_name": "Runbooks and Troubleshooting", "section_name": "Database", "last_edited_by": "On-Call Engineering"}
+    },
+    {
+      "source_item_id": "ek-sec-001",
+      "title": "Secrets vault usage",
+      "section_path": "Internal Tools / Secrets",
+      "acl_tags": ["employees", "engineering"],
+      "chunk_text": "Application secrets live in the secrets vault, never in code or environment files committed to git. Request a scoped token, read secrets at startup, and rotate them on a schedule. Access to each path is logged for audit.",
+      "tags": ["security", "secrets", "vault", "tools"],
+      "metadata": {"notebook_name": "Internal Tools", "section_name": "Secrets", "last_edited_by": "Security Engineering"}
+    },
+    {
+      "source_item_id": "ek-sec-002",
+      "title": "Data classification policy",
+      "section_path": "Security and Compliance / Policy",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "Data is classified as public, internal, confidential, or restricted. Confidential and restricted data must be encrypted at rest and in transit, and may only be shared with people who have a business need to know.",
+      "tags": ["security", "data", "classification", "policy", "compliance"],
+      "metadata": {"notebook_name": "Security and Compliance", "section_name": "Policy", "last_edited_by": "Security Governance"}
+    },
+    {
+      "source_item_id": "ek-sec-003",
+      "title": "Security incident response",
+      "section_path": "Security and Compliance / Incident",
+      "acl_tags": ["security"],
+      "chunk_text": "On a suspected breach, page the security on-call, isolate the affected system, preserve logs, and start the incident record. Only the security team may communicate externally. Containment steps and forensic details are restricted.",
+      "tags": ["security", "incident", "response", "breach", "restricted"],
+      "metadata": {"notebook_name": "Security and Compliance", "section_name": "Incident", "last_edited_by": "Security Operations"}
+    },
+    {
+      "source_item_id": "ek-fin-001",
+      "title": "Expense reimbursement",
+      "section_path": "Finance and Procurement / Expenses",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "Submit expenses in the finance portal within thirty days, attach receipts, and select the correct cost center. Approved expenses are reimbursed in the next payroll cycle. Travel over a set amount needs manager pre-approval.",
+      "tags": ["finance", "expense", "reimbursement", "receipts"],
+      "metadata": {"notebook_name": "Finance and Procurement", "section_name": "Expenses", "last_edited_by": "Finance Operations"}
+    },
+    {
+      "source_item_id": "ek-fin-002",
+      "title": "Vendor invoice processing",
+      "section_path": "Finance and Procurement / Payables",
+      "acl_tags": ["finance"],
+      "chunk_text": "Vendor invoices are matched against the purchase order and the goods receipt before payment. Finance verifies bank details out of band to prevent fraud. Payment terms and approved vendor pricing are confidential to the finance team.",
+      "tags": ["finance", "invoice", "vendor", "payables", "confidential"],
+      "metadata": {"notebook_name": "Finance and Procurement", "section_name": "Payables", "last_edited_by": "Accounts Payable"}
+    },
+    {
+      "source_item_id": "ek-fin-003",
+      "title": "Cloud cost management",
+      "section_path": "Finance and Procurement / Cloud",
+      "acl_tags": ["employees", "engineering", "finance"],
+      "chunk_text": "Cloud spend is tracked per team through cost allocation tags. Teams review a monthly cost report, shut down idle environments, and right size oversized instances. Unexpected spikes trigger an alert to the owning team.",
+      "tags": ["finance", "cloud", "cost", "management", "engineering"],
+      "metadata": {"notebook_name": "Finance and Procurement", "section_name": "Cloud", "last_edited_by": "FinOps"}
+    },
+    {
+      "source_item_id": "ek-att-001",
+      "title": "VPN access and recovery — vpn_troubleshooting_checklist.pdf",
+      "section_path": "IT Support / Network / VPN access and recovery",
+      "acl_tags": ["public", "employees"],
+      "chunk_text": "Checklist: confirm the client version, clear the saved profile, re-run the connection test, capture the diagnostic log, and attach the log id when raising the certificate reissue request. Escalate to network engineering after two failed attempts.",
+      "tags": ["it", "vpn", "checklist", "attachment", "troubleshooting"],
+      "metadata": {"notebook_name": "IT Support", "section_name": "Network", "is_attachment": true, "attachment_name": "vpn_troubleshooting_checklist.pdf", "parent_source_item_id": "ek-it-001", "parent_title": "VPN access and recovery", "last_edited_by": "IT Service Desk"}
+    }
+  ]
+}

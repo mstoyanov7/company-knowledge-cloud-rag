@@ -11,7 +11,8 @@ def test_prompt_builder_enforces_onenote_only_no_information_contract() -> None:
     assert "readable OneNote attachments" in prompt.system_instruction
     assert "Do not use outside knowledge" in prompt.system_instruction
     assert f"reply exactly: {NO_INFORMATION_ANSWER}" in prompt.system_instruction
-    assert "Do not include numeric source markers" in prompt.system_instruction
+    assert "append that block's marker" in prompt.system_instruction
+    assert "Do not add a separate Source or Sources line" in prompt.system_instruction
     assert "Synthesize the retrieved notes into a polished, human-like answer" in prompt.system_instruction
     assert "fenced Markdown code blocks" in prompt.system_instruction
     assert "powershell" in prompt.system_instruction

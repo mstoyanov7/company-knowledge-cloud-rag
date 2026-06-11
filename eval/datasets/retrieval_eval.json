@@ -1,0 +1,70 @@
+{
+  "name": "retrieval-eval-v1",
+  "description": "Labeled corpus + queries for comparing embedding models on retrieval quality. 'paraphrase' queries share little or no vocabulary with the relevant document and are where semantic embeddings should beat the lexical token-hash baseline; 'keyword' queries overlap lexically and both should handle them.",
+  "documents": [
+    {
+      "id": "doc-working-hours",
+      "title": "Working Hours",
+      "text": "Standard working hours are 09:00 to 18:00, Monday to Friday. Flexible start is allowed between 08:00 and 10:00 as long as eight hours are completed. Lunch break is one unpaid hour. Overtime requires manager approval."
+    },
+    {
+      "id": "doc-paid-leave",
+      "title": "Paid Leave",
+      "text": "Employees receive 20 days of annual leave per year. Sick leave is up to 10 days, with a medical note required after three consecutive days. Unpaid leave requires HR approval."
+    },
+    {
+      "id": "doc-remote-work",
+      "title": "Remote Work Policy",
+      "text": "Working remotely is allowed up to three days per week and must be approved by your manager. Staff must remain reachable on Slack during business hours."
+    },
+    {
+      "id": "doc-benefits",
+      "title": "Company Benefits",
+      "text": "Benefits enrollment opens during your first week. Choose your health insurance coverage, activate the wellness portal, and review the retirement savings plan."
+    },
+    {
+      "id": "doc-vpn",
+      "title": "VPN Setup",
+      "text": "To reach internal systems from outside the office, connect through the company VPN client. Sign in with multi-factor authentication using credentials issued by IT support."
+    },
+    {
+      "id": "doc-payroll",
+      "title": "Payroll Onboarding",
+      "text": "New hires must complete payroll forms in the first two days, provide bank account details for salary deposits, and submit tax withholding declarations."
+    },
+    {
+      "id": "doc-flutter",
+      "title": "Flutter Embedded HMI Setup",
+      "text": "Install the Flutter SDK and the embedded toolchain to build the in-vehicle dashboard user interface. Configure the device target and run the HMI application on the head unit."
+    },
+    {
+      "id": "doc-qt-wayland",
+      "title": "Qt Wayland HMI Tool Setup",
+      "text": "Use Qt 6.5 with Wayland support on Linux. Install the Wayland compositor tooling and configure the Qt platform plugin to render the human-machine interface."
+    },
+    {
+      "id": "doc-cpp-renderer",
+      "title": "C++ Renderer Engine Setup",
+      "text": "Build the C++ rendering engine that draws 3D scenes with OpenGL. Set up CMake, link the graphics libraries, and run the sample to display a textured model."
+    },
+    {
+      "id": "doc-ota",
+      "title": "OTA Campaign Simulator Setup",
+      "text": "Define an over-the-air update campaign model and run the simulator to validate rollout stages against a staging backend before release."
+    }
+  ],
+  "queries": [
+    {"query_id": "q-vacation", "question": "How many vacation days do I get each year?", "relevant_ids": ["doc-paid-leave"], "kind": "paraphrase"},
+    {"query_id": "q-sick", "question": "What is the sick day allowance?", "relevant_ids": ["doc-paid-leave"], "kind": "keyword"},
+    {"query_id": "q-start-time", "question": "What time should I begin my workday?", "relevant_ids": ["doc-working-hours"], "kind": "paraphrase"},
+    {"query_id": "q-overtime", "question": "What is the overtime policy?", "relevant_ids": ["doc-working-hours"], "kind": "keyword"},
+    {"query_id": "q-wfh", "question": "Can I do my job from home?", "relevant_ids": ["doc-remote-work"], "kind": "paraphrase"},
+    {"query_id": "q-network", "question": "How do I connect securely to internal systems from outside the office?", "relevant_ids": ["doc-vpn"], "kind": "paraphrase"},
+    {"query_id": "q-health", "question": "Where do I sign up for medical insurance?", "relevant_ids": ["doc-benefits"], "kind": "paraphrase"},
+    {"query_id": "q-salary", "question": "What forms do new hires complete to get paid?", "relevant_ids": ["doc-payroll"], "kind": "paraphrase"},
+    {"query_id": "q-dashboard", "question": "How do I build the in-vehicle dashboard UI with Flutter?", "relevant_ids": ["doc-flutter"], "kind": "keyword"},
+    {"query_id": "q-wayland", "question": "Set up Wayland compositor tooling for the Qt interface", "relevant_ids": ["doc-qt-wayland"], "kind": "keyword"},
+    {"query_id": "q-opengl", "question": "Rendering 3D graphics with OpenGL", "relevant_ids": ["doc-cpp-renderer"], "kind": "keyword"},
+    {"query_id": "q-update", "question": "How do I test rolling out a firmware update over the air?", "relevant_ids": ["doc-ota"], "kind": "paraphrase"}
+  ]
+}

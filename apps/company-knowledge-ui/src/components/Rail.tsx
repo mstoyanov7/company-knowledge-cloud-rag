@@ -27,7 +27,8 @@ type RailProps = {
   onSelectConversation: (conversationId: string) => void;
   onDeleteConversation: (conversationId: string) => void;
   onTogglePin: (conversation: Conversation) => void;
-  onAskPinned: (item: PinnedItem) => void;
+  onOpenPinnedConversation: (item: PinnedItem) => void;
+  onUnpinPinnedConversation: (item: PinnedItem) => void;
   onOpenSearch: () => void;
   isProfileMenuOpen: boolean;
   profileButtonRef: RefObject<HTMLButtonElement | null>;
@@ -46,7 +47,8 @@ export function Rail({
   onSelectConversation,
   onDeleteConversation,
   onTogglePin,
-  onAskPinned,
+  onOpenPinnedConversation,
+  onUnpinPinnedConversation,
   onOpenSearch,
   isProfileMenuOpen,
   profileButtonRef,
@@ -101,15 +103,26 @@ export function Rail({
 
         {pins.length > 0 ? (
           <>
-            <div className="rail__sectlabel">Pinned answers</div>
+            <div className="rail__sectlabel">Pinned chats</div>
             {pins.map((pin) => (
-              <div key={pin.id} className="li-wrap">
-                <button type="button" className="li" onClick={() => onAskPinned(pin)}>
+              <div key={pin.id} className="li-wrap li-wrap--with-actions">
+                <button type="button" className="li" onClick={() => onOpenPinnedConversation(pin)}>
                   <span className="li__ico">
-                    <Pin size={13} aria-hidden="true" />
+                    <MessageSquare size={13} aria-hidden="true" />
                   </span>
-                  <span className="li__label">{pin.question}</span>
+                  <span className="li__label">{pin.title}</span>
                 </button>
+                <span className="li-actions li-actions--single">
+                  <button
+                    type="button"
+                    className="li__pin is-pinned"
+                    onClick={() => onUnpinPinnedConversation(pin)}
+                    aria-label={`Unpin ${pin.title}`}
+                    title="Unpin chat"
+                  >
+                    <Pin size={12} aria-hidden="true" />
+                  </button>
+                </span>
               </div>
             ))}
           </>
@@ -121,37 +134,43 @@ export function Rail({
             {selectedTopicId ? "No chats in this topic yet." : "Pick a topic to start a chat."}
           </div>
         ) : (
-          conversations.map((conversation) => (
-            <div key={conversation.id} className="li-wrap">
-              <button
-                type="button"
-                className={conversation.id === activeConversationId ? "li is-active" : "li"}
-                onClick={() => onSelectConversation(conversation.id)}
-              >
-                <span className="li__ico">
-                  <MessageSquare size={13} aria-hidden="true" />
+          conversations.map((conversation) => {
+            const pinned = isPinned(pins, conversation.id);
+            return (
+              <div key={conversation.id} className="li-wrap li-wrap--with-actions">
+                <button
+                  type="button"
+                  className={conversation.id === activeConversationId ? "li is-active" : "li"}
+                  onClick={() => onSelectConversation(conversation.id)}
+                >
+                  <span className="li__ico">
+                    <MessageSquare size={13} aria-hidden="true" />
+                  </span>
+                  <span className="li__label">{conversation.title}</span>
+                </button>
+                <span className="li-actions">
+                  <button
+                    type="button"
+                    className={pinned ? "li__pin is-pinned" : "li__pin"}
+                    onClick={() => onTogglePin(conversation)}
+                    aria-label={pinned ? "Unpin chat" : "Pin chat"}
+                    title={pinned ? "Unpin chat" : "Pin chat"}
+                  >
+                    <Pin size={12} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="li__del"
+                    onClick={() => onDeleteConversation(conversation.id)}
+                    aria-label={`Delete ${conversation.title}`}
+                    title="Delete chat"
+                  >
+                    <Trash2 size={13} aria-hidden="true" />
+                  </button>
                 </span>
-                <span className="li__label">{conversation.title}</span>
-              </button>
-              <button
-                type="button"
-                className={isPinned(pins, conversation.id) ? "li__pin is-pinned" : "li__pin"}
-                onClick={() => onTogglePin(conversation)}
-                aria-label={isPinned(pins, conversation.id) ? "Unpin" : "Pin"}
-                title={isPinned(pins, conversation.id) ? "Unpin" : "Pin"}
-              >
-                <Pin size={12} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="li__del"
-                onClick={() => onDeleteConversation(conversation.id)}
-                aria-label={`Delete ${conversation.title}`}
-              >
-                <Trash2 size={13} aria-hidden="true" />
-              </button>
-            </div>
-          ))
+              </div>
+            );
+          })
         )}
       </div>
 

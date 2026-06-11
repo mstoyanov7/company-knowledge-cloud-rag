@@ -1,0 +1,8 @@
+web-app environment variables
+=============================
+
+Example environment values for local development.
+
+* VITE_API_BASE_URL=https://api.dev.northwind.local
+* VITE_FEATURE_NEW_CART=true
+* VITE_SENTRY_DSN= (leave blank locally)

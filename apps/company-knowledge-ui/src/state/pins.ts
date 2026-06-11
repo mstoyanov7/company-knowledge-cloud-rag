@@ -1,12 +1,11 @@
 import { safeParseJson, type StorageLike } from "./storage";
 
-// Pinned answers — real, persisted in localStorage (same approach as
-// conversations). Lets a user keep useful questions one click away.
+// Pinned chat sessions, persisted in localStorage alongside conversations.
 const PINS_KEY = "companyKnowledgePins.v1";
 
 export type PinnedItem = {
   id: string;
-  question: string;
+  title: string;
   topicId: string;
 };
 
@@ -17,11 +16,12 @@ export function loadPins(storage: StorageLike = window.localStorage): PinnedItem
       if (!value || typeof value !== "object") {
         return null;
       }
-      const item = value as Partial<PinnedItem>;
-      if (!item.id || !item.question || !item.topicId) {
+      const item = value as Partial<PinnedItem> & { question?: string };
+      const title = item.title || item.question;
+      if (!item.id || !title || !item.topicId) {
         return null;
       }
-      return { id: String(item.id), question: String(item.question), topicId: String(item.topicId) };
+      return { id: String(item.id), title: String(title), topicId: String(item.topicId) };
     })
     .filter((item): item is PinnedItem => item !== null);
 }

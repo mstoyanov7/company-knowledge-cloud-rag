@@ -46,7 +46,6 @@ Push-Location $RepoRoot
 try {
     $envValues = Read-DotEnv $EnvPath
     $ragApiPort = Get-Setting $envValues "RAG_API_PORT" "8080"
-    $openWebUiPort = Get-Setting $envValues "OPENWEBUI_PORT" "3000"
     $qdrantPort = Get-Setting $envValues "QDRANT_PORT" "6333"
     $ragApiKey = Get-Setting $envValues "RAG_API_KEY" "cloudrag-rag-key"
     $postgresUser = Get-Setting $envValues "POSTGRES_USER" "cloudrag"
@@ -58,7 +57,6 @@ try {
     Write-Host ""
     Write-Host "HTTP endpoints"
     @(
-        Test-HttpEndpoint "Open WebUI" "http://localhost:$openWebUiPort"
         Test-HttpEndpoint "RAG API health" "http://localhost:$ragApiPort/health"
         Test-HttpEndpoint "RAG API ready" "http://localhost:$ragApiPort/ready"
         Test-HttpEndpoint "Qdrant" "http://localhost:$qdrantPort/collections"

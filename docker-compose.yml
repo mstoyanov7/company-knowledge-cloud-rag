@@ -17,16 +17,6 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7
-    ports:
-      - "${REDIS_PORT}:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   qdrant:
     image: qdrant/qdrant:latest
     ports:
@@ -44,8 +34,6 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
       RAG_API_PORT: 8080
@@ -55,8 +43,6 @@ services:
       - ./.cache:/workspace/.cache
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       qdrant:
         condition: service_started
@@ -95,16 +81,12 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
     volumes:
       - ./.cache:/workspace/.cache
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       qdrant:
         condition: service_started
@@ -119,8 +101,6 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
     volumes:
@@ -128,44 +108,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
       qdrant:
         condition: service_started
 
-  openwebui:
-    profiles:
-      - legacy-openwebui
-    image: ghcr.io/open-webui/open-webui:main
-    ports:
-      - "${OPENWEBUI_PORT}:8080"
-    environment:
-      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
-      ENABLE_PERSISTENT_CONFIG: ${ENABLE_PERSISTENT_CONFIG}
-      ENABLE_OLLAMA_API: ${ENABLE_OLLAMA_API}
-      ENABLE_OPENAI_API: "true"
-      OPENAI_API_BASE_URL: http://rag-api:8080/v1
-      OPENAI_API_BASE_URLS: http://rag-api:8080/v1
-      OPENAI_API_KEY: ${MOCK_API_KEY}
-      OPENAI_API_KEYS: ${MOCK_API_KEY}
-      WEBUI_URL: ${WEBUI_URL}
-      ENABLE_OAUTH_SIGNUP: ${ENABLE_OAUTH_SIGNUP}
-      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
-      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
-      MICROSOFT_CLIENT_TENANT_ID: ${MICROSOFT_CLIENT_TENANT_ID}
-      MICROSOFT_REDIRECT_URI: ${MICROSOFT_REDIRECT_URI}
-      OPENID_PROVIDER_URL: ${OPENID_PROVIDER_URL}
-      OAUTH_SCOPES: ${OAUTH_SCOPES}
-      OAUTH_GROUP_CLAIM: ${OAUTH_GROUP_CLAIM}
-      ENABLE_OAUTH_GROUP_MANAGEMENT: ${ENABLE_OAUTH_GROUP_MANAGEMENT}
-      ENABLE_OAUTH_GROUP_CREATION: ${ENABLE_OAUTH_GROUP_CREATION}
-    volumes:
-      - open-webui-data:/app/backend/data
-    depends_on:
-      rag-api:
-        condition: service_healthy
-
 volumes:
-  open-webui-data:
   postgres-data:
   qdrant-data:

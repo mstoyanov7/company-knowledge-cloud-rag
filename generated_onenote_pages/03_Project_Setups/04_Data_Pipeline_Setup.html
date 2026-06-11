@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Data Pipeline Setup</title>
+  <style>body { font-family: Aptos, Arial, sans-serif; color: #1f2933; line-height: 1.45; max-width: 900px; margin: 32px auto; padding: 0 24px; }
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.attach { background: #ebf8ff; border-left: 4px solid #2b6cb0; padding: 10px 12px; }</style>
+</head>
+<body>
+  <article>
+    <h1>Data Pipeline Setup</h1>
+    <p class="summary">Local setup for the analytics data pipeline (Python/Airflow).</p>
+    <h2>Purpose</h2>
+    <p>Data Pipeline Setup is maintained by Data Team for software engineers joining a project. This project setup record local setup for the analytics data pipeline (Python/Airflow).</p>
+
+    <h2>Key Facts</h2>
+    <ul>
+      <li>The pipeline orchestrates daily ETL jobs with Apache Airflow.</li>
+      <li>Airflow runs locally on port 8080 with the example DAGs disabled.</li>
+      <li>Source data is mocked from data/fixtures during local runs.</li>
+      <li>The dbt models build into a local DuckDB file for fast iteration.</li>
+    </ul>
+
+    <h2>Setup Process</h2>
+    <ol>
+      <li>Start Airflow with the provided docker compose file.</li>
+      <li>Seed local fixtures.</li>
+      <li>Trigger the daily_etl DAG and confirm success.</li>
+    </ol>
+
+    <h2>Ownership</h2>
+    <table>
+      <tr><th>Owner team</th><td>Data Team</td></tr>
+      <tr><th>Audience</th><td>software engineers joining a project</td></tr>
+      <tr><th>Systems</th><td>GitHub, Airflow, dbt, DuckDB</td></tr>
+    </table>
+
+    <h2>Systems Involved</h2>
+    <p>This work touches GitHub, Airflow, dbt, DuckDB.</p>
+
+    <h2>Commands</h2>
+    <p class="note">Run from a clean shell and keep the output with the setup or incident record.</p>
+    <pre><code class="language-bash">git clone ssh://git.northwind.local/data/analytics-pipeline.git
+cd analytics-pipeline &amp;&amp; docker compose up -d airflow
+python scripts/seed_fixtures.py
+airflow dags trigger daily_etl
+dbt build --profiles-dir profiles/local</code></pre>
+
+    <h2>What To Keep</h2>
+    <p>Keep the setup ticket, bootstrap output, verification log with the related ticket or record.</p>
+  </article>
+</body>
+</html>

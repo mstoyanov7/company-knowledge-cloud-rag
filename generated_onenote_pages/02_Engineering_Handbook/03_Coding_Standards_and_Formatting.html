@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Coding Standards and Formatting</title>
+  <style>body { font-family: Aptos, Arial, sans-serif; color: #1f2933; line-height: 1.45; max-width: 900px; margin: 32px auto; padding: 0 24px; }
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid #d9e2ec; padding-bottom: 4px; }
+p.summary { font-size: 15px; margin-top: 0; color: #334e68; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #bcccdc; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #f0f4f8; width: 210px; }
+dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 12px 0; }
+dt { font-weight: 700; color: #334e68; }
+dd { margin: 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+pre { background: #102a43; color: #f0f4f8; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { font-family: Consolas, "Courier New", monospace; }
+.note { background: #fffbea; border-left: 4px solid #f0b429; padding: 10px 12px; }
+.attach { background: #ebf8ff; border-left: 4px solid #2b6cb0; padding: 10px 12px; }</style>
+</head>
+<body>
+  <article>
+    <h1>Coding Standards and Formatting</h1>
+    <p class="summary">Language formatters and linters enforced in CI.</p>
+    <h2>Context</h2>
+    <p>Coding Standards and Formatting is maintained by Architecture Office for all software engineers. This engineering standard language formatters and linters enforced in CI.</p>
+
+    <h2>Owner and Systems</h2>
+    <dl>
+      <dt>Owner</dt><dd>Architecture Office</dd>
+      <dt>For</dt><dd>all software engineers</dd>
+      <dt>Systems</dt><dd>CI Pipeline, GitHub, pre-commit</dd>
+    </dl>
+
+    <h2>How We Apply It</h2>
+    <ol>
+      <li>Install the pre-commit hooks with &#x27;pre-commit install&#x27;.</li>
+      <li>Run formatters locally before pushing.</li>
+      <li>Fix lint and type errors rather than suppressing them.</li>
+    </ol>
+
+    <h2>Key Facts</h2>
+    <ul>
+      <li>Python uses ruff and black; TypeScript uses ESLint and Prettier.</li>
+      <li>Formatting is enforced in CI and a failing format check blocks merge.</li>
+      <li>Maximum line length is 100 characters for Python and 100 for TypeScript.</li>
+      <li>Public functions require docstrings or JSDoc describing parameters and return values.</li>
+      <li>Type checking runs with mypy (strict) and tsc (strict) on every PR.</li>
+    </ul>
+
+    <h2>Attachments</h2>
+    <p class="attach">The files below are generated next to this page. Attach them to the OneNote page so their content is indexed and searchable.</p>
+    <ul>
+      <li><strong>coding-standards.md</strong> &mdash; The normative coding standards enforced across repositories. <em>(attach this file to the OneNote page)</em></li>
+    </ul>
+
+    <h2>Systems Involved</h2>
+    <p>This work touches CI Pipeline, GitHub, pre-commit.</p>
+  </article>
+</body>
+</html>

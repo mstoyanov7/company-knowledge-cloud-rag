@@ -402,6 +402,41 @@ def _subject_concept_tokens(question_analysis: QuestionAnalysis) -> set[str]:
     return {token for token in tokens if token not in _GENERIC_TOPIC_TERMS and token not in _WEAK_QUERY_TERMS}
 
 
+def subject_supports_confident_grade(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> bool:
+    """Whether a chunk may be graded a confident (direct/partial) answer.
+
+    A confident grade requires the question's distinctive subject to appear where a
+    page declares what it is about - its title or section path - or to match as a
+    strong distinctive phrase. A lone generic token surfacing in the body (e.g.
+    "model" inside an unrelated setup guide) is not enough. This stops a setup
+    guide for a different product from being treated as a direct answer just
+    because it shares scaffolding words, while still letting a body-only answer
+    through when the distinctive phrase itself is present. Returns ``True`` when the
+    question has no distinctive subject, leaving generic questions ungated.
+    """
+    subject_tokens = _subject_concept_tokens(question_analysis)
+    if not subject_tokens:
+        return True
+    title_section_tokens = _content_tokens(" ".join([chunk.title, chunk.section_path or ""]))
+    if subject_tokens.intersection(title_section_tokens):
+        return True
+    if _has_fuzzy_metadata_token_match(subject_tokens, chunk):
+        return True
+    # A strong key-phrase match means the distinctive phrase (not a single shared
+    # word) is present, so a body-only answer is still allowed through.
+    if _key_phrase_score(question_analysis, chunk) >= 6.0:
+        return True
+    # Body-only answers are allowed when the distinctive subject is present
+    # *substantially* - several of its tokens, or a clear majority of a small
+    # subject - not a lone coincidental word. "overtime" (the whole subject) in a
+    # Working Hours page passes; "model" alone, 1 of {model, viewer, ...} for an
+    # OpenGL question landing on an unrelated setup guide, does not.
+    body_overlap = subject_tokens.intersection(_content_tokens(chunk.chunk_text))
+    if not body_overlap:
+        return False
+    return len(body_overlap) >= 2 or (len(body_overlap) / len(subject_tokens)) >= 0.5
+
+
 def _has_must_have_concept(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> bool:
     must_tokens = _concept_tokens(question_analysis.must_have_concepts)
     if not must_tokens:

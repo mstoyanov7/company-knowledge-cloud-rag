@@ -13,8 +13,8 @@ from shared_schemas import AppSettings, OneNoteCheckpoint, SourceAttachment, Sou
 from graph_connectors.onenote.connector import OneNoteConnector
 from graph_connectors.onenote.models import OneNotePage, OneNoteSection, OneNoteSite
 from sync_worker.ingestion import (
+    ChunkEmbedder,
     CompositeFileExtractor,
-    DeterministicEmbedder,
     READABLE_ATTACHMENT_EXTENSIONS,
     TextChunker,
     compute_bytes_hash,
@@ -39,7 +39,7 @@ class OneNoteSyncService:
         parser: OneNoteHtmlParser,
         normalizer: OneNoteDocumentNormalizer,
         chunker: TextChunker,
-        embedder: DeterministicEmbedder,
+        embedder: ChunkEmbedder,
         metadata_store: MetadataStorePort,
         vector_store: VectorStorePort,
         resource_hook: OneNoteResourceHook,
@@ -89,6 +89,10 @@ class OneNoteSyncService:
     def _sync(self, mode: SyncMode, *, reconcile_inventory: bool) -> SyncReport:
         started = time.perf_counter()
         self._ensure_storage()
+        # Bootstrap is a full rebuild: re-embed and re-upsert every page even when
+        # its content hash is unchanged, so a freshly (re)created vector collection
+        # is fully repopulated. Incremental keeps the unchanged-hash fast path.
+        force_reindex = mode == SyncMode.bootstrap
 
         site, notebooks, sections = self.connector.resolve_scope()
         allowed_notebook_ids = {notebook.id for notebook in notebooks}
@@ -133,8 +137,22 @@ class OneNoteSyncService:
                 )
                 for page in scoped_pages:
                     processed_source_ids.add(self._source_item_id(page))
+                    try:
+                        self._process_page(site=site, page=page, report=report, force_reindex=force_reindex)
+                    except Exception as error:
+                        # A single page failing (e.g. Graph 429 throttling that
+                        # outlasts retries) must not abort the whole job. Skip it
+                        # and leave the cursor behind it so the next incremental
+                        # run picks it up.
+                        report.items_failed += 1
+                        self.logger.warning(
+                            "event=onenote_page_failed scope=%s page_id=%s error=%s",
+                            self.settings.onenote_scope_key,
+                            page.id,
+                            error,
+                        )
+                        continue
                     last_cursor = max_timestamp(last_cursor, page.last_modified_utc)
-                    self._process_page(site=site, page=page, report=report)
                 if not next_url:
                     break
 
@@ -169,13 +187,14 @@ class OneNoteSyncService:
         report.checkpoint = checkpoint
 
         self.logger.info(
-            "event=onenote_sync_completed job=%s scope=%s items_seen=%s changed=%s skipped=%s deleted=%s chunks_written=%s cursor=%s",
+            "event=onenote_sync_completed job=%s scope=%s items_seen=%s changed=%s skipped=%s deleted=%s failed=%s chunks_written=%s cursor=%s",
             report.job_name,
             report.scope_key,
             report.items_seen,
             report.items_changed,
             report.items_skipped,
             report.items_deleted,
+            report.items_failed,
             report.chunks_written,
             checkpoint.last_modified_cursor_utc.isoformat() if checkpoint.last_modified_cursor_utc else None,
         )
@@ -192,7 +211,9 @@ class OneNoteSyncService:
                 self.items_counter.add(value, {"mode": mode.value, "state": state})
         return report
 
-    def _process_page(self, *, site: OneNoteSite, page: OneNotePage, report: SyncReport) -> None:
+    def _process_page(
+        self, *, site: OneNoteSite, page: OneNotePage, report: SyncReport, force_reindex: bool = False
+    ) -> None:
         html = self.connector.client.get_page_content(page.content_url)
         parsed = self.parser.parse(html)
         self.resource_hook.handle_resources(page.id, parsed.resources)
@@ -213,7 +234,7 @@ class OneNoteSyncService:
             document = document.model_copy(update={"metadata": metadata})
         existing = self.metadata_store.get_source_document(document.source_item_id)
 
-        if existing and not self._document_changed(existing, document) and not attachment_changed:
+        if existing and not force_reindex and not self._document_changed(existing, document) and not attachment_changed:
             if existing.last_modified_utc != document.last_modified_utc:
                 self.metadata_store.upsert_source_document(self.settings.onenote_scope_key, document)
             report.items_skipped += 1
@@ -528,6 +549,10 @@ class OneNoteSyncService:
                 existing.title != current.title,
                 existing.section_path != current.section_path,
                 existing.source_url != current.source_url,
+                # A change in the access-tag mapping must re-index the page even
+                # when its content is byte-for-byte identical; otherwise the page
+                # would keep stale ACL tags until its text next changes.
+                sorted(existing.acl_tags) != sorted(current.acl_tags),
                 existing.metadata.get("section_id") != current.metadata.get("section_id"),
                 existing.metadata.get("notebook_id") != current.metadata.get("notebook_id"),
                 existing.metadata.get("page_order") != current.metadata.get("page_order"),

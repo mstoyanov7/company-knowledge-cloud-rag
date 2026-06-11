@@ -598,6 +598,127 @@ def test_answer_service_expands_too_narrow_structured_model_answer() -> None:
     assert "- **Lunch break:** 1 hour (unpaid)" in response.answer
 
 
+def test_answer_service_expands_full_first_day_schedule_across_chunks() -> None:
+    import asyncio
+
+    source_item_id = "onenote:first-day-orientation"
+    chunks = [
+        _chunk(
+            "# Onboarding - 02 First Day Orientation\n"
+            "Section: Onboarding\n"
+            "Owner: HR Onboarding Team\n"
+            "Summary: First-day onboarding guide covering welcome session and agenda.",
+            title="First Day Orientation",
+            chunk_id="first-day-metadata",
+        ).model_copy(
+            update={
+                "source_item_id": source_item_id,
+                "chunk_index": 0,
+                "chunk_kind": "metadata",
+                "metadata": {"chunk_kind": "metadata"},
+            }
+        ),
+        _chunk(
+            "# First Day Orientation\n"
+            "09:00 - 09:30 Welcome breakfast and badge pickup.\n"
+            "10:00 - 10:45 HR paperwork and benefits overview.\n"
+            "11:00 - 11:45 Workstation setup with IT.",
+            title="First Day Orientation",
+            chunk_id="first-day-0",
+        ).model_copy(update={"source_item_id": source_item_id, "chunk_index": 1}),
+        _chunk(
+            "# First Day Orientation\n"
+            "12:00 - 13:00 Lunch with the team.\n"
+            "13:00 - 14:00 Security and compliance briefing.\n"
+            "14:00 - 15:00 Product and project overview.",
+            title="First Day Orientation",
+            chunk_id="first-day-1",
+        ).model_copy(update={"source_item_id": source_item_id, "chunk_index": 2}),
+        _chunk(
+            "# First Day Orientation\n"
+            "15:00 - 16:00 Meet your manager and confirm first-week goals.\n"
+            "16:00 - 17:00 Pairing session with your onboarding buddy.\n"
+            "18:00 - 18:15 End-of-day wrap-up and questions.",
+            title="First Day Orientation",
+            chunk_id="first-day-2",
+        ).model_copy(update={"source_item_id": source_item_id, "chunk_index": 3}),
+        _chunk(
+            "# Quality Review\n"
+            "- Owner confirmed.\n"
+            "- Start-date dependency reviewed.\n"
+            "- Employee-facing wording checked.",
+            title="First Day Orientation",
+            chunk_id="first-day-review",
+        ).model_copy(update={"source_item_id": source_item_id, "chunk_index": 4}),
+        _chunk(
+            "# Export Metadata\n"
+            "| Field | Value |\n"
+            "| --- | --- |\n"
+            "| Generated Date | 2026-06-02 |\n"
+            "| Format | OneNote HTML |\n"
+            "| Layout Style | agenda |",
+            title="First Day Orientation",
+            chunk_id="first-day-export",
+        ).model_copy(update={"source_item_id": source_item_id, "chunk_index": 5}),
+    ]
+
+    response = asyncio.run(
+        _answer_with_static_llm_for_chunks(
+            "What should I expect on my first day of work?",
+            chunks,
+            (
+                "On your first day, you have welcome breakfast at 09:00, HR paperwork at 10:00, "
+                "and workstation setup at 11:00. [1]"
+            ),
+        )
+    )
+
+    assert response.answer.startswith("### First Day Orientation")
+    assert "| Time | What happens |" in response.answer
+    assert "09:00 - 09:30" in response.answer
+    assert "18:00 - 18:15" in response.answer
+    assert "End-of-day wrap-up and questions" in response.answer
+    assert "Page:" not in response.answer
+    assert "Owner:" not in response.answer
+    assert "Summary:" not in response.answer
+    assert "Owner confirmed" not in response.answer
+    assert "Generated Date" not in response.answer
+    assert "OneNote HTML" not in response.answer
+    assert len(response.citations) == 3
+
+
+def test_answer_service_repairs_dangling_markdown_table_pipes() -> None:
+    import asyncio
+
+    response = asyncio.run(
+        _answer_with_static_llm(
+            "What is the first day schedule?",
+            _chunk(
+                "# First Day Orientation\n"
+                "09:00 - 09:30 Welcome breakfast.\n"
+                "10:00 - 10:45 HR paperwork.\n"
+                "11:00 - 11:45 Workstation setup.",
+                title="First Day Orientation",
+            ),
+            (
+                "### First Day Orientation\n\n"
+                "| Time | Activity |\n"
+                "| --- | --- |\n"
+                "| 09:00 - 09:30 | Welcome breakfast.\n"
+                "|\n"
+                "| 10:00 - 10:45 | HR paperwork.\n"
+                "|\n"
+                "| 11:00 - 11:45 | Workstation setup. [1]\n"
+                "|"
+            ),
+        )
+    )
+
+    assert "| 09:00 - 09:30 | Welcome breakfast. |" in response.answer
+    assert "| 11:00 - 11:45 | Workstation setup. |" in response.answer
+    assert "\n|\n" not in response.answer
+
+
 def test_answer_service_answers_specific_overtime_question_from_matching_line() -> None:
     import asyncio
 

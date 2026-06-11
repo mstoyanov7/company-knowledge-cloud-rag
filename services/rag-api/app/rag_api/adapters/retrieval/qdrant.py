@@ -17,7 +17,9 @@ from shared_schemas import (
     RetrievalResult,
 )
 
-from rag_api.adapters.embeddings import DeterministicQueryEmbedder
+from shared_schemas.embeddings import Embedder
+
+from rag_api.adapters.embeddings import build_query_embedder
 from rag_api.services.query_understanding import canonical_key_phrase
 from rag_api.services.retrieval_ranking import fuzzy_metadata_relevance_score
 
@@ -30,9 +32,9 @@ _LEXICAL_SCAN_HARD_CAP = 100_000
 class QdrantAclRetriever:
     name = "qdrant-hybrid-acl"
 
-    def __init__(self, settings: AppSettings, *, embedder: DeterministicQueryEmbedder | None = None) -> None:
+    def __init__(self, settings: AppSettings, *, embedder: Embedder | None = None) -> None:
         self.settings = settings
-        self.embedder = embedder or DeterministicQueryEmbedder(settings)
+        self.embedder = embedder or build_query_embedder(settings)
         self.client = QdrantClient(url=settings.qdrant_url)
 
     async def retrieve(self, request: RetrievalRequest) -> RetrievalResult:
@@ -42,8 +44,12 @@ class QdrantAclRetriever:
 
         access_scope = request.access_scope
         collections = self._collections_for_request(request)
-        payload_filter = self.build_payload_filter(access_scope, focus_source_item_ids=request.focus_source_item_ids)
-        query_vector = self.embedder.embed_text(request.question)
+        payload_filter = self.build_payload_filter(
+            access_scope,
+            section_filters=request.section_filters,
+            focus_source_item_ids=request.focus_source_item_ids,
+        )
+        query_vector = self.embedder.embed_query(request.question)
         candidates: list[ChunkDocument] = []
         collections_queried: list[str] = []
 
@@ -90,6 +96,7 @@ class QdrantAclRetriever:
                 returned_count=len(chunks),
                 filtered_count=0,
                 source_filters=access_scope.source_filters,
+                section_filters=request.section_filters,
                 collections_queried=collections_queried,
                 payload_filter=payload_filter.model_dump(mode="json", by_alias=True, exclude_none=True),
                 duration_ms=duration_ms,
@@ -175,6 +182,7 @@ class QdrantAclRetriever:
     def build_payload_filter(
         access_scope: AccessScope,
         *,
+        section_filters: list[str] | None = None,
         focus_source_item_ids: list[str] | None = None,
     ) -> models.Filter:
         acl_tags = access_scope.allowed_acl_tags or ["__no_allowed_acl_tags__"]
@@ -193,6 +201,14 @@ class QdrantAclRetriever:
                 models.FieldCondition(
                     key="source_system",
                     match=models.MatchAny(any=access_scope.source_filters),
+                )
+            )
+        section_names = [value.strip() for value in section_filters or [] if value.strip()]
+        if section_names:
+            must.append(
+                models.FieldCondition(
+                    key="metadata.section_name",
+                    match=models.MatchAny(any=section_names),
                 )
             )
         if focus_source_item_ids:

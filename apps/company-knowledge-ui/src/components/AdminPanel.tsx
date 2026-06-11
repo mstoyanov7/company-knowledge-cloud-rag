@@ -1,6 +1,7 @@
 import {
   Badge,
   Building2,
+  ChevronDown,
   Check,
   Layers,
   Palette,
@@ -14,6 +15,7 @@ import {
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import {
+  activateUser,
   approveUser,
   createAdminTopic,
   disableAdminTopic,
@@ -28,6 +30,7 @@ import {
 } from "../api/admin";
 import type { UserProfile } from "../api/auth";
 import type { TopicAdmin } from "../api/topics";
+import { getTopicIcon, TOPIC_ICON_OPTIONS } from "./topicIcon";
 import { useToast } from "./ToastProvider";
 
 type AdminPanelProps = {
@@ -40,7 +43,6 @@ type AdminPanelProps = {
 
 type UserDraft = {
   name: string;
-  status: UserProfile["status"];
   app_role: UserProfile["app_role"];
   role: string;
   dept: string;
@@ -53,7 +55,6 @@ type TopicDraft = {
   description: string;
   icon: string;
   acl_tags: string;
-  source_filters: string;
   retrieval_tags: string;
   suggested_questions: string;
   enabled: boolean;
@@ -65,11 +66,46 @@ const BLANK_TOPIC: TopicDraft = {
   description: "",
   icon: "layers",
   acl_tags: "public,employees",
-  source_filters: "onenote,sharepoint",
   retrieval_tags: "",
   suggested_questions: "",
   enabled: true
 };
+
+const APP_ROLE_OPTIONS: Array<{ value: UserProfile["app_role"]; label: string }> = [
+  { value: "user", label: "Standard user" },
+  { value: "system_admin", label: "System administrator" }
+];
+
+const DEPARTMENT_OPTIONS = [
+  "People & HR",
+  "Finance",
+  "Engineering",
+  "IT & Security",
+  "Product",
+  "Sales",
+  "Operations",
+  "Legal",
+  "Procurement",
+  "Customer Success",
+  "Facilities"
+];
+
+const DISPLAY_ROLE_OPTIONS = [
+  "Employee",
+  "Engineer",
+  "Senior Engineer",
+  "Engineering Manager",
+  "Product Manager",
+  "Designer",
+  "People Operations",
+  "Finance",
+  "IT & Security",
+  "Security Analyst",
+  "Sales",
+  "Operations",
+  "Facilities",
+  "Contractor"
+];
 
 export function AdminPanel({
   currentUser,
@@ -96,6 +132,7 @@ export function AdminPanel({
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isIconMenuOpen, setIsIconMenuOpen] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -156,12 +193,14 @@ export function AdminPanel({
 
   function selectTopic(topic: TopicAdmin) {
     setIsNewTopic(false);
+    setIsIconMenuOpen(false);
     setSelectedTopicId(topic.id);
     setTopicDraft(draftFromTopic(topic));
   }
 
   function startNewTopic() {
     setIsNewTopic(true);
+    setIsIconMenuOpen(false);
     setSelectedTopicId(null);
     setTopicDraft(BLANK_TOPIC);
   }
@@ -175,7 +214,6 @@ export function AdminPanel({
       () =>
         updateAdminUser(selectedUser.user_id, {
           name: userDraft.name,
-          status: userDraft.status,
           app_role: userDraft.app_role,
           role: emptyToNull(userDraft.role),
           dept: emptyToNull(userDraft.dept),
@@ -197,7 +235,6 @@ export function AdminPanel({
       description: topicDraft.description.trim(),
       icon: emptyToNull(topicDraft.icon),
       acl_tags: splitCsv(topicDraft.acl_tags),
-      source_filters: splitCsv(topicDraft.source_filters),
       retrieval_tags: splitCsv(topicDraft.retrieval_tags),
       suggested_questions: splitLines(topicDraft.suggested_questions),
       enabled: topicDraft.enabled
@@ -257,6 +294,10 @@ export function AdminPanel({
     }
   }
 
+  const TopicDraftIcon = getTopicIcon(topicDraft.icon);
+  const selectedIconLabel =
+    TOPIC_ICON_OPTIONS.find((option) => option.id === topicDraft.icon)?.label || "Notebook";
+
   return (
     <div className="modal-host">
       <div className="modal__scrim" onClick={onClose} />
@@ -296,7 +337,7 @@ export function AdminPanel({
                   {users.map((user) => (
                     <button
                       key={user.user_id}
-                      className={user.user_id === selectedUserId ? "admin-row is-active" : "admin-row"}
+                      className={userRowClassName(user, selectedUserId)}
                       type="button"
                       onClick={() => selectUser(user)}
                     >
@@ -311,10 +352,18 @@ export function AdminPanel({
                 </div>
 
                 {selectedUser && userDraft ? (
-                  <form className="admin-form scroll" onSubmit={saveUser}>
+                  <form
+                    className={selectedUser.status === "suspended" ? "admin-form admin-form--suspended scroll" : "admin-form scroll"}
+                    onSubmit={saveUser}
+                  >
                     <div className="admin-form__title">
-                      <h3>{selectedUser.name}</h3>
-                      <span>{selectedUser.email}</span>
+                      <div>
+                        <h3>{selectedUser.name}</h3>
+                        <span>{selectedUser.email}</span>
+                      </div>
+                      <span className={`admin-status admin-status--${selectedUser.status}`}>
+                        {selectedUser.status}
+                      </span>
                     </div>
                     <label className="fld">
                       <span className="fld__lbl">Display name</span>
@@ -327,21 +376,6 @@ export function AdminPanel({
                     </label>
                     <div className="admin-form__two">
                       <label className="fld">
-                        <span className="fld__lbl">Status</span>
-                        <span className="fld__box">
-                          <select
-                            className="fld__in fld__sel"
-                            value={userDraft.status}
-                            onChange={(event) => setUserDraft({ ...userDraft, status: event.target.value as UserProfile["status"] })}
-                          >
-                            <option value="pending">pending</option>
-                            <option value="active">active</option>
-                            <option value="suspended">suspended</option>
-                            <option value="rejected">rejected</option>
-                          </select>
-                        </span>
-                      </label>
-                      <label className="fld">
                         <span className="fld__lbl">App role</span>
                         <span className="fld__box">
                           <select
@@ -349,48 +383,84 @@ export function AdminPanel({
                             value={userDraft.app_role}
                             onChange={(event) => setUserDraft({ ...userDraft, app_role: event.target.value as UserProfile["app_role"] })}
                           >
-                            <option value="user">user</option>
-                            <option value="system_admin">system_admin</option>
+                            {APP_ROLE_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
                           </select>
                         </span>
                       </label>
-                    </div>
-                    <div className="admin-form__two">
                       <label className="fld">
                         <span className="fld__lbl">Department</span>
                         <span className="fld__box">
                           <span className="fld__ico">
                             <Building2 size={16} aria-hidden="true" />
                           </span>
-                          <input className="fld__in" value={userDraft.dept} onChange={(event) => setUserDraft({ ...userDraft, dept: event.target.value })} />
+                          <select
+                            className="fld__in fld__sel"
+                            value={userDraft.dept}
+                            onChange={(event) => setUserDraft({ ...userDraft, dept: event.target.value })}
+                          >
+                            <option value="">No department</option>
+                            {optionsWithCurrent(DEPARTMENT_OPTIONS, userDraft.dept).map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
                         </span>
                       </label>
+                    </div>
+                    <div className="admin-form__two">
                       <label className="fld">
                         <span className="fld__lbl">Display role</span>
                         <span className="fld__box">
                           <span className="fld__ico">
                             <Badge size={16} aria-hidden="true" />
                           </span>
-                          <input className="fld__in" value={userDraft.role} onChange={(event) => setUserDraft({ ...userDraft, role: event.target.value })} />
+                          <select
+                            className="fld__in fld__sel"
+                            value={userDraft.role}
+                            onChange={(event) => setUserDraft({ ...userDraft, role: event.target.value })}
+                          >
+                            <option value="">No display role</option>
+                            {optionsWithCurrent(DISPLAY_ROLE_OPTIONS, userDraft.role).map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </span>
+                      </label>
+                      <label className="fld">
+                        <span className="fld__lbl">ACL tags</span>
+                        <span className="fld__box">
+                          <input className="fld__in" value={userDraft.acl_tags} onChange={(event) => setUserDraft({ ...userDraft, acl_tags: event.target.value })} />
                         </span>
                       </label>
                     </div>
-                    <label className="fld">
-                      <span className="fld__lbl">ACL tags</span>
-                      <span className="fld__box">
-                        <input className="fld__in" value={userDraft.acl_tags} onChange={(event) => setUserDraft({ ...userDraft, acl_tags: event.target.value })} />
-                      </span>
-                    </label>
                     <div className="admin-actions">
-                      <button className="btn" type="button" disabled={isSaving} onClick={() => runUserAction(() => approveUser(selectedUser.user_id), "User approved.")}>
-                        <Check size={14} aria-hidden="true" /> Approve
-                      </button>
-                      <button className="btn" type="button" disabled={isSaving} onClick={() => runUserAction(() => rejectUser(selectedUser.user_id), "User rejected.")}>
-                        Reject
-                      </button>
-                      <button className="btn" type="button" disabled={isSaving} onClick={() => runUserAction(() => suspendUser(selectedUser.user_id), "User suspended.")}>
-                        Suspend
-                      </button>
+                      {selectedUser.status === "pending" ? (
+                        <>
+                          <button className="btn" type="button" disabled={isSaving} onClick={() => runUserAction(() => approveUser(selectedUser.user_id), "User approved.")}>
+                            <Check size={14} aria-hidden="true" /> Approve
+                          </button>
+                          <button className="btn btn--danger" type="button" disabled={isSaving} onClick={() => runUserAction(() => rejectUser(selectedUser.user_id), "User rejected.")}>
+                            Reject
+                          </button>
+                        </>
+                      ) : null}
+                      {selectedUser.status === "active" ? (
+                        <button className="btn btn--danger" type="button" disabled={isSaving} onClick={() => runUserAction(() => suspendUser(selectedUser.user_id), "User suspended.")}>
+                          Suspend
+                        </button>
+                      ) : null}
+                      {selectedUser.status === "suspended" ? (
+                        <button className="btn btn--accent" type="button" disabled={isSaving} onClick={() => runUserAction(() => activateUser(selectedUser.user_id), "User activated.")}>
+                          <Check size={14} aria-hidden="true" /> Activate
+                        </button>
+                      ) : null}
                       <span className="topbar__spacer" />
                       <button className="btn btn--accent" type="submit" disabled={isSaving}>
                         <Save size={14} aria-hidden="true" /> Save
@@ -438,9 +508,47 @@ export function AdminPanel({
                     </label>
                     <label className="fld">
                       <span className="fld__lbl">Icon</span>
-                      <span className="fld__box">
-                        <input className="fld__in" value={topicDraft.icon} onChange={(event) => setTopicDraft({ ...topicDraft, icon: event.target.value })} />
-                      </span>
+                      <div className="icon-picker-wrap">
+                        <button
+                          className="icon-picker"
+                          type="button"
+                          aria-haspopup="menu"
+                          aria-expanded={isIconMenuOpen}
+                          onClick={() => setIsIconMenuOpen((current) => !current)}
+                        >
+                          <span className="icon-picker__mark">
+                            <TopicDraftIcon size={16} aria-hidden="true" />
+                          </span>
+                          <span className="icon-picker__text">
+                            <b>{selectedIconLabel}</b>
+                            <small>{topicDraft.icon || "notebook-tabs"}</small>
+                          </span>
+                          <ChevronDown size={15} aria-hidden="true" />
+                        </button>
+                        {isIconMenuOpen ? (
+                          <div className="icon-menu" role="menu">
+                            {TOPIC_ICON_OPTIONS.map((option) => (
+                              <button
+                                key={option.id}
+                                className={option.id === topicDraft.icon ? "icon-menu__item is-active" : "icon-menu__item"}
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={option.id === topicDraft.icon}
+                                onClick={() => {
+                                  setTopicDraft({ ...topicDraft, icon: option.id });
+                                  setIsIconMenuOpen(false);
+                                }}
+                              >
+                                <span className="icon-menu__mark">
+                                  <option.Icon size={15} aria-hidden="true" />
+                                </span>
+                                <span>{option.label}</span>
+                                {option.id === topicDraft.icon ? <Check size={14} aria-hidden="true" /> : null}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                     </label>
                   </div>
                   <label className="fld">
@@ -453,20 +561,12 @@ export function AdminPanel({
                     <span className="fld__lbl">Description</span>
                     <textarea className="admin-textarea" value={topicDraft.description} onChange={(event) => setTopicDraft({ ...topicDraft, description: event.target.value })} />
                   </label>
-                  <div className="admin-form__two">
-                    <label className="fld">
-                      <span className="fld__lbl">ACL tags</span>
-                      <span className="fld__box">
-                        <input className="fld__in" value={topicDraft.acl_tags} onChange={(event) => setTopicDraft({ ...topicDraft, acl_tags: event.target.value })} />
-                      </span>
-                    </label>
-                    <label className="fld">
-                      <span className="fld__lbl">Source filters</span>
-                      <span className="fld__box">
-                        <input className="fld__in" value={topicDraft.source_filters} onChange={(event) => setTopicDraft({ ...topicDraft, source_filters: event.target.value })} />
-                      </span>
-                    </label>
-                  </div>
+                  <label className="fld">
+                    <span className="fld__lbl">ACL tags</span>
+                    <span className="fld__box">
+                      <input className="fld__in" value={topicDraft.acl_tags} onChange={(event) => setTopicDraft({ ...topicDraft, acl_tags: event.target.value })} />
+                    </span>
+                  </label>
                   <label className="fld">
                     <span className="fld__lbl">Retrieval tags</span>
                     <span className="fld__box">
@@ -546,7 +646,6 @@ export function AdminPanel({
 function draftFromUser(user: UserProfile): UserDraft {
   return {
     name: user.name,
-    status: user.status,
     app_role: user.app_role,
     role: user.role || "",
     dept: user.dept || "",
@@ -559,9 +658,8 @@ function draftFromTopic(topic: TopicAdmin): TopicDraft {
     id: topic.id,
     name: topic.name,
     description: topic.description,
-    icon: topic.icon || "",
+    icon: topic.icon || "notebook-tabs",
     acl_tags: topic.acl_tags.join(","),
-    source_filters: topic.source_filters.join(","),
     retrieval_tags: topic.retrieval_tags.join(","),
     suggested_questions: topic.suggested_questions.join("\n"),
     enabled: topic.enabled
@@ -579,8 +677,27 @@ function replaceTopic(topics: TopicAdmin[], updated: TopicAdmin): TopicAdmin[] {
   return next.sort((left, right) => left.name.localeCompare(right.name));
 }
 
+function userRowClassName(user: UserProfile, selectedUserId: string | null): string {
+  const classes = ["admin-row"];
+  if (user.user_id === selectedUserId) {
+    classes.push("is-active");
+  }
+  if (user.status === "suspended") {
+    classes.push("admin-row--suspended");
+  }
+  return classes.join(" ");
+}
+
 function statusRank(status: UserProfile["status"]): number {
   return { pending: 0, active: 1, suspended: 2, rejected: 3 }[status] ?? 9;
+}
+
+function optionsWithCurrent(options: string[], current: string): string[] {
+  const trimmed = current.trim();
+  if (!trimmed || options.includes(trimmed)) {
+    return options;
+  }
+  return [trimmed, ...options];
 }
 
 function splitCsv(value: string): string[] {

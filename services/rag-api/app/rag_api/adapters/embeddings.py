@@ -1,10 +1,8 @@
 from shared_schemas import AppSettings
-from shared_schemas.embeddings import embed_text_token_hash
+from shared_schemas.embeddings import Embedder, create_embedder
 
 
-class DeterministicQueryEmbedder:
-    def __init__(self, settings: AppSettings) -> None:
-        self.settings = settings
-
-    def embed_text(self, text: str) -> list[float]:
-        return embed_text_token_hash(text, vector_size=self.settings.embedding_vector_size)
+def build_query_embedder(settings: AppSettings) -> Embedder:
+    """Query-side embedder. Resolves through the shared factory so query vectors
+    always come from the same model and dimension as the indexed chunk vectors."""
+    return create_embedder(settings)

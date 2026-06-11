@@ -102,6 +102,7 @@ class OpenAICompatibleLlmAdapter:
                                     "keyword_queries",
                                     "must_have_concepts",
                                     "avoid_concepts",
+                                    "sub_questions",
                                 ],
                                 "question": question,
                                 "detected_language": detected_language,
@@ -120,6 +121,7 @@ class OpenAICompatibleLlmAdapter:
                                     "Avoid over-broad one-word queries such as paid, date, policy, information, details, or notes.",
                                     "Put required concepts that retrieved evidence should contain in must_have_concepts.",
                                     "Put concepts that would indicate a different topic in avoid_concepts only when the user question implies them.",
+                                    "If the question asks for several distinct things (for example install X and configure Y and deploy Z), split it into at most 3 self-contained sub_questions, each answerable on its own; otherwise return an empty sub_questions list.",
                                     "Do not assume the answer.",
                                     "Do not include explanations outside JSON.",
                                 ],
@@ -222,7 +224,10 @@ class OpenAICompatibleLlmAdapter:
             "Keep short identifiers, file paths, and variable names as inline code. "
             "For key-value lines, rewrite them naturally unless a label is useful; then preserve the label as a bold bullet label. "
             "Do not add facts from loosely related chunks. "
-            "Do not include numeric citation markers like [1], [2], source IDs, or a visible Source/Sources line. "
+            "Each context block above is labeled with a numeric marker such as [1] or [2]. "
+            "When a sentence relies on facts from a block, append that block's marker (for example [1]) at the end of the sentence, "
+            "and cite every block you draw facts from. Never invent a marker number that is not present in the context. "
+            "Do not add a separate Source or Sources line; use only the inline [n] markers. "
             "If the context is related but does not directly answer the question, reply exactly: "
             "I could not find that information in the available OneNote notes or readable attachments. "
             "If the context does not answer the question, reply exactly: "
