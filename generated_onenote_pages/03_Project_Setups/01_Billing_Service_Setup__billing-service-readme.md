@@ -1,5 +1,7 @@
 # billing-service README
 
+_Attached to the "Billing Service Setup" project setup record in the Project Setups section, owned by Payments Team._
+
 Quick reference for running billing-service locally.
 
 ## Ports

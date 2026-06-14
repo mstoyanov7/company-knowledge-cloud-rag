@@ -50,15 +50,7 @@ class AppSettings(BaseSettings):
     onenote_token_cache_path: str = ".cache/onenote_token_cache.json"
     onenote_retry_attempts: int = 6
     onenote_retry_backoff_seconds: float = 2.0
-    # Proactive pacing between Graph requests to avoid OneNote 429 throttling
-    # (error 20166). 0 disables pacing; ~0.3-0.5s noticeably reduces throttling
-    # during a bootstrap of many pages.
     onenote_request_delay_seconds: float = 0.0
-    # Sliding look-back applied to the incremental cursor. Graph can report
-    # lastModifiedDateTime slightly out of order, so re-checking a small window
-    # behind the cursor guards against missing a page whose timestamp lagged.
-    # Pages re-fetched in the window cost only a content-hash compare when
-    # unchanged, so a few minutes is cheap insurance. 0 disables the window.
     onenote_incremental_lookback_seconds: int = 300
     attachment_storage_dir: str = ".cache/attachments"
 
@@ -74,19 +66,17 @@ class AppSettings(BaseSettings):
     otel_console_exporter: bool = False
 
     onenote_sync_interval_seconds: int = 900
+    # Automatic OneNote sync runs once per day at this local clock time (HH:MM)
+    # in onenote_sync_timezone, instead of polling on a fixed seconds interval.
+    onenote_sync_daily_time: str = "02:00"
+    onenote_sync_timezone: str = "Europe/Sofia"
     worker_poll_interval_seconds: int = 30
-    # Must match the embedding model's output dimension. nomic-embed-text = 768.
-    # The token-hash fallback works at any size. A mismatch with the live model is
-    # detected at startup and forces a Qdrant collection rebuild.
     embedding_vector_size: int = 768
 
     default_llm_provider: str = "mock"
-    # "ollama" = real semantic embeddings (nomic-embed-text); "token-hash-v1" =
-    # offline lexical fallback used by the test suite. See shared_schemas.embeddings.
     default_embedding_provider: str = "ollama"
     embedding_model_name: str = "nomic-embed-text"
-    # Optional dedicated embedding endpoint/key; empty falls back to the LLM
-    # OpenAI-compatible settings so a single Ollama instance serves both.
+
     embedding_base_url: str = ""
     embedding_api_key: SecretStr = SecretStr("")
     default_model_name: str = "mock-onboarding-assistant"
@@ -97,9 +87,7 @@ class AppSettings(BaseSettings):
     llm_max_tokens: int = 1400
     mock_api_key: SecretStr = SecretStr("cloudrag-local-key")
     mock_top_k: int = 3
-    # Optional path to a JSON corpus the mock retriever loads instead of its
-    # built-in 3-document sample. Used by the evaluation harness to run against a
-    # richer offline corpus; unset keeps the deterministic sample used by tests.
+
     mock_corpus_path: str = ""
     rag_api_key: SecretStr = SecretStr("")
     topics_config_path: str = "config/topics.json"
@@ -108,21 +96,21 @@ class AppSettings(BaseSettings):
     retrieval_candidate_multiplier: int = 3
     retrieval_score_threshold: float | None = None
     retrieval_min_keyword_overlap: int = 1
-    # Max chunks the lexical (title/keyword) fallback scans per query. The scan
-    # paginates through the whole accessible corpus; <= 0 means "scan all" so a
-    # title match is never missed because the page sat past the first batch.
+
     retrieval_lexical_scan_limit: int = 0
-    # Quiz-style clarification: when a specific question is equally answerable
-    # from several distinct pages, ask the user which one they mean instead of
-    # guessing. closeness_ratio gates "no single dominant page"; max_options caps
-    # how many candidates are offered (count is otherwise dynamic, min 2).
+
     clarify_enabled: bool = True
     clarify_closeness_ratio: float = 0.6
     clarify_max_options: int = 5
-    # One corrective regeneration when the answer guard rejects a model draft,
-    # before falling back to an extractive (source-formatted) answer.
+
     answer_guard_repair_enabled: bool = True
     rerank_enabled: bool = True
+
+    semantic_fixture_path: str = "eval/datasets/semantic_fixture.json"
+
+    retrieval_min_semantic_score: float = 0.0
+
+    mock_lexical_scoring: str = "overlap"
     rag_debug_enabled: bool = False
     app_database_url: str = "sqlite:///./.cache/rag_api.sqlite3"
 

@@ -13,7 +13,10 @@ def test_prompt_builder_enforces_onenote_only_no_information_contract() -> None:
     assert f"reply exactly: {NO_INFORMATION_ANSWER}" in prompt.system_instruction
     assert "append that block's marker" in prompt.system_instruction
     assert "Do not add a separate Source or Sources line" in prompt.system_instruction
-    assert "Synthesize the retrieved notes into a polished, human-like answer" in prompt.system_instruction
+    # Synthesis contract: one combined answer in the model's own words, with the
+    # format decided by the collected evidence rather than the source layout.
+    assert "ONE complete answer written in your own" in prompt.system_instruction
+    assert "never mirror" in prompt.system_instruction
     assert "fenced Markdown code blocks" in prompt.system_instruction
     assert "powershell" in prompt.system_instruction
 
@@ -25,7 +28,7 @@ def test_prompt_builder_detailed_depth_requests_fuller_structured_answers() -> N
     assert "all directly relevant details" in prompt.system_instruction
     assert "multiple relevant sentences or paragraphs" in prompt.system_instruction
     assert "Use fenced code blocks" in prompt.system_instruction
-    assert "summary" in prompt.system_instruction.lower()
+    assert "first a short direct answer" in prompt.system_instruction.lower()
     assert prompt.question_analysis is not None
     assert prompt.question_analysis["answer_depth"] == "detailed"
 

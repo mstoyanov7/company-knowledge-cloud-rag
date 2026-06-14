@@ -13,16 +13,17 @@ _PROCEDURE_ORDER = {
     "procedure": 0,
     "overview": 1,
     "prerequisites": 2,
-    "install": 3,
-    "configuration": 4,
-    "run": 5,
-    "verification": 6,
-    "troubleshooting": 7,
-    "checklist": 8,
-    "commands": 9,
-    "reference": 10,
-    "section": 11,
-    "table": 12,
+    "steps": 3,
+    "install": 4,
+    "configuration": 5,
+    "run": 6,
+    "commands": 7,
+    "verification": 8,
+    "troubleshooting": 9,
+    "checklist": 10,
+    "reference": 11,
+    "section": 12,
+    "table": 13,
     "metadata": 99,
 }
 
@@ -65,7 +66,7 @@ def build_answer_context(
         # in their natural setup order (overview -> prerequisites -> ... -> run).
         ordered_pairs = sorted(
             enumerate(ordered_pairs),
-            key=lambda item: (_PROCEDURE_ORDER.get(chunk_kind_of(item[1][0]) or "section", 11), item[0]),
+            key=lambda item: (_PROCEDURE_ORDER.get(chunk_kind_of(item[1][0]) or "section", 12), item[0]),
         )
         ordered_pairs = [pair for _index, pair in ordered_pairs]
 

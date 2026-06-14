@@ -1478,8 +1478,14 @@ def main() -> None:
             (folder / f"{prefix}.html").write_text(
                 render_page(section, page, page_index), encoding="utf-8"
             )
+            page_context = (
+                f"Attached to the \"{page.title}\" {section.page_type} "
+                f"in the {section.name} section, owned by {page.owner}."
+            )
             for attachment in page.attachments:
-                write_attachment(folder / f"{prefix}__{attachment.filename}", attachment)
+                write_attachment(
+                    folder / f"{prefix}__{attachment.filename}", attachment, context=page_context
+                )
 
 
 def render_page(section: SectionSpec, page: PageSpec, page_index: int) -> str:
@@ -1504,9 +1510,15 @@ def render_page(section: SectionSpec, page: PageSpec, page_index: int) -> str:
 
 
 def render_body(section: SectionSpec, page: PageSpec, variant: int) -> str:
+    # A clear, self-contained intro: who owns it, who it is for, what it covers,
+    # and the single most important fact stated up front. The earlier template
+    # produced ungrammatical leads ("This HR policy how annual leave ... work")
+    # that added noise to the indexed text; this reads as a real page opener.
+    lead_fact = f" {page.facts[0]}" if page.facts else ""
     overview = (
-        f"{page.title} is maintained by {page.owner} for {section.audience}. "
-        f"This {section.page_type} {page.summary[0].lower() + page.summary[1:]}"
+        f"{page.title} is the {section.page_type} maintained by {page.owner} "
+        f"for {section.audience}. It covers {page.summary[0].lower() + page.summary[1:]}"
+        f"{lead_fact}"
     )
     ownership = ownership_table(section, page) if variant % 2 == 0 else ownership_dl(section, page)
     key_facts = list_section("Key Facts", page.facts)
@@ -1601,30 +1613,33 @@ def attachment_section(attachments) -> str:
 # Attachment file writers
 # --------------------------------------------------------------------------------------
 
-def write_attachment(path: Path, attachment: AttachmentSpec) -> None:
+def write_attachment(path: Path, attachment: AttachmentSpec, *, context: str = "") -> None:
     try:
         if attachment.kind == "md":
-            path.write_text(render_markdown(attachment), encoding="utf-8")
+            path.write_text(render_markdown(attachment, context), encoding="utf-8")
         elif attachment.kind == "txt":
-            path.write_text(render_plaintext(attachment), encoding="utf-8")
+            path.write_text(render_plaintext(attachment, context), encoding="utf-8")
         elif attachment.kind == "docx":
-            write_docx(path, attachment)
+            write_docx(path, attachment, context)
         elif attachment.kind == "pptx":
-            write_pptx(path, attachment)
+            write_pptx(path, attachment, context)
         elif attachment.kind == "pdf":
-            write_pdf(path, attachment)
+            write_pdf(path, attachment, context)
         else:
             raise ValueError(f"Unknown attachment kind: {attachment.kind}")
     except Exception as error:  # graceful fallback so the pack always generates
         fallback = path.with_suffix(".md")
         fallback.write_text(
-            render_markdown(attachment) + f"\n\n> Note: original {attachment.kind} generation failed ({error}).\n",
+            render_markdown(attachment, context) + f"\n\n> Note: original {attachment.kind} generation failed ({error}).\n",
             encoding="utf-8",
         )
 
 
-def render_markdown(attachment: AttachmentSpec) -> str:
-    lines = [f"# {attachment.title}", "", attachment.intro, ""]
+def render_markdown(attachment: AttachmentSpec, context: str = "") -> str:
+    lines = [f"# {attachment.title}", ""]
+    if context:
+        lines += [f"_{context}_", ""]
+    lines += [attachment.intro, ""]
     for bullet in attachment.bullets:
         lines.append(f"- {bullet}")
     if attachment.bullets:
@@ -1638,8 +1653,11 @@ def render_markdown(attachment: AttachmentSpec) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_plaintext(attachment: AttachmentSpec) -> str:
-    lines = [attachment.title, "=" * len(attachment.title), "", attachment.intro, ""]
+def render_plaintext(attachment: AttachmentSpec, context: str = "") -> str:
+    lines = [attachment.title, "=" * len(attachment.title), ""]
+    if context:
+        lines += [context, ""]
+    lines += [attachment.intro, ""]
     for bullet in attachment.bullets:
         lines.append(f"* {bullet}")
     for heading, body in attachment.sections:
@@ -1651,11 +1669,13 @@ def render_plaintext(attachment: AttachmentSpec) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def write_docx(path: Path, attachment: AttachmentSpec) -> None:
+def write_docx(path: Path, attachment: AttachmentSpec, context: str = "") -> None:
     from docx import Document
 
     document = Document()
     document.add_heading(attachment.title, level=0)
+    if context:
+        document.add_paragraph(context, style="Intense Quote")
     document.add_paragraph(attachment.intro)
     for bullet in attachment.bullets:
         document.add_paragraph(bullet, style="List Bullet")
@@ -1666,7 +1686,7 @@ def write_docx(path: Path, attachment: AttachmentSpec) -> None:
     document.save(str(path))
 
 
-def write_pptx(path: Path, attachment: AttachmentSpec) -> None:
+def write_pptx(path: Path, attachment: AttachmentSpec, context: str = "") -> None:
     from pptx import Presentation
     from pptx.util import Pt
 
@@ -1676,7 +1696,7 @@ def write_pptx(path: Path, attachment: AttachmentSpec) -> None:
 
     title_slide = presentation.slides.add_slide(title_layout)
     title_slide.shapes.title.text = attachment.title
-    title_slide.placeholders[1].text = attachment.intro
+    title_slide.placeholders[1].text = f"{context}\n{attachment.intro}" if context else attachment.intro
 
     sections = attachment.sections or (("Highlights", attachment.bullets),)
     for heading, body in sections:
@@ -1691,7 +1711,7 @@ def write_pptx(path: Path, attachment: AttachmentSpec) -> None:
     presentation.save(str(path))
 
 
-def write_pdf(path: Path, attachment: AttachmentSpec) -> None:
+def write_pdf(path: Path, attachment: AttachmentSpec, context: str = "") -> None:
     from fpdf import FPDF
 
     pdf = FPDF()
@@ -1707,6 +1727,10 @@ def write_pdf(path: Path, attachment: AttachmentSpec) -> None:
     pdf.set_font("Helvetica", "B", 16)
     line(attachment.title, height=9)
     pdf.ln(2)
+    if context:
+        pdf.set_font("Helvetica", "I", 10)
+        line(context)
+        pdf.ln(1)
     pdf.set_font("Helvetica", size=11)
     line(attachment.intro)
     pdf.ln(2)

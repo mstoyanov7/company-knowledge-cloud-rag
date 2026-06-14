@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
@@ -11,6 +12,7 @@ from shared_schemas import (
     EvaluationReport,
     OpsJobRecord,
     OpsJobStatus,
+    SystemRuntimeSettings,
     SecurityAuditEvent,
 )
 
@@ -96,11 +98,95 @@ class PostgresOpsStore:
                             report_json TEXT NOT NULL,
                             created_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
                         );
+
+                        CREATE TABLE IF NOT EXISTS system_runtime_settings (
+                            settings_id TEXT PRIMARY KEY,
+                            llm_model TEXT NOT NULL,
+                            onenote_sync_interval_seconds INTEGER NOT NULL,
+                            onenote_sync_paused BOOLEAN NOT NULL DEFAULT FALSE,
+                            updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                            updated_by_user_id TEXT
+                        );
+
+                        ALTER TABLE system_runtime_settings
+                            ADD COLUMN IF NOT EXISTS onenote_sync_daily_time TEXT NOT NULL DEFAULT '02:00';
                         """
                     )
                 finally:
                     cursor.execute("SELECT pg_advisory_unlock(hashtext('cloud_rag_ops_schema'))")
             connection.commit()
+
+    def get_system_runtime_settings(self) -> SystemRuntimeSettings:
+        self.ensure_schema()
+        with psycopg.connect(self.settings.postgres_dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO system_runtime_settings (
+                        settings_id, llm_model, onenote_sync_interval_seconds,
+                        onenote_sync_daily_time, onenote_sync_paused, updated_at_utc
+                    )
+                    VALUES ('default', %s, %s, %s, FALSE, NOW())
+                    ON CONFLICT (settings_id) DO NOTHING
+                    """,
+                    (
+                        self.settings.default_model_name,
+                        self.settings.onenote_sync_interval_seconds,
+                        self.settings.onenote_sync_daily_time,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    SELECT llm_model, onenote_sync_interval_seconds, onenote_sync_paused,
+                           updated_at_utc, updated_by_user_id, onenote_sync_daily_time
+                    FROM system_runtime_settings
+                    WHERE settings_id = 'default'
+                    """
+                )
+                row = cursor.fetchone()
+            connection.commit()
+        if row is None:
+            raise RuntimeError("Failed to load system runtime settings.")
+        return _system_runtime_settings_from_row(row)
+
+    def update_system_runtime_settings(
+        self,
+        updates: dict[str, Any],
+        *,
+        updated_by_user_id: str | None = None,
+    ) -> SystemRuntimeSettings:
+        current = self.get_system_runtime_settings()
+        llm_model = str(updates.get("llm_model") or current.llm_model).strip()
+        interval = int(updates.get("onenote_sync_interval_seconds") or current.onenote_sync_interval_seconds)
+        daily_time = str(updates.get("onenote_sync_daily_time") or current.onenote_sync_daily_time).strip()
+        paused = bool(updates["onenote_sync_paused"]) if "onenote_sync_paused" in updates else current.onenote_sync_paused
+        interval = max(60, min(86400, interval))
+        daily_time = _normalize_daily_time(daily_time, fallback=current.onenote_sync_daily_time)
+        if not llm_model:
+            llm_model = self.settings.default_model_name
+
+        with psycopg.connect(self.settings.postgres_dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE system_runtime_settings
+                    SET llm_model = %s,
+                        onenote_sync_interval_seconds = %s,
+                        onenote_sync_daily_time = %s,
+                        onenote_sync_paused = %s,
+                        updated_at_utc = NOW(),
+                        updated_by_user_id = %s
+                    WHERE settings_id = 'default'
+                    RETURNING llm_model, onenote_sync_interval_seconds, onenote_sync_paused,
+                              updated_at_utc, updated_by_user_id, onenote_sync_daily_time
+                    """,
+                    (llm_model, interval, daily_time, paused, updated_by_user_id),
+                )
+                row = cursor.fetchone()
+            connection.commit()
+        if row is None:
+            raise RuntimeError("Failed to update system runtime settings.")
+        return _system_runtime_settings_from_row(row)
 
     def enqueue_job(
         self,
@@ -292,6 +378,25 @@ class PostgresOpsStore:
                 )
             connection.commit()
 
+    def latest_job(self, job_type: str) -> OpsJobRecord | None:
+        self.ensure_schema()
+        with psycopg.connect(self.settings.postgres_dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT job_id, job_type, dedupe_key, payload_json, status, attempts, max_attempts,
+                           available_at_utc, locked_at_utc, locked_by, last_error, created_at_utc,
+                           updated_at_utc, completed_at_utc
+                    FROM ops_jobs
+                    WHERE job_type = %s
+                    ORDER BY created_at_utc DESC
+                    LIMIT 1
+                    """,
+                    (job_type,),
+                )
+                row = cursor.fetchone()
+        return _job_from_row(row) if row else None
+
     def record_metric(self, metric_name: str, value: float, labels: dict[str, Any] | None = None) -> None:
         self.ensure_schema()
         with psycopg.connect(self.settings.postgres_dsn) as connection:
@@ -379,6 +484,25 @@ def _job_from_row(row) -> OpsJobRecord:
         created_at_utc=row[11],
         updated_at_utc=row[12],
         completed_at_utc=row[13],
+    )
+
+
+_DAILY_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def _normalize_daily_time(value: str, *, fallback: str) -> str:
+    candidate = (value or "").strip()
+    return candidate if _DAILY_TIME_RE.match(candidate) else fallback
+
+
+def _system_runtime_settings_from_row(row) -> SystemRuntimeSettings:
+    return SystemRuntimeSettings(
+        llm_model=str(row[0]),
+        onenote_sync_interval_seconds=int(row[1]),
+        onenote_sync_paused=bool(row[2]),
+        updated_at_utc=row[3],
+        updated_by_user_id=row[4],
+        onenote_sync_daily_time=_normalize_daily_time(str(row[5]) if row[5] is not None else "02:00", fallback="02:00"),
     )
 
 

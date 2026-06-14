@@ -57,7 +57,7 @@ def build_evidence_profile(chunks: list) -> EvidenceProfile:
         code_lines = sum(1 for line in lines if _CODE_LINE.match(line) or _FENCE.match(line))
         if code_lines >= 2 or chunk_kind_hint(chunk) in {"commands", "install", "configuration"}:
             code_chunks += 1
-        if any(_STEP_LINE.match(line) for line in lines) or chunk_kind_hint(chunk) in {"procedure", "checklist"}:
+        if any(_STEP_LINE.match(line) for line in lines) or chunk_kind_hint(chunk) in {"procedure", "steps", "checklist"}:
             has_steps = True
         if sum(1 for line in lines if _TABLE_LINE.match(line)) >= 2:
             has_table = True

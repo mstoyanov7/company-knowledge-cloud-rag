@@ -72,7 +72,15 @@ class QdrantAclRetriever:
                 collection_was_queried = True
                 for point in response.points:
                     if point.payload:
-                        candidates.append(self._chunk_from_payload(point.payload, score=float(point.score or 0.0)))
+                        cosine = float(point.score or 0.0)
+                        chunk = self._chunk_from_payload(point.payload, score=cosine)
+                        # Carry the raw cosine so the downstream pipeline can treat a
+                        # strong semantic match as topical evidence even without shared
+                        # keywords (gated by RETRIEVAL_SEMANTIC_CONFIDENT_SCORE).
+                        chunk = chunk.model_copy(
+                            update={"metadata": {**(chunk.metadata or {}), "semantic_score": cosine}}
+                        )
+                        candidates.append(chunk)
 
             lexical_candidates = self._lexical_candidates(collection_name, payload_filter, request.question)
             if lexical_candidates:

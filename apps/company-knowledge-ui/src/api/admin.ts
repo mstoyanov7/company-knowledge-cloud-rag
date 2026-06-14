@@ -23,6 +23,49 @@ export type UiSettings = {
 
 export type UiSettingsUpdate = Partial<Pick<UiSettings, "accent_hue" | "app_name" | "app_subtitle" | "logo_text" | "logo_url">>;
 
+export type OpsJob = {
+  job_id: string;
+  job_type: string;
+  dedupe_key: string;
+  payload: Record<string, unknown>;
+  status: "pending" | "running" | "succeeded" | "failed" | "dead_letter";
+  attempts: number;
+  max_attempts: number;
+  available_at_utc: string;
+  locked_at_utc?: string | null;
+  locked_by?: string | null;
+  last_error?: string | null;
+  created_at_utc: string;
+  updated_at_utc: string;
+  completed_at_utc?: string | null;
+};
+
+export type AdminSystemSettings = {
+  llm_provider: string;
+  llm_model: string;
+  available_llm_models: string[];
+  onenote_sync_interval_seconds: number;
+  onenote_sync_daily_time: string;
+  onenote_sync_timezone?: string;
+  onenote_sync_paused: boolean;
+  last_sync_job?: OpsJob | null;
+  updated_at_utc?: string | null;
+  updated_by_user_id?: string | null;
+};
+
+export type AdminSystemSettingsUpdate = {
+  llm_model?: string;
+  onenote_sync_interval_seconds?: number;
+  onenote_sync_daily_time?: string;
+  onenote_sync_paused?: boolean;
+};
+
+export type ForceSyncResponse = {
+  job: OpsJob;
+  created: boolean;
+  settings: AdminSystemSettings;
+};
+
 export function fetchUiSettings(): Promise<UiSettings> {
   return apiRequest<UiSettings>("/api/v1/ui-settings");
 }
@@ -75,4 +118,16 @@ export function disableAdminTopic(topicId: string): Promise<TopicAdmin> {
 
 export function updateUiSettings(request: UiSettingsUpdate): Promise<UiSettings> {
   return apiRequest<UiSettings>("/api/v1/admin/ui-settings", { method: "PATCH", body: request });
+}
+
+export function fetchAdminSystemSettings(): Promise<AdminSystemSettings> {
+  return apiRequest<AdminSystemSettings>("/api/v1/admin/system-settings");
+}
+
+export function updateAdminSystemSettings(request: AdminSystemSettingsUpdate): Promise<AdminSystemSettings> {
+  return apiRequest<AdminSystemSettings>("/api/v1/admin/system-settings", { method: "PATCH", body: request });
+}
+
+export function forceSystemSync(): Promise<ForceSyncResponse> {
+  return apiRequest<ForceSyncResponse>("/api/v1/admin/system-sync/run", { method: "POST" });
 }

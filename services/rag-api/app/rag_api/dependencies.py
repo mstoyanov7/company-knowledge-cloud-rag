@@ -45,6 +45,10 @@ def get_app_data_store(request: Request) -> AppDataStore:
 def get_retriever(settings: AppSettings) -> RetrievalPort:
     if settings.retrieval_provider == "qdrant":
         return QdrantAclRetriever(settings)
+    if settings.retrieval_provider == "semantic_fixture":
+        from rag_api.adapters.retrieval.semantic_fixture import FixtureSemanticRetriever
+
+        return FixtureSemanticRetriever(settings)
     return MockRetriever(settings)
 
 
@@ -54,10 +58,11 @@ def get_document_metadata(settings: AppSettings) -> DocumentMetadataPort:
     return MockSourceMetadataAdapter(settings)
 
 
-def get_llm(settings: AppSettings) -> LlmPort:
+def get_llm(settings: AppSettings, *, model_name: str | None = None) -> LlmPort:
+    resolved_model = model_name or settings.default_model_name
     if settings.default_llm_provider.lower() in {"ollama", "openai-compatible", "openai_compatible"}:
-        return OpenAICompatibleLlmAdapter(settings)
-    return MockLlmAdapter(model_name=settings.default_model_name)
+        return OpenAICompatibleLlmAdapter(settings, model_name=resolved_model)
+    return MockLlmAdapter(model_name=resolved_model)
 
 
 def get_answer_service(
@@ -66,7 +71,10 @@ def get_answer_service(
 ) -> AnswerService:
     app_store = store if isinstance(store, AppDataStore) else None
     reranker = KeywordOverlapReranker() if settings.rerank_enabled else None
-    llm = get_llm(settings)
+    llm = get_llm(settings, model_name=_runtime_llm_model(settings))
+    from rag_api.services.retrieval_ranking import configure_semantic_scoring
+
+    configure_semantic_scoring(getattr(settings, "retrieval_semantic_confident_score", 0.0))
     return AnswerService(
         llm=llm,
         prompt_builder=PromptBuilder(),
@@ -89,7 +97,7 @@ def get_answer_service(
 
 def get_system_service(settings: AppSettings = Depends(get_runtime_settings)) -> SystemService:
     return SystemService(
-        llm=get_llm(settings),
+        llm=get_llm(settings, model_name=_runtime_llm_model(settings)),
         retriever=get_retriever(settings),
         settings=settings,
     )
@@ -100,7 +108,11 @@ def get_topic_service(
     store: AppDataStore | None = Depends(get_app_data_store),
 ) -> TopicService:
     app_store = store if isinstance(store, AppDataStore) else None
-    return TopicService(loader=TopicLoader(settings.topics_config_path), store=app_store)
+    return TopicService(
+        loader=TopicLoader(settings.topics_config_path),
+        store=app_store,
+        prune_orphaned_seed_topics=False,
+    )
 
 
 def get_document_service(settings: AppSettings = Depends(get_runtime_settings)) -> DocumentService:
@@ -193,6 +205,15 @@ def get_request_auth_context(
         )
 
     return RequestAuthContext(auth_method="anonymous")
+
+
+def _runtime_llm_model(settings: AppSettings) -> str:
+    try:
+        from sync_worker.persistence import PostgresOpsStore
+
+        return PostgresOpsStore(settings).get_system_runtime_settings().llm_model
+    except Exception:
+        return settings.default_model_name
 
 
 def effective_user_context(

@@ -401,19 +401,7 @@ export function KnowledgeShell({
   }
 
   function openCitation(citation: Citation) {
-    const topic = selectedTopic;
-    setPanelSource({
-      ...citationToPanelSource(citation),
-      actions: topic
-        ? [
-            {
-              label: `Ask ${topic.name} about this source`,
-              question: `What does "${citation.title}" say about this?`,
-              topicId: topic.id
-            }
-          ]
-        : []
-    });
+    setPanelSource(citationToPanelSource(citation));
   }
 
   function openDocumentSource(document: NotebookPage | DocumentSummary) {

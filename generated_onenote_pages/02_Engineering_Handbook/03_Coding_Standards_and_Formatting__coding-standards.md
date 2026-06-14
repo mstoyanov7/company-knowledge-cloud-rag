@@ -1,5 +1,7 @@
 # Coding Standards
 
+_Attached to the "Coding Standards and Formatting" engineering standard in the Engineering Handbook section, owned by Architecture Office._
+
 The normative coding standards enforced across repositories.
 
 ## Python

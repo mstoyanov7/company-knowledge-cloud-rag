@@ -29,7 +29,13 @@ class AnswerTopicScope:
 
 
 class TopicService:
-    def __init__(self, loader: TopicLoader | None = None, store: AppDataStore | None = None) -> None:
+    def __init__(
+        self,
+        loader: TopicLoader | None = None,
+        store: AppDataStore | None = None,
+        *,
+        prune_orphaned_seed_topics: bool = True,
+    ) -> None:
         self._loader = loader
         self._store = store
         topics = loader.load() if loader is not None else []
@@ -37,7 +43,8 @@ class TopicService:
         if self._store is not None:
             if topics:
                 self._store.seed_topics_if_empty([_record_from_topic(topic) for topic in topics])
-            self._prune_orphaned_seed_topics()
+            if prune_orphaned_seed_topics:
+                self._prune_orphaned_seed_topics()
 
     def _prune_orphaned_seed_topics(self) -> None:
         """Remove system-seeded topics that are no longer in the config.

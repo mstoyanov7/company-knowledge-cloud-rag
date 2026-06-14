@@ -11,6 +11,7 @@ from sync_worker.observability import configure_observability
 from sync_worker.onenote import build_onenote_sync_service
 from sync_worker.ops.scheduler import OpsScheduler
 from sync_worker.persistence import PostgresOpsStore
+from sync_worker.topics import refresh_app_topics_from_sources
 
 try:
     from opentelemetry import metrics, trace
@@ -89,7 +90,12 @@ class OpsJobRunner:
 
     def _execute(self, job: OpsJobRecord) -> None:
         if job.job_type == OpsJobType.onenote_reconciliation.value:
+            runtime = self.store.get_system_runtime_settings()
+            if runtime.onenote_sync_paused and job.payload.get("trigger") != "admin":
+                self.logger.info("event=ops_job_skipped reason=onenote_sync_paused job_id=%s", job.job_id)
+                return
             build_onenote_sync_service(self.settings).reconciliation()
+            refresh_app_topics_from_sources(self.settings)
             return
 
         raise ValueError(f"Unsupported ops job_type={job.job_type}")

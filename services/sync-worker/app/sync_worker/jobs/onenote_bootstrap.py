@@ -6,6 +6,7 @@ import logging
 from shared_schemas import get_settings
 
 from sync_worker.onenote import build_onenote_sync_service
+from sync_worker.topics import refresh_app_topics_from_sources
 
 
 def run() -> None:
@@ -21,13 +22,15 @@ def run() -> None:
 
     service = build_onenote_sync_service(settings)
     report = service.bootstrap()
+    topic_count = refresh_app_topics_from_sources(settings)
     logging.getLogger("sync_worker.jobs.onenote_bootstrap").info(
-        "event=onenote_bootstrap_report items_seen=%s changed=%s skipped=%s deleted=%s chunks=%s",
+        "event=onenote_bootstrap_report items_seen=%s changed=%s skipped=%s deleted=%s chunks=%s topics=%s",
         report.items_seen,
         report.items_changed,
         report.items_skipped,
         report.items_deleted,
         report.chunks_written,
+        topic_count,
     )
 
 

@@ -16,3 +16,8 @@ benchmarks/results/*
 .env
 .env.*
 !.env.example
+/thesis/
+THESIS_CHANGELOG.md
+thesis-requirements.txt
+/prompts/
+/generated_onenote_pages/

@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import UTC, datetime
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from shared_schemas import (
+    AdminSystemSettings,
+    AdminSystemSettingsUpdate,
     AdminUserUpdate,
     AppSettings,
+    ForceSyncResponse,
+    OpsJobType,
+    SystemRuntimeSettings,
     TopicAdmin,
     TopicCreateRequest,
     TopicUpdateRequest,
@@ -16,6 +25,7 @@ from rag_api.dependencies import (
     RequestAuthContext,
     get_app_data_store,
     get_document_metadata,
+    get_llm,
     get_local_auth_service,
     get_request_auth_context,
     get_runtime_settings,
@@ -23,6 +33,7 @@ from rag_api.dependencies import (
 from rag_api.persistence.app_store import AppDataStore, AppTopicRecord, UiSettingsRecord, json_dumps
 from rag_api.services.local_auth import LocalAuthError, LocalAuthService
 from rag_api.services.topic_sync import reconcile_topics_from_sources
+from sync_worker.persistence import PostgresOpsStore
 
 router = APIRouter(prefix="/api/v1", tags=["admin"])
 
@@ -135,7 +146,12 @@ async def refresh_topics_from_sources(
     store: AppDataStore = Depends(get_app_data_store),
     settings: AppSettings = Depends(get_runtime_settings),
 ) -> list[TopicAdmin]:
-    records = reconcile_topics_from_sources(get_document_metadata(settings), store, settings)
+    records = reconcile_topics_from_sources(
+        get_document_metadata(settings),
+        store,
+        settings,
+        prune_stale=settings.retrieval_provider == "qdrant",
+    )
     return [_topic_admin_from_record(record) for record in records]
 
 
@@ -184,6 +200,61 @@ async def update_ui_settings(
 ) -> UiSettings:
     record = store.update_ui_settings(request.model_dump(exclude_unset=True), updated_by_user_id=admin.user_id)
     return _ui_settings_from_record(record)
+
+
+@router.get("/admin/system-settings", response_model=AdminSystemSettings)
+async def admin_system_settings(
+    _admin: UserProfile = Depends(_require_system_admin),
+    settings: AppSettings = Depends(get_runtime_settings),
+) -> AdminSystemSettings:
+    return await _admin_system_settings(settings)
+
+
+@router.patch("/admin/system-settings", response_model=AdminSystemSettings)
+async def update_system_settings(
+    request: AdminSystemSettingsUpdate,
+    admin: UserProfile = Depends(_require_system_admin),
+    settings: AppSettings = Depends(get_runtime_settings),
+) -> AdminSystemSettings:
+    updates = request.model_dump(exclude_unset=True)
+    store = PostgresOpsStore(settings)
+    current = store.get_system_runtime_settings()
+    model_name = updates.get("llm_model")
+    if model_name is not None:
+        cleaned_model = str(model_name).strip()
+        if not cleaned_model:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Model name is required.")
+        available_models = await _available_llm_models(settings, selected_model=current.llm_model)
+        if cleaned_model not in available_models:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Select one of the available LLM models.")
+        updates["llm_model"] = cleaned_model
+
+    runtime = store.update_system_runtime_settings(
+        updates,
+        updated_by_user_id=admin.user_id,
+    )
+    return await _admin_system_settings(settings, runtime=runtime)
+
+
+@router.post("/admin/system-sync/run", response_model=ForceSyncResponse)
+async def force_system_sync(
+    admin: UserProfile = Depends(_require_system_admin),
+    settings: AppSettings = Depends(get_runtime_settings),
+) -> ForceSyncResponse:
+    store = PostgresOpsStore(settings)
+    now = datetime.now(UTC)
+    job, created = store.enqueue_job(
+        OpsJobType.onenote_reconciliation.value,
+        {
+            "trigger": "admin",
+            "actor_user_id": admin.user_id,
+            "requested_at_utc": now.isoformat(),
+        },
+        dedupe_key=f"admin:{OpsJobType.onenote_reconciliation.value}:{now.timestamp()}:{uuid4().hex[:8]}",
+        max_attempts=settings.ops_job_max_attempts,
+        available_at_utc=now,
+    )
+    return ForceSyncResponse(job=job, created=created, settings=await _admin_system_settings(settings))
 
 
 def _reject_self_lockout(admin: UserProfile, user_id: str, request: AdminUserUpdate) -> None:
@@ -239,6 +310,39 @@ def _ui_settings_from_record(record: UiSettingsRecord) -> UiSettings:
         updated_at_utc=record.updated_at_utc,
         updated_by_user_id=record.updated_by_user_id,
     )
+
+
+async def _admin_system_settings(
+    settings: AppSettings,
+    *,
+    runtime: SystemRuntimeSettings | None = None,
+) -> AdminSystemSettings:
+    store = PostgresOpsStore(settings)
+    runtime = runtime or store.get_system_runtime_settings()
+    available_models = await _available_llm_models(settings, selected_model=runtime.llm_model)
+    if runtime.llm_model not in available_models:
+        available_models = [runtime.llm_model, *available_models]
+    return AdminSystemSettings(
+        llm_provider=settings.default_llm_provider,
+        llm_model=runtime.llm_model,
+        available_llm_models=available_models,
+        onenote_sync_interval_seconds=runtime.onenote_sync_interval_seconds,
+        onenote_sync_daily_time=runtime.onenote_sync_daily_time,
+        onenote_sync_timezone=settings.onenote_sync_timezone,
+        onenote_sync_paused=runtime.onenote_sync_paused,
+        updated_at_utc=runtime.updated_at_utc,
+        updated_by_user_id=runtime.updated_by_user_id,
+        last_sync_job=store.latest_job(OpsJobType.onenote_reconciliation.value),
+    )
+
+
+async def _available_llm_models(settings: AppSettings, *, selected_model: str) -> list[str]:
+    try:
+        models = await asyncio.wait_for(get_llm(settings, model_name=selected_model).list_models(), timeout=5)
+    except Exception:
+        models = [selected_model]
+    unique = sorted({model.strip() for model in models if model.strip()})
+    return unique or [selected_model]
 
 
 def _normalize_list(values: list[str]) -> list[str]:

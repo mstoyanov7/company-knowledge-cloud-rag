@@ -38,6 +38,8 @@ def reconcile_topics_from_sources(
     metadata: DocumentMetadataPort,
     store: AppDataStore,
     settings: AppSettings,
+    *,
+    prune_stale: bool = True,
 ) -> list[AppTopicRecord]:
     sections = _sections_from_documents(metadata.list_documents())
     records = store.list_topic_records(enabled_only=False)
@@ -76,22 +78,23 @@ def reconcile_topics_from_sources(
         records_by_id[updated.topic_id] = updated
         records_by_section_key[section_key] = updated
 
-    stale_topic_ids: list[str] = []
-    for record in list(records_by_id.values()):
-        if not record.auto_managed or record.section_key in current_section_keys:
-            continue
-        if record.updated_by_user_id == TOPIC_SYNC_ACTOR:
-            # Purely sync-managed topic whose section no longer exists (renamed
-            # or removed). Delete it so renamed sections do not leave behind
-            # disabled duplicates that clutter the topic list.
-            stale_topic_ids.append(record.topic_id)
-        else:
-            # A human customized this topic; keep their edits but hide it so it
-            # does not linger as a filter for a section that is gone.
-            store.upsert_topic_record(record.topic_id, {"enabled": False}, updated_by_user_id=TOPIC_SYNC_ACTOR)
+    if prune_stale:
+        stale_topic_ids: list[str] = []
+        for record in list(records_by_id.values()):
+            if not record.auto_managed or record.section_key in current_section_keys:
+                continue
+            if record.updated_by_user_id == TOPIC_SYNC_ACTOR:
+                # Purely sync-managed topic whose section no longer exists
+                # (renamed or removed). Delete it so renamed sections do not
+                # leave behind disabled duplicates that clutter the topic list.
+                stale_topic_ids.append(record.topic_id)
+            else:
+                # A human customized this topic; keep their edits but hide it so
+                # it does not linger as a filter for a section that is gone.
+                store.upsert_topic_record(record.topic_id, {"enabled": False}, updated_by_user_id=TOPIC_SYNC_ACTOR)
 
-    if stale_topic_ids:
-        store.delete_topic_records(stale_topic_ids)
+        if stale_topic_ids:
+            store.delete_topic_records(stale_topic_ids)
 
     return store.list_topic_records(enabled_only=False)
 

@@ -28,6 +28,9 @@ dependencies = [
     "alembic>=1.13,<2.0",
     "bcrypt>=4.1,<5.0",
     "uvicorn[standard]>=0.30,<1.0",
+    # Provides the IANA tz database for zoneinfo on slim images that lack the
+    # system tzdata, so the daily sync time honors ONENOTE_SYNC_TIMEZONE.
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]

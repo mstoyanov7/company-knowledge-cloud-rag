@@ -25,6 +25,27 @@ class MockRetriever:
     def __init__(self, settings: AppSettings) -> None:
         self.settings = settings
         self._documents = self._build_corpus()
+        self._bm25 = None
+        self._bm25_index: dict[str, int] = {}
+        if str(getattr(settings, "mock_lexical_scoring", "overlap")).lower() == "bm25":
+            try:
+                from rank_bm25 import BM25Okapi
+
+                tokenized = [
+                    sorted(
+                        _tokenize(
+                            " ".join(
+                                [doc.title, doc.section_path or "", doc.chunk_text, " ".join(doc.tags)]
+                            )
+                        )
+                    )
+                    for doc in self._documents
+                ]
+                self._bm25 = BM25Okapi(tokenized)
+                self._bm25_index = {doc.chunk_id: index for index, doc in enumerate(self._documents)}
+                self.name = "mock-bm25"
+            except ImportError:  # pragma: no cover - optional dependency
+                self._bm25 = None
 
     @property
     def documents(self) -> tuple[ChunkDocument, ...]:
@@ -42,6 +63,9 @@ class MockRetriever:
             source_filters=request.source_filters,
         )
         question_tokens = _tokenize(request.question)
+        bm25_scores = (
+            self._bm25.get_scores(sorted(question_tokens)) if self._bm25 is not None and question_tokens else None
+        )
         allowed_acl_tags = set(access_scope.allowed_acl_tags)
         source_filters = set(access_scope.source_filters)
         section_filters = list(dict.fromkeys(value.strip() for value in request.section_filters if value.strip()))
@@ -84,7 +108,13 @@ class MockRetriever:
                 continue
 
             topic_overlap = set(request.topic_tags).intersection(set(document.tags))
-            scored.append(document.model_copy(update={"score": float(len(overlap) + len(topic_overlap) + fuzzy_score)}))
+            if bm25_scores is not None:
+                lexical_score = float(bm25_scores[self._bm25_index[document.chunk_id]])
+            else:
+                lexical_score = float(len(overlap))
+            scored.append(
+                document.model_copy(update={"score": lexical_score + len(topic_overlap) + fuzzy_score})
+            )
 
         scored.sort(key=lambda item: (-item.score, item.title, item.chunk_index))
         top_k = min(request.top_k, self.settings.mock_top_k)

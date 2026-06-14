@@ -13,9 +13,15 @@ from rag_api.ports import GenerationResult, PromptContext
 class OpenAICompatibleLlmAdapter:
     provider_name = "openai-compatible"
 
-    def __init__(self, settings: AppSettings, *, http_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self,
+        settings: AppSettings,
+        *,
+        model_name: str | None = None,
+        http_client: httpx.AsyncClient | None = None,
+    ) -> None:
         self.settings = settings
-        self.model_name = settings.default_model_name
+        self.model_name = model_name or settings.default_model_name
         self.base_url = settings.llm_openai_base_url.rstrip("/")
         self.api_key = settings.llm_openai_api_key.get_secret_value()
         self.http_client = http_client

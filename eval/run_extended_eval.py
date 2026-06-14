@@ -14,6 +14,24 @@ Run (offline, deterministic):
 
 Writes eval/results/extended_latest.json and prints a summary.
 
+To measure the production-faithful *hybrid semantic* configuration reproducibly,
+first freeze the real nomic-embed-text vectors once (needs Ollama):
+
+    python eval/build_semantic_manifest.py     # collect texts to embed
+    python eval/build_semantic_fixture.py      # embed -> semantic_fixture.json
+
+then run the same cases through the frozen vectors with the hybrid knobs:
+
+    RETRIEVAL_PROVIDER=semantic_fixture DEFAULT_LLM_PROVIDER=mock \
+    SECURITY_AUDIT_ENABLED=false AUTH_ENABLED=false \
+    APP_DATABASE_URL=sqlite:///./.cache/eval.sqlite3 \
+    MOCK_CORPUS_PATH=eval/datasets/extended_corpus.json \
+    RETRIEVAL_MIN_SEMANTIC_SCORE=0.5 RETRIEVAL_LEXICAL_WEIGHT=0.05 \
+    RETRIEVAL_SEMANTIC_CONFIDENT_SCORE=0.72 \
+    python eval/run_extended_eval.py --part answerable --label semantic
+    # ... then --part probes / --part acl / --part aggregate, all --label semantic
+    # writes eval/results/extended_latest_semantic.json
+
 The work can be split into parts (--part answerable --start N --end M,
 --part probes, --part acl) and merged with --part aggregate.
 """
@@ -208,7 +226,13 @@ def main() -> None:
                         default="aggregate")
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--end", type=int, default=10_000)
+    parser.add_argument("--label", default="",
+                        help="evaluation tier label; separates parts/results per tier")
     args = parser.parse_args()
+    global PARTS_DIR, OUTPUT
+    if args.label:
+        PARTS_DIR = HERE / "results" / f"extended_parts_{args.label}"
+        OUTPUT = HERE / "results" / f"extended_latest_{args.label}.json"
     dataset = json.loads(DATASET.read_text(encoding="utf-8"))
     if args.part == "answerable":
         asyncio.run(run_answerable(dataset, args.start, args.end))

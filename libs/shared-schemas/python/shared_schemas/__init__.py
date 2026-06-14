@@ -43,10 +43,14 @@ from shared_schemas.documents import (
 from shared_schemas.evaluation import EvaluationCase, EvaluationCaseResult, EvaluationReport, EvaluationSummary
 from shared_schemas.feedback import FeedbackRequest, FeedbackResponse
 from shared_schemas.ops import (
+    AdminSystemSettings,
+    AdminSystemSettingsUpdate,
     DeadLetterRecord,
+    ForceSyncResponse,
     OpsJobRecord,
     OpsJobStatus,
     OpsJobType,
+    SystemRuntimeSettings,
 )
 from shared_schemas.sync import JobStatus, OneNoteCheckpoint, SyncJob, SyncMode, SyncReport
 from shared_schemas.topics import (
@@ -67,6 +71,8 @@ __all__ = [
     "AppSettings",
     "AccessScope",
     "AccountStatus",
+    "AdminSystemSettings",
+    "AdminSystemSettingsUpdate",
     "AdminUserUpdate",
     "AclBinding",
     "AppRole",
@@ -87,6 +93,7 @@ __all__ = [
     "EvaluationSummary",
     "FeedbackRequest",
     "FeedbackResponse",
+    "ForceSyncResponse",
     "JobStatus",
     "LoginRequest",
     "LogoutResponse",
@@ -104,6 +111,7 @@ __all__ = [
     "SecurityAuditEvent",
     "SourceAttachment",
     "SourceDocument",
+    "SystemRuntimeSettings",
     "SyncJob",
     "SyncMode",
     "SyncReport",

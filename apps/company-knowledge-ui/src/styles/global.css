@@ -2780,6 +2780,7 @@ p {
 .admin__tabs {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
@@ -2910,6 +2911,9 @@ p {
 .admin-form--branding {
   max-width: 560px;
 }
+.admin-form--system {
+  max-width: 760px;
+}
 .admin-form__title {
   margin-bottom: 2px;
   display: flex;
@@ -2945,6 +2949,51 @@ p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+.system-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.system-card {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+}
+.system-card > span {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.system-card div {
+  min-width: 0;
+}
+.system-card b,
+.system-card small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.system-card b {
+  font-size: 13px;
+  font-weight: 720;
+}
+.system-card small {
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 11px;
 }
 .admin-textarea {
   min-height: 76px;
@@ -3090,6 +3139,9 @@ p {
     max-height: 220px;
   }
   .admin-form__two {
+    grid-template-columns: 1fr;
+  }
+  .system-cards {
     grid-template-columns: 1fr;
   }
   .icon-menu {

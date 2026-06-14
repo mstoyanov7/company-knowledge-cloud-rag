@@ -1,6 +1,8 @@
 web-app environment variables
 =============================
 
+Attached to the "Web App Setup" project setup record in the Project Setups section, owned by Frontend Team.
+
 Example environment values for local development.
 
 * VITE_API_BASE_URL=https://api.dev.northwind.local

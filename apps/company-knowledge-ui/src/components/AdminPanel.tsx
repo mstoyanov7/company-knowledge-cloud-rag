@@ -1,12 +1,18 @@
 import {
   Badge,
+  Bot,
   Building2,
   ChevronDown,
   Check,
+  Clock3,
   Layers,
   Palette,
+  Pause,
   Plus,
+  Play,
+  RefreshCw,
   Save,
+  Settings2,
   ShieldCheck,
   UserRound,
   Users,
@@ -19,13 +25,17 @@ import {
   approveUser,
   createAdminTopic,
   disableAdminTopic,
+  fetchAdminSystemSettings,
   fetchAdminTopics,
   fetchAdminUsers,
+  forceSystemSync,
   rejectUser,
   suspendUser,
+  updateAdminSystemSettings,
   updateAdminTopic,
   updateAdminUser,
   updateUiSettings,
+  type AdminSystemSettings,
   type UiSettings
 } from "../api/admin";
 import type { UserProfile } from "../api/auth";
@@ -58,6 +68,11 @@ type TopicDraft = {
   retrieval_tags: string;
   suggested_questions: string;
   enabled: boolean;
+};
+
+type SystemDraft = {
+  llm_model: string;
+  sync_daily_time: string;
 };
 
 const BLANK_TOPIC: TopicDraft = {
@@ -115,13 +130,15 @@ export function AdminPanel({
   onUiSettingsChanged
 }: AdminPanelProps) {
   const { toast } = useToast();
-  const [tab, setTab] = useState<"users" | "topics" | "branding">("users");
+  const [tab, setTab] = useState<"users" | "topics" | "system" | "branding">("users");
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [topics, setTopics] = useState<TopicAdmin[]>([]);
+  const [systemSettings, setSystemSettings] = useState<AdminSystemSettings | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [userDraft, setUserDraft] = useState<UserDraft | null>(null);
   const [topicDraft, setTopicDraft] = useState<TopicDraft>(BLANK_TOPIC);
+  const [systemDraft, setSystemDraft] = useState<SystemDraft | null>(null);
   const [isNewTopic, setIsNewTopic] = useState(false);
   const [brandDraft, setBrandDraft] = useState({
     app_name: uiSettings.app_name,
@@ -136,13 +153,15 @@ export function AdminPanel({
 
   useEffect(() => {
     let current = true;
-    Promise.all([fetchAdminUsers(), fetchAdminTopics()])
-      .then(([nextUsers, nextTopics]) => {
+    Promise.all([fetchAdminUsers(), fetchAdminTopics(), fetchAdminSystemSettings()])
+      .then(([nextUsers, nextTopics, nextSystemSettings]) => {
         if (!current) {
           return;
         }
         setUsers(nextUsers);
         setTopics(nextTopics);
+        setSystemSettings(nextSystemSettings);
+        setSystemDraft(draftFromSystemSettings(nextSystemSettings));
         const firstUser = nextUsers[0] || null;
         const firstTopic = nextTopics[0] || null;
         setSelectedUserId(firstUser?.user_id || null);
@@ -294,6 +313,59 @@ export function AdminPanel({
     }
   }
 
+  async function saveSystemSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!systemDraft) {
+      return;
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(systemDraft.sync_daily_time)) {
+      toast("Daily sync time must be a valid 24-hour time (HH:MM).", "err");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const saved = await updateAdminSystemSettings({
+        llm_model: systemDraft.llm_model,
+        onenote_sync_daily_time: systemDraft.sync_daily_time
+      });
+      setSystemSettings(saved);
+      setSystemDraft(draftFromSystemSettings(saved));
+      toast("System settings saved.", "ok");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "System settings save failed.", "err");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function setSyncPaused(paused: boolean) {
+    setIsSaving(true);
+    try {
+      const saved = await updateAdminSystemSettings({ onenote_sync_paused: paused });
+      setSystemSettings(saved);
+      setSystemDraft(draftFromSystemSettings(saved));
+      toast(paused ? "Automatic sync paused." : "Automatic sync resumed.", "ok");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Sync control failed.", "err");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function runSyncNow() {
+    setIsSaving(true);
+    try {
+      const response = await forceSystemSync();
+      setSystemSettings(response.settings);
+      setSystemDraft(draftFromSystemSettings(response.settings));
+      toast(`Sync job queued (${response.job.status}).`, "ok");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not queue sync job.", "err");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   const TopicDraftIcon = getTopicIcon(topicDraft.icon);
   const selectedIconLabel =
     TOPIC_ICON_OPTIONS.find((option) => option.id === topicDraft.icon)?.label || "Notebook";
@@ -321,6 +393,9 @@ export function AdminPanel({
           </button>
           <button type="button" className={tab === "topics" ? "is-active" : ""} onClick={() => setTab("topics")}>
             <Layers size={14} aria-hidden="true" /> Topics
+          </button>
+          <button type="button" className={tab === "system" ? "is-active" : ""} onClick={() => setTab("system")}>
+            <Settings2 size={14} aria-hidden="true" /> System
           </button>
           <button type="button" className={tab === "branding" ? "is-active" : ""} onClick={() => setTab("branding")}>
             <Palette size={14} aria-hidden="true" /> Branding
@@ -596,6 +671,106 @@ export function AdminPanel({
               </div>
             ) : null}
 
+            {tab === "system" && systemSettings && systemDraft ? (
+              <form className="admin-form admin-form--system scroll" onSubmit={saveSystemSettings}>
+                <div className="admin-form__title">
+                  <div>
+                    <h3>System controls</h3>
+                    <span>Runtime settings for answers and OneNote synchronization</span>
+                  </div>
+                  <span className={systemSettings.onenote_sync_paused ? "admin-status admin-status--suspended" : "admin-status"}>
+                    {systemSettings.onenote_sync_paused ? "sync paused" : "sync active"}
+                  </span>
+                </div>
+
+                <div className="system-cards">
+                  <div className="system-card">
+                    <span>
+                      <Bot size={16} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <b>{systemSettings.llm_provider}</b>
+                      <small>{systemSettings.llm_model}</small>
+                    </div>
+                  </div>
+                  <div className="system-card">
+                    <span>
+                      <Clock3 size={16} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <b>{systemSettings.onenote_sync_daily_time}</b>
+                      <small>Daily sync{systemSettings.onenote_sync_timezone ? ` (${systemSettings.onenote_sync_timezone})` : ""}</small>
+                    </div>
+                  </div>
+                  <div className="system-card">
+                    <span>
+                      <RefreshCw size={16} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <b>{systemSettings.last_sync_job?.status || "no jobs"}</b>
+                      <small>{lastSyncLabel(systemSettings)}</small>
+                    </div>
+                  </div>
+                </div>
+
+                <label className="fld">
+                  <span className="fld__lbl">LLM model</span>
+                  <span className="fld__box">
+                    <span className="fld__ico">
+                      <Bot size={16} aria-hidden="true" />
+                    </span>
+                    <select
+                      className="fld__in fld__sel"
+                      value={systemDraft.llm_model}
+                      onChange={(event) => setSystemDraft({ ...systemDraft, llm_model: event.target.value })}
+                    >
+                      {optionsWithCurrent(systemSettings.available_llm_models, systemDraft.llm_model).map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                </label>
+
+                <label className="fld">
+                  <span className="fld__lbl">
+                    Daily sync time{systemSettings.onenote_sync_timezone ? ` (${systemSettings.onenote_sync_timezone})` : ""}
+                  </span>
+                  <span className="fld__box">
+                    <span className="fld__ico">
+                      <Clock3 size={16} aria-hidden="true" />
+                    </span>
+                    <input
+                      className="fld__in"
+                      type="time"
+                      value={systemDraft.sync_daily_time}
+                      onChange={(event) => setSystemDraft({ ...systemDraft, sync_daily_time: event.target.value })}
+                    />
+                  </span>
+                </label>
+
+                <div className="admin-actions admin-actions--wrap">
+                  {systemSettings.onenote_sync_paused ? (
+                    <button className="btn btn--accent" type="button" disabled={isSaving} onClick={() => setSyncPaused(false)}>
+                      <Play size={14} aria-hidden="true" /> Resume automatic sync
+                    </button>
+                  ) : (
+                    <button className="btn" type="button" disabled={isSaving} onClick={() => setSyncPaused(true)}>
+                      <Pause size={14} aria-hidden="true" /> Pause automatic sync
+                    </button>
+                  )}
+                  <button className="btn" type="button" disabled={isSaving} onClick={runSyncNow}>
+                    <RefreshCw size={14} aria-hidden="true" /> Run sync now
+                  </button>
+                  <span className="topbar__spacer" />
+                  <button className="btn btn--accent" type="submit" disabled={isSaving}>
+                    <Save size={14} aria-hidden="true" /> Save system settings
+                  </button>
+                </div>
+              </form>
+            ) : null}
+
             {tab === "branding" ? (
               <form className="admin-form admin-form--branding" onSubmit={saveBranding}>
                 <label className="fld">
@@ -666,6 +841,13 @@ function draftFromTopic(topic: TopicAdmin): TopicDraft {
   };
 }
 
+function draftFromSystemSettings(settings: AdminSystemSettings): SystemDraft {
+  return {
+    llm_model: settings.llm_model,
+    sync_daily_time: settings.onenote_sync_daily_time || "02:00"
+  };
+}
+
 function replaceUser(users: UserProfile[], updated: UserProfile): UserProfile[] {
   const next = users.map((user) => (user.user_id === updated.user_id ? updated : user));
   return next.sort((left, right) => statusRank(left.status) - statusRank(right.status) || left.email.localeCompare(right.email));
@@ -698,6 +880,24 @@ function optionsWithCurrent(options: string[], current: string): string[] {
     return options;
   }
   return [trimmed, ...options];
+}
+
+function lastSyncLabel(settings: AdminSystemSettings): string {
+  const job = settings.last_sync_job;
+  if (!job) {
+    return "No sync job queued";
+  }
+  const value = job.completed_at_utc || job.updated_at_utc || job.created_at_utc;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return job.job_type;
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
 }
 
 function splitCsv(value: string): string[] {

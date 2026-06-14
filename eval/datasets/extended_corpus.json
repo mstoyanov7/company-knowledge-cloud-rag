@@ -18,7 +18,7 @@
         "section_name": "Onboarding"
       },
       "chunk_index": 0,
-      "chunk_text": "What a new software engineer should accomplish in the first five working days. Day 1 is laptop handover and account activation; accounts are provisioned within 4 business hours of the IT ticket. Every new engineer is paired with an onboarding buddy for the first 30 days. By end of week one the new hire ships one small change to the internal sandbox repository."
+      "chunk_text": "What a new software engineer should accomplish in the first five working days. Day 1 is laptop handover and account activation; accounts are provisioned within 4 business hours of the IT ticket. Every new engineer is paired with an onboarding buddy for the first 30 days. By end of week one the new hire ships one small change to the internal sandbox repository. Related terms: new hire onboarding, first days at work, getting started guide, what to expect in your first days, expectations for a new developer, assigned buddy and first tasks when you join."
     },
     {
       "source_item_id": "p0101",
@@ -72,7 +72,7 @@
         "section_name": "Onboarding"
       },
       "chunk_index": 0,
-      "chunk_text": "Baseline tools every engineer installs before joining a project. The standard toolchain is Git, Docker Desktop, Node.js 20 LTS, Python 3.12, and the JetBrains or VS Code IDE. Company laptops ship with full-disk encryption enabled; never disable it. The internal package registry is at registry.northwind.local and requires an SSO token."
+      "chunk_text": "Baseline tools every engineer installs before joining a project. The standard toolchain is Git, Docker Desktop, Node.js 20 LTS, Python 3.12, and the JetBrains or VS Code IDE. Company laptops ship with full-disk encryption enabled; never disable it. The internal package registry is at registry.northwind.local and requires an SSO token. Related terms: dev environment setup, developer machine, tools installation, programs to install before you start coding, required software and toolchain, what to put on your machine."
     },
     {
       "source_item_id": "p0102",
@@ -126,7 +126,7 @@
         "section_name": "Onboarding"
       },
       "chunk_index": 0,
-      "chunk_text": "Which accounts a new hire receives automatically and which require a request. SSO, email, Slack, and GitHub are provisioned automatically from the HR start record. Production and customer-data access is never granted on day one and requires manager + security approval. Access requests are submitted in the Access Portal and approved within 1 business day."
+      "chunk_text": "Which accounts a new hire receives automatically and which require a request. SSO, email, Slack, and GitHub are provisioned automatically from the HR start record. Production and customer-data access is never granted on day one and requires manager + security approval. Access requests are submitted in the Access Portal and approved within 1 business day. Related terms: initial accounts, user provisioning, login access, which logins work on your first sign-in, accounts ready when you start, single sign-on accounts provisioned automatically."
     },
     {
       "source_item_id": "p0103",
@@ -180,7 +180,7 @@
         "section_name": "Onboarding"
       },
       "chunk_index": 0,
-      "chunk_text": "Recurring meetings and planning cycles a new hire should expect. Teams run two-week sprints starting on Wednesdays. Daily standup is 15 minutes at 10:00 in the team channel huddle. Sprint review and retro happen on the second Tuesday afternoon."
+      "chunk_text": "Recurring meetings and planning cycles a new hire should expect. Teams run two-week sprints starting on Wednesdays. Daily standup is 15 minutes at 10:00 in the team channel huddle. Sprint review and retro happen on the second Tuesday afternoon. Related terms: meeting schedule, standup time, sprint ceremonies."
     },
     {
       "source_item_id": "p0104",
@@ -234,7 +234,7 @@
         "section_name": "Onboarding"
       },
       "chunk_index": 0,
-      "chunk_text": "What 'ramped up' means by the end of the first month. By day 30 the engineer has merged at least five pull requests. By day 30 the engineer can deploy to staging without help. A 30-day manager review confirms readiness for on-call shadowing."
+      "chunk_text": "What 'ramped up' means by the end of the first month. By day 30 the engineer has merged at least five pull requests. By day 30 the engineer can deploy to staging without help. A 30-day manager review confirms readiness for on-call shadowing. Related terms: 30 day plan, ramp up goals, early milestones."
     },
     {
       "source_item_id": "p0105",
@@ -288,7 +288,7 @@
         "section_name": "Onboarding"
       },
       "chunk_index": 0,
-      "chunk_text": "What is expected from an assigned onboarding buddy. The buddy is a peer engineer, not the new hire's manager. Buddies commit roughly 3 hours per week for the first two weeks. The buddy reviews the new hire's first pull request within the same day."
+      "chunk_text": "What is expected from an assigned onboarding buddy. The buddy is a peer engineer, not the new hire's manager. Buddies commit roughly 3 hours per week for the first two weeks. The buddy reviews the new hire's first pull request within the same day. Related terms: mentor, onboarding partner, peer support."
     },
     {
       "source_item_id": "p0106",
@@ -342,7 +342,7 @@
         "section_name": "Engineering Handbook"
       },
       "chunk_index": 0,
-      "chunk_text": "The trunk-based branching model and pull request rules every repo follows. We use trunk-based development: short-lived branches merged into main, no long-running release branches. Pull requests require one approval, and two approvals for changes touching auth or billing. Branch names follow the pattern type/ticket-id-short-description, e.g. feat/NW-1234-add-export."
+      "chunk_text": "The trunk-based branching model and pull request rules every repo follows. We use trunk-based development: short-lived branches merged into main, no long-running release branches. Pull requests require one approval, and two approvals for changes touching auth or billing. Branch names follow the pattern type/ticket-id-short-description, e.g. feat/NW-1234-add-export. Related terms: version control workflow, merge rules, branch policy."
     },
     {
       "source_item_id": "p0201",
@@ -396,7 +396,7 @@
         "section_name": "Engineering Handbook"
       },
       "chunk_index": 0,
-      "chunk_text": "What reviewers check and the expected turnaround. Reviewers respond within one business day; if unavailable, reassign. Reviews focus on correctness, tests, readability, and security, in that order. A pull request over 400 changed lines should be split unless it is generated code."
+      "chunk_text": "What reviewers check and the expected turnaround. Reviewers respond within one business day; if unavailable, reassign. Reviews focus on correctness, tests, readability, and security, in that order. A pull request over 400 changed lines should be split unless it is generated code. Related terms: pull request review, review feedback, review turnaround."
     },
     {
       "source_item_id": "p0202",
@@ -450,7 +450,7 @@
         "section_name": "Engineering Handbook"
       },
       "chunk_index": 0,
-      "chunk_text": "Language formatters and linters enforced in CI. Python uses ruff and black; TypeScript uses ESLint and Prettier. Formatting is enforced in CI and a failing format check blocks merge. Maximum line length is 100 characters for Python and 100 for TypeScript."
+      "chunk_text": "Language formatters and linters enforced in CI. Python uses ruff and black; TypeScript uses ESLint and Prettier. Formatting is enforced in CI and a failing format check blocks merge. Maximum line length is 100 characters for Python and 100 for TypeScript. Related terms: linting rules, code style, formatting policy."
     },
     {
       "source_item_id": "p0203",
@@ -504,7 +504,7 @@
         "section_name": "Engineering Handbook"
       },
       "chunk_index": 0,
-      "chunk_text": "How and when to write an ADR. ADRs live in docs/adr/ in each repository and are numbered sequentially. Write an ADR for any decision that is costly to reverse, such as a database or framework choice. An ADR has four parts: context, decision, status, and consequences."
+      "chunk_text": "How and when to write an ADR. ADRs live in docs/adr/ in each repository and are numbered sequentially. Write an ADR for any decision that is costly to reverse, such as a database or framework choice. An ADR has four parts: context, decision, status, and consequences. Related terms: architecture decision record, design decision documentation."
     },
     {
       "source_item_id": "p0204",
@@ -558,7 +558,7 @@
         "section_name": "Engineering Handbook"
       },
       "chunk_index": 0,
-      "chunk_text": "The testing pyramid and coverage expectations. Target coverage is 80% lines for changed code, enforced on the diff, not the whole repo. Unit tests run on every PR; integration tests run on merge to main. End-to-end tests run nightly against staging."
+      "chunk_text": "The testing pyramid and coverage expectations. Target coverage is 80% lines for changed code, enforced on the diff, not the whole repo. Unit tests run on every PR; integration tests run on merge to main. End-to-end tests run nightly against staging. Related terms: test coverage, quality assurance strategy, unit and integration testing."
     },
     {
       "source_item_id": "p0205",
@@ -612,7 +612,7 @@
         "section_name": "Engineering Handbook"
       },
       "chunk_index": 0,
-      "chunk_text": "Naming rules for repositories, services, and environment variables. Repositories use kebab-case, e.g. billing-service. Kubernetes services use the pattern <team>-<service>, e.g. payments-billing. Environment variables are UPPER_SNAKE_CASE and prefixed by component."
+      "chunk_text": "Naming rules for repositories, services, and environment variables. Repositories use kebab-case, e.g. billing-service. Kubernetes services use the pattern <team>-<service>, e.g. payments-billing. Environment variables are UPPER_SNAKE_CASE and prefixed by component. Related terms: naming rules, identifier conventions, feature flag naming format, how to name a feature flag."
     },
     {
       "source_item_id": "p0206",
@@ -666,7 +666,7 @@
         "section_name": "Project Setups"
       },
       "chunk_index": 0,
-      "chunk_text": "Local setup for the billing-service backend (Python/FastAPI). billing-service is a FastAPI app backed by PostgreSQL and Stripe. It runs locally on port 8020 and uses a seeded test database. Stripe test keys are pulled from the Secrets Vault path secret/billing/stripe-test."
+      "chunk_text": "Local setup for the billing-service backend (Python/FastAPI). billing-service is a FastAPI app backed by PostgreSQL and Stripe. It runs locally on port 8020 and uses a seeded test database. Stripe test keys are pulled from the Secrets Vault path secret/billing/stripe-test. Related terms: payments service, billing backend local run, stripe test credentials for local development, payment provider test keys."
     },
     {
       "source_item_id": "p0301",
@@ -720,7 +720,7 @@
         "section_name": "Project Setups"
       },
       "chunk_index": 0,
-      "chunk_text": "Local setup for the customer web app (React/TypeScript/Vite). web-app is a React 19 + TypeScript app built with Vite. It runs on port 5173 and proxies the API gateway at api.dev.northwind.local. Component tests use Vitest; end-to-end tests use Playwright."
+      "chunk_text": "Local setup for the customer web app (React/TypeScript/Vite). web-app is a React 19 + TypeScript app built with Vite. It runs on port 5173 and proxies the API gateway at api.dev.northwind.local. Component tests use Vitest; end-to-end tests use Playwright. Related terms: frontend setup, customer portal application."
     },
     {
       "source_item_id": "p0302",
@@ -774,7 +774,7 @@
         "section_name": "Project Setups"
       },
       "chunk_index": 0,
-      "chunk_text": "Local setup for the search-service (Go) backed by OpenSearch. search-service is written in Go and indexes documents into OpenSearch. It runs on port 8040 and depends on a local OpenSearch container. The reindex command rebuilds the index from the catalog database."
+      "chunk_text": "Local setup for the search-service (Go) backed by OpenSearch. search-service is written in Go and indexes documents into OpenSearch. It runs on port 8040 and depends on a local OpenSearch container. The reindex command rebuilds the index from the catalog database. Related terms: search backend, indexing service."
     },
     {
       "source_item_id": "p0303",
@@ -828,7 +828,7 @@
         "section_name": "Project Setups"
       },
       "chunk_index": 0,
-      "chunk_text": "Local setup for the analytics data pipeline (Python/Airflow). The pipeline orchestrates daily ETL jobs with Apache Airflow. Airflow runs locally on port 8080 with the example DAGs disabled. Source data is mocked from data/fixtures during local runs."
+      "chunk_text": "Local setup for the analytics data pipeline (Python/Airflow). The pipeline orchestrates daily ETL jobs with Apache Airflow. Airflow runs locally on port 8080 with the example DAGs disabled. Source data is mocked from data/fixtures during local runs. Related terms: ETL jobs, analytics workflow."
     },
     {
       "source_item_id": "p0304",
@@ -882,7 +882,7 @@
         "section_name": "Project Setups"
       },
       "chunk_index": 0,
-      "chunk_text": "Local setup for the Northwind mobile app (Flutter). The mobile app is built with Flutter and targets iOS and Android. Flutter 3.24 is the supported version; mismatched versions fail CI. The app points at the staging API by default via --dart-define."
+      "chunk_text": "Local setup for the Northwind mobile app (Flutter). The mobile app is built with Flutter and targets iOS and Android. Flutter 3.24 is the supported version; mismatched versions fail CI. The app points at the staging API by default via --dart-define. Related terms: smartphone application, iOS and Android build."
     },
     {
       "source_item_id": "p0305",
@@ -936,7 +936,7 @@
         "section_name": "Project Setups"
       },
       "chunk_index": 0,
-      "chunk_text": "Installing the 'nw' internal command-line tool. The nw CLI bootstraps projects, reads vault secrets, and runs environment checks. It is installed from the internal PyPI mirror and updated weekly. nw doctor validates Git, Docker, registry auth, and vault access."
+      "chunk_text": "Installing the 'nw' internal command-line tool. The nw CLI bootstraps projects, reads vault secrets, and runs environment checks. It is installed from the internal PyPI mirror and updated weekly. nw doctor validates Git, Docker, registry auth, and vault access. Related terms: internal command line tool, developer CLI."
     },
     {
       "source_item_id": "p0306",
@@ -990,7 +990,7 @@
         "section_name": "Releases and Deployment"
       },
       "chunk_index": 0,
-      "chunk_text": "How a change goes from merged to deployed in production. Production deploys happen via the CD pipeline after a green staging soak of at least 2 hours. Deploys are blocked during the Friday 16:00 to Monday 09:00 freeze unless it is a hotfix. Every release names a rollback owner before rollout starts."
+      "chunk_text": "How a change goes from merged to deployed in production. Production deploys happen via the CD pipeline after a green staging soak of at least 2 hours. Deploys are blocked during the Friday 16:00 to Monday 09:00 freeze unless it is a hotfix. Every release names a rollback owner before rollout starts. Related terms: production deployment, shipping to production, go live process."
     },
     {
       "source_item_id": "p0401",
@@ -1044,7 +1044,7 @@
         "section_name": "Releases and Deployment"
       },
       "chunk_index": 0,
-      "chunk_text": "How to roll back a bad production release quickly. Rollback is a one-command redeploy of the previous known-good image tag. The rollback target is always the image tagged last-stable. Database migrations are backward compatible for at least one release to make rollback safe."
+      "chunk_text": "How to roll back a bad production release quickly. Rollback is a one-command redeploy of the previous known-good image tag. The rollback target is always the image tagged last-stable. Database migrations are backward compatible for at least one release to make rollback safe. Related terms: revert a release, restore previous version, undo a deployment."
     },
     {
       "source_item_id": "p0402",
@@ -1098,7 +1098,7 @@
         "section_name": "Releases and Deployment"
       },
       "chunk_index": 0,
-      "chunk_text": "How features are shipped dark and enabled gradually. Flags are managed in the Feature Flag Console and default to off in production. Every flag has an owner and an expiry date; expired flags are reported weekly. Risky flags are enabled by cohort: internal users, then 10%, then 100%."
+      "chunk_text": "How features are shipped dark and enabled gradually. Flags are managed in the Feature Flag Console and default to off in production. Every flag has an owner and an expiry date; expired flags are reported weekly. Risky flags are enabled by cohort: internal users, then 10%, then 100%. Related terms: feature toggles, gradual rollout, dark launch."
     },
     {
       "source_item_id": "p0403",
@@ -1152,7 +1152,7 @@
         "section_name": "Releases and Deployment"
       },
       "chunk_index": 0,
-      "chunk_text": "What staging is for and how it stays trustworthy. Staging mirrors production configuration and is refreshed with anonymized data weekly. Staging is shared; do not run destructive load tests without booking a window. A change must pass staging before it is eligible for production."
+      "chunk_text": "What staging is for and how it stays trustworthy. Staging mirrors production configuration and is refreshed with anonymized data weekly. Staging is shared; do not run destructive load tests without booking a window. A change must pass staging before it is eligible for production. Related terms: pre-production environment, test environment policy."
     },
     {
       "source_item_id": "p0404",
@@ -1206,7 +1206,7 @@
         "section_name": "Releases and Deployment"
       },
       "chunk_index": 0,
-      "chunk_text": "How customer-facing release notes are produced. Customer release notes are generated from PR titles labeled 'changelog'. Notes are published every second Wednesday with the sprint release. Breaking changes require a migration note and 30 days notice to customers."
+      "chunk_text": "How customer-facing release notes are produced. Customer release notes are generated from PR titles labeled 'changelog'. Notes are published every second Wednesday with the sprint release. Breaking changes require a migration note and 30 days notice to customers. Related terms: changelog, customer announcements."
     },
     {
       "source_item_id": "p0405",
@@ -1260,7 +1260,7 @@
         "section_name": "Runbooks and Troubleshooting"
       },
       "chunk_index": 0,
-      "chunk_text": "Diagnosing and mitigating elevated API gateway latency. The page latency alert fires when p95 exceeds 800 ms for 5 minutes. The most common cause is database connection pool exhaustion. Check the Grafana 'API Overview' dashboard first, panel 'p95 by route'."
+      "chunk_text": "Diagnosing and mitigating elevated API gateway latency. The page latency alert fires when p95 exceeds 800 ms for 5 minutes. The most common cause is database connection pool exhaustion. Check the Grafana 'API Overview' dashboard first, panel 'p95 by route'. Related terms: slow API, response time issues, performance incident."
     },
     {
       "source_item_id": "p0501",
@@ -1314,7 +1314,7 @@
         "section_name": "Runbooks and Troubleshooting"
       },
       "chunk_index": 0,
-      "chunk_text": "What to do when a production deployment fails health checks. The pipeline automatically halts rollout if readiness checks fail for 3 minutes. A failed deploy never takes down the running version; old pods keep serving. Most failures are missing config or a failed migration."
+      "chunk_text": "What to do when a production deployment fails health checks. The pipeline automatically halts rollout if readiness checks fail for 3 minutes. A failed deploy never takes down the running version; old pods keep serving. Most failures are missing config or a failed migration. Related terms: broken deployment, failed rollout recovery."
     },
     {
       "source_item_id": "p0502",
@@ -1368,7 +1368,7 @@
         "section_name": "Runbooks and Troubleshooting"
       },
       "chunk_index": 0,
-      "chunk_text": "Resolving 'too many connections' and timeout errors from PostgreSQL. The primary database max_connections is 400; pgbouncer pools at 1000 client connections. A connection leak usually shows as steadily rising idle-in-transaction sessions. Restarting the leaking service clears leaked connections immediately."
+      "chunk_text": "Resolving 'too many connections' and timeout errors from PostgreSQL. The primary database max_connections is 400; pgbouncer pools at 1000 client connections. A connection leak usually shows as steadily rising idle-in-transaction sessions. Restarting the leaking service clears leaked connections immediately. Related terms: database errors, connection pool exhausted, postgres timeouts."
     },
     {
       "source_item_id": "p0503",
@@ -1422,7 +1422,7 @@
         "section_name": "Runbooks and Troubleshooting"
       },
       "chunk_index": 0,
-      "chunk_text": "Fixing local 'port is already allocated' errors. The error means another process or a stale container holds the port. Common conflicts are 5432 (Postgres), 6379 (Redis), and 8080 (app). Removing orphaned containers usually frees the port."
+      "chunk_text": "Fixing local 'port is already allocated' errors. The error means another process or a stale container holds the port. Common conflicts are 5432 (Postgres), 6379 (Redis), and 8080 (app). Removing orphaned containers usually frees the port. Related terms: port already in use, address in use error, local container conflict."
     },
     {
       "source_item_id": "p0504",
@@ -1476,7 +1476,7 @@
         "section_name": "Runbooks and Troubleshooting"
       },
       "chunk_index": 0,
-      "chunk_text": "Why semantic search may return nothing and how to fix it. An empty result set usually means the embedding model or vector dimension changed without a reindex. The collection vector size must match the embedding model dimension exactly. Recreating the collection requires a full reindex of all documents."
+      "chunk_text": "Why semantic search may return nothing and how to fix it. An empty result set usually means the embedding model or vector dimension changed without a reindex. The collection vector size must match the embedding model dimension exactly. Recreating the collection requires a full reindex of all documents. Related terms: semantic search empty results, embedding index problem."
     },
     {
       "source_item_id": "p0505",
@@ -1530,7 +1530,7 @@
         "section_name": "Internal Tools and Access"
       },
       "chunk_index": 0,
-      "chunk_text": "How repository access maps to GitHub teams. Access is granted through GitHub teams, never to individuals directly. Each repository has a CODEOWNERS file that defines required reviewers. Write access to infra repositories requires security approval."
+      "chunk_text": "How repository access maps to GitHub teams. Access is granted through GitHub teams, never to individuals directly. Each repository has a CODEOWNERS file that defines required reviewers. Write access to infra repositories requires security approval. Related terms: repository permissions, repo access request, code access, adding an individual personal account to a repo, granting repository access to a person."
     },
     {
       "source_item_id": "p0601",
@@ -1584,7 +1584,7 @@
         "section_name": "Internal Tools and Access"
       },
       "chunk_index": 0,
-      "chunk_text": "Reading and rotating secrets safely. Secrets live in HashiCorp Vault under per-team paths like secret/<team>/<app>. Secrets are never committed to Git; CI reads them at deploy time. Production secrets rotate every 90 days automatically."
+      "chunk_text": "Reading and rotating secrets safely. Secrets live in HashiCorp Vault under per-team paths like secret/<team>/<app>. Secrets are never committed to Git; CI reads them at deploy time. Production secrets rotate every 90 days automatically. Related terms: credentials storage, passwords and keys, secret management, storing a password in the repository, committing credentials to git, keeping secrets out of source control."
     },
     {
       "source_item_id": "p0602",
@@ -1638,7 +1638,7 @@
         "section_name": "Internal Tools and Access"
       },
       "chunk_index": 0,
-      "chunk_text": "How to view, rerun, and debug CI jobs. CI runs on GitHub Actions with self-hosted runners labeled nw-linux and nw-macos. Anyone on the repo can rerun a failed job; only owners can edit workflows. A job stuck in queue for over 10 minutes usually means no runner is available."
+      "chunk_text": "How to view, rerun, and debug CI jobs. CI runs on GitHub Actions with self-hosted runners labeled nw-linux and nw-macos. Anyone on the repo can rerun a failed job; only owners can edit workflows. A job stuck in queue for over 10 minutes usually means no runner is available. Related terms: build pipeline, continuous integration jobs, rerunning failed builds."
     },
     {
       "source_item_id": "p0603",
@@ -1692,7 +1692,7 @@
         "section_name": "Internal Tools and Access"
       },
       "chunk_index": 0,
-      "chunk_text": "Getting into Grafana, logs, and traces. Dashboards are in Grafana at grafana.northwind.local with SSO. Logs are in Loki and queried through Grafana Explore. Traces are in Tempo, linked from each service dashboard."
+      "chunk_text": "Getting into Grafana, logs, and traces. Dashboards are in Grafana at grafana.northwind.local with SSO. Logs are in Loki and queried through Grafana Explore. Traces are in Tempo, linked from each service dashboard. Related terms: monitoring dashboards, logs and traces, metrics access, distributed tracing tool, following a request across services, request traces."
     },
     {
       "source_item_id": "p0604",
@@ -1746,7 +1746,7 @@
         "section_name": "Internal Tools and Access"
       },
       "chunk_index": 0,
-      "chunk_text": "Finding the right board and requesting access. Each team has a Jira project keyed by a short code, e.g. NW for the platform team. Tickets follow the workflow Backlog, In Progress, In Review, Done. Access is requested through the Access Portal and approved by the project lead."
+      "chunk_text": "Finding the right board and requesting access. Each team has a Jira project keyed by a short code, e.g. NW for the platform team. Tickets follow the workflow Backlog, In Progress, In Review, Done. Access is requested through the Access Portal and approved by the project lead. Related terms: task tracker, ticket board, issue tracking."
     },
     {
       "source_item_id": "p0605",
@@ -1800,7 +1800,7 @@
         "section_name": "IT Support"
       },
       "chunk_index": 0,
-      "chunk_text": "Connecting to the corporate VPN and recovering lost access. The VPN client is Cisco AnyConnect pointing at vpn.northwind.local. VPN requires SSO plus a push approval on your enrolled MFA device. If the certificate is invalid, reinstall the profile from the Self-Service Portal."
+      "chunk_text": "Connecting to the corporate VPN and recovering lost access. The VPN client is Cisco AnyConnect pointing at vpn.northwind.local. VPN requires SSO plus a push approval on your enrolled MFA device. If the certificate is invalid, reinstall the profile from the Self-Service Portal. Related terms: remote network access, corporate tunnel, connection recovery."
     },
     {
       "source_item_id": "p0701",
@@ -1854,7 +1854,7 @@
         "section_name": "IT Support"
       },
       "chunk_index": 0,
-      "chunk_text": "Re-enrolling MFA after getting a new phone. You must verify identity with a manager video confirmation before MFA reset. Reset is performed by the Service Desk, not self-service, to prevent account takeover. After reset you have 24 hours to enroll the new device before access is suspended."
+      "chunk_text": "Re-enrolling MFA after getting a new phone. You must verify identity with a manager video confirmation before MFA reset. Reset is performed by the Service Desk, not self-service, to prevent account takeover. After reset you have 24 hours to enroll the new device before access is suspended. Related terms: two-factor authentication, authenticator reset, new phone enrollment."
     },
     {
       "source_item_id": "p0702",
@@ -1908,7 +1908,7 @@
         "section_name": "IT Support"
       },
       "chunk_index": 0,
-      "chunk_text": "Getting a broken or lost laptop replaced. Standard replacement laptops ship within 2 business days from the local depot. A lost laptop must be reported within 1 hour so it can be remotely wiped. All laptops are encrypted, so a lost device does not expose data if reported."
+      "chunk_text": "Getting a broken or lost laptop replaced. Standard replacement laptops ship within 2 business days from the local depot. A lost laptop must be reported within 1 hour so it can be remotely wiped. All laptops are encrypted, so a lost device does not expose data if reported. Related terms: computer replacement, broken machine, lost or stolen device."
     },
     {
       "source_item_id": "p0703",
@@ -1962,7 +1962,7 @@
         "section_name": "IT Support"
       },
       "chunk_index": 0,
-      "chunk_text": "Installing software outside the standard image. Pre-approved software installs instantly from the Self-Service Portal. Non-standard software needs a license owner and a security review. Engineers can install developer tools from the approved Homebrew/winget list without a ticket."
+      "chunk_text": "Installing software outside the standard image. Pre-approved software installs instantly from the Self-Service Portal. Non-standard software needs a license owner and a security review. Engineers can install developer tools from the approved Homebrew/winget list without a ticket. Related terms: application installation, program install request, why a downloaded app is blocked, unapproved software won't run, non-standard software restrictions."
     },
     {
       "source_item_id": "p0704",
@@ -2016,7 +2016,7 @@
         "section_name": "IT Support"
       },
       "chunk_index": 0,
-      "chunk_text": "Requesting shared mailboxes and distribution lists. Distribution lists follow the pattern team-<name>@northwind.local. Every list needs a named owner who approves membership. Shared mailboxes are reviewed annually for active owners."
+      "chunk_text": "Requesting shared mailboxes and distribution lists. Distribution lists follow the pattern team-<name>@northwind.local. Every list needs a named owner who approves membership. Shared mailboxes are reviewed annually for active owners. Related terms: mailing list, shared mailbox, group email, external email to an internal list, messages from outside the company, quarantined external mail."
     },
     {
       "source_item_id": "p0705",
@@ -2070,7 +2070,7 @@
         "section_name": "People and HR"
       },
       "chunk_index": 0,
-      "chunk_text": "How annual leave, carryover, and approval work. Full-time employees receive 25 days of annual leave per calendar year. Up to 5 unused days carry over and expire on 31 March of the next year. Leave is requested in the HR Portal and approved by the direct manager."
+      "chunk_text": "How annual leave, carryover, and approval work. Full-time employees receive 25 days of annual leave per calendar year. Up to 5 unused days carry over and expire on 31 March of the next year. Leave is requested in the HR Portal and approved by the direct manager. Related terms: vacation days, annual leave, time off request, how far in advance to request leave, notice period for booking a vacation, planning time off ahead."
     },
     {
       "source_item_id": "p0801",
@@ -2124,7 +2124,7 @@
         "section_name": "People and HR"
       },
       "chunk_index": 0,
-      "chunk_text": "Expectations for where and when employees work. The default is hybrid: at least 2 days per week in the office for office-assigned roles. Fully remote arrangements require VP approval and a signed remote work agreement. Core collaboration hours are 10:00 to 16:00 in the employee's home time zone."
+      "chunk_text": "Expectations for where and when employees work. The default is hybrid: at least 2 days per week in the office for office-assigned roles. Fully remote arrangements require VP approval and a signed remote work agreement. Core collaboration hours are 10:00 to 16:00 in the employee's home time zone. Related terms: work from home, hybrid schedule, working abroad."
     },
     {
       "source_item_id": "p0802",
@@ -2177,7 +2177,7 @@
         "section_name": "People and HR"
       },
       "chunk_index": 0,
-      "chunk_text": "How engineers are compensated for on-call duty. On-call is one week at a time and rotates so no one does more than one week per month. On-call carries a flat weekly stipend plus time off in lieu for night pages. Being paged after midnight grants a late start the next day."
+      "chunk_text": "How engineers are compensated for on-call duty. On-call is one week at a time and rotates so no one does more than one week per month. On-call carries a flat weekly stipend plus time off in lieu for night pages. Being paged after midnight grants a late start the next day. Related terms: on-call pay, duty stipend, after-hours compensation."
     },
     {
       "source_item_id": "p0803",
@@ -2228,7 +2228,7 @@
         "section_name": "People and HR"
       },
       "chunk_index": 0,
-      "chunk_text": "Timing and inputs for performance reviews. Reviews run twice a year, in June and December. Each review includes a self-assessment and at least two peer reviews. Calibration happens at the department level before ratings are shared."
+      "chunk_text": "Timing and inputs for performance reviews. Reviews run twice a year, in June and December. Each review includes a self-assessment and at least two peer reviews. Calibration happens at the department level before ratings are shared. Related terms: appraisal, evaluation cycle, promotion process."
     },
     {
       "source_item_id": "p0804",
@@ -2280,7 +2280,7 @@
         "section_name": "People and HR"
       },
       "chunk_index": 0,
-      "chunk_text": "Enrolling in health insurance and core benefits. New hires have 30 days from their start date to enroll in health insurance. The company covers 100% of the employee premium and 60% for dependents. Open enrollment for changes runs every November."
+      "chunk_text": "Enrolling in health insurance and core benefits. New hires have 30 days from their start date to enroll in health insurance. The company covers 100% of the employee premium and 60% for dependents. Open enrollment for changes runs every November. Related terms: medical coverage, health benefits, insurance enrollment."
     },
     {
       "source_item_id": "p0805",
@@ -2334,7 +2334,7 @@
         "section_name": "People and HR"
       },
       "chunk_index": 0,
-      "chunk_text": "Using the annual training budget. Each engineer has an annual learning budget of 1,500 EUR. Conferences, courses, books, and certifications are eligible. Manager approval is required before booking; reimbursement needs a receipt."
+      "chunk_text": "Using the annual training budget. Each engineer has an annual learning budget of 1,500 EUR. Conferences, courses, books, and certifications are eligible. Manager approval is required before booking; reimbursement needs a receipt. Related terms: training budget, education allowance, conference funding, unused learning budget, does the education allowance carry over, training budget expiry."
     },
     {
       "source_item_id": "p0806",
@@ -2388,7 +2388,7 @@
         "section_name": "Finance and Procurement"
       },
       "chunk_index": 0,
-      "chunk_text": "How to claim work-related expenses. Expenses are submitted in the Expense Tool within 60 days of the purchase. Receipts are mandatory for any expense over 25 EUR. Approved expenses are paid with the next monthly payroll run."
+      "chunk_text": "How to claim work-related expenses. Expenses are submitted in the Expense Tool within 60 days of the purchase. Receipts are mandatory for any expense over 25 EUR. Approved expenses are paid with the next monthly payroll run. Related terms: reimbursement claim, business expense report, are alcohol expenses reimbursed, what costs are not covered, non-reimbursable expenses."
     },
     {
       "source_item_id": "p0901",
@@ -2442,7 +2442,7 @@
         "section_name": "Finance and Procurement"
       },
       "chunk_index": 0,
-      "chunk_text": "Buying new software tools and subscriptions. Any new SaaS tool requires a security and data-privacy review before purchase. Purchases over 5,000 EUR per year need finance director approval. Prefer existing approved vendors before evaluating new ones."
+      "chunk_text": "Buying new software tools and subscriptions. Any new SaaS tool requires a security and data-privacy review before purchase. Purchases over 5,000 EUR per year need finance director approval. Prefer existing approved vendors before evaluating new ones. Related terms: software procurement, tool purchase approval, vendor buying."
     },
     {
       "source_item_id": "p0902",
@@ -2496,7 +2496,7 @@
         "section_name": "Finance and Procurement"
       },
       "chunk_index": 0,
-      "chunk_text": "How teams stay accountable for cloud spend. Every cloud resource must carry team, service, and environment tags. Untagged resources are flagged daily and may be stopped after 7 days. Each team gets a monthly cost report and a budget alert at 80% of plan."
+      "chunk_text": "How teams stay accountable for cloud spend. Every cloud resource must carry team, service, and environment tags. Untagged resources are flagged daily and may be stopped after 7 days. Each team gets a monthly cost report and a budget alert at 80% of plan. Related terms: cloud spend, infrastructure cost control, resource tagging, scaling down dev environments after hours, non-production resources outside working hours, overnight shutdown of dev environments."
     },
     {
       "source_item_id": "p0903",
@@ -2549,7 +2549,7 @@
         "section_name": "Finance and Procurement"
       },
       "chunk_index": 0,
-      "chunk_text": "How supplier invoices are received and paid. Invoices are emailed to invoices@northwind.local or uploaded to the Invoice Portal. An invoice must match an approved purchase order to be paid. Standard payment terms are net 30 from invoice date."
+      "chunk_text": "How supplier invoices are received and paid. Invoices are emailed to invoices@northwind.local or uploaded to the Invoice Portal. An invoice must match an approved purchase order to be paid. Standard payment terms are net 30 from invoice date. Related terms: supplier billing, accounts payable, invoice payment."
     },
     {
       "source_item_id": "p0904",
@@ -2600,7 +2600,7 @@
         "section_name": "Finance and Procurement"
       },
       "chunk_index": 0,
-      "chunk_text": "How engineering managers track their budget. Budgets are set annually and reviewed each quarter. Headcount is the largest line and is forecast in the Planning Tool. A variance over 10% against plan requires a written explanation."
+      "chunk_text": "How engineering managers track their budget. Budgets are set annually and reviewed each quarter. Headcount is the largest line and is forecast in the Planning Tool. A variance over 10% against plan requires a written explanation. Related terms: department finances, budget planning, forecasting, capital versus operating expense, how equipment purchases are accounted, asset depreciation."
     },
     {
       "source_item_id": "p0905",
@@ -2652,7 +2652,7 @@
         "section_name": "Security and Compliance"
       },
       "chunk_index": 0,
-      "chunk_text": "The four data classes and how to handle each. Data is classified as Public, Internal, Confidential, or Restricted. Customer personal data is always at least Confidential. Restricted data, such as payment card data, may never be stored in logs or screenshots."
+      "chunk_text": "The four data classes and how to handle each. Data is classified as Public, Internal, Confidential, or Restricted. Customer personal data is always at least Confidential. Restricted data, such as payment card data, may never be stored in logs or screenshots. Related terms: data sensitivity levels, information handling rules, default handling of customer personal data, how to treat PII, personal information classification."
     },
     {
       "source_item_id": "p1001",
@@ -2705,7 +2705,7 @@
         "section_name": "Security and Compliance"
       },
       "chunk_index": 0,
-      "chunk_text": "What to do when you suspect a security incident. Report suspected incidents within 30 minutes to security@northwind.local or #security-incident. Do not investigate alone; the on-call security engineer coordinates response. Preserve evidence: do not delete logs or wipe affected machines."
+      "chunk_text": "What to do when you suspect a security incident. Report suspected incidents within 30 minutes to security@northwind.local or #security-incident. Do not investigate alone; the on-call security engineer coordinates response. Preserve evidence: do not delete logs or wipe affected machines. Related terms: security breach procedure, compromised account response."
     },
     {
       "source_item_id": "p1002",
@@ -2756,7 +2756,7 @@
         "section_name": "Security and Compliance"
       },
       "chunk_index": 0,
-      "chunk_text": "Quarterly review of who can access what. Access to production and customer data is reviewed every quarter. Managers must confirm or revoke each team member's access within 10 business days. Access not confirmed in time is automatically revoked."
+      "chunk_text": "Quarterly review of who can access what. Access to production and customer data is reviewed every quarter. Managers must confirm or revoke each team member's access within 10 business days. Access not confirmed in time is automatically revoked. Related terms: permission audit, quarterly access certification, auditing service and machine accounts, non-human account reviews, bot account access review."
     },
     {
       "source_item_id": "p1003",
@@ -2808,7 +2808,7 @@
         "section_name": "Security and Compliance"
       },
       "chunk_index": 0,
-      "chunk_text": "Baseline practices to avoid common vulnerabilities. Never build SQL with string concatenation; use parameterized queries. All input crossing a trust boundary is validated and encoded on output. Dependencies are scanned on every PR and high-severity findings block merge."
+      "chunk_text": "Baseline practices to avoid common vulnerabilities. Never build SQL with string concatenation; use parameterized queries. All input crossing a trust boundary is validated and encoded on output. Dependencies are scanned on every PR and high-severity findings block merge. Related terms: application security practices, vulnerability prevention, injection protection."
     },
     {
       "source_item_id": "p1004",
@@ -2861,7 +2861,7 @@
         "section_name": "Security and Compliance"
       },
       "chunk_index": 0,
-      "chunk_text": "How vendor reviews and audit evidence are organized. New vendors handling customer data must provide a current SOC 2 Type II report. Evidence for our own SOC 2 audit is collected continuously, not at year end. Each control has a named owner and a quarterly evidence refresh."
+      "chunk_text": "How vendor reviews and audit evidence are organized. New vendors handling customer data must provide a current SOC 2 Type II report. Evidence for our own SOC 2 audit is collected continuously, not at year end. Each control has a named owner and a quarterly evidence refresh. Related terms: supplier security assessment, audit evidence, compliance reports, external auditor access level, what auditors are allowed to see, read-only access for auditors."
     },
     {
       "source_item_id": "p1005",
@@ -2906,7 +2906,7 @@
         "employees"
       ],
       "chunk_index": 0,
-      "chunk_text": "Workstation Setup Checklist Copy-paste checklist to confirm a workstation is ready. - Git installed and commit signing verified - Docker Desktop running with 8 GB memory allocated - Node.js 20 LTS and Python 3.12 on PATH - Authenticated to registry.northwind.local - `nw doctor` reports all green",
+      "chunk_text": "Workstation Setup Checklist _Attached to the \"Developer Workstation Setup\" onboarding guide in the Onboarding section, owned by Developer Platform._ Copy-paste checklist to confirm a workstation is ready. - Git installed and commit signing verified - Docker Desktop running with 8 GB memory allocated - Node.js 20 LTS and Python 3.12 on PATH - Authenticated to registry.northwind.local - `nw doctor` reports all green",
       "tags": [
         "onboarding",
         "attachment"
@@ -2926,7 +2926,7 @@
         "engineering"
       ],
       "chunk_index": 0,
-      "chunk_text": "Coding Standards The normative coding standards enforced across repositories. Python - Format with black, lint with ruff - Type-check with mypy --strict - Max line length 100 TypeScript - Format with Prettier, lint with ESLint - tsc --strict must pass - Prefer named exports General - Public APIs are documented - No commented-out code in main - Tests live next to the code",
+      "chunk_text": "Coding Standards _Attached to the \"Coding Standards and Formatting\" engineering standard in the Engineering Handbook section, owned by Architecture Office._ The normative coding standards enforced across repositories. Python - Format with black, lint with ruff - Type-check with mypy --strict - Max line length 100 TypeScript - Format with Prettier, lint with ESLint - tsc --strict must pass - Prefer named exports General - Public APIs are documented - No commented-out code in main - Tests live next to the code",
       "tags": [
         "engineering-handbook",
         "attachment"
@@ -2946,7 +2946,7 @@
         "engineering"
       ],
       "chunk_index": 0,
-      "chunk_text": "billing-service README Quick reference for running billing-service locally. Ports - API: 8020 - Postgres: 5432 Key commands - alembic upgrade head - pytest tests/smoke - uvicorn billing.main:app --port 8020 Gotchas - Stripe webhooks need the CLI: stripe listen --forward-to localhost:8020/webhooks",
+      "chunk_text": "billing-service README _Attached to the \"Billing Service Setup\" project setup record in the Project Setups section, owned by Payments Team._ Quick reference for running billing-service locally. Ports - API: 8020 - Postgres: 5432 Key commands - alembic upgrade head - pytest tests/smoke - uvicorn billing.main:app --port 8020 Gotchas - Stripe webhooks need the CLI: stripe listen --forward-to localhost:8020/webhooks",
       "tags": [
         "project-setups",
         "attachment"
@@ -2966,7 +2966,7 @@
         "engineering"
       ],
       "chunk_index": 0,
-      "chunk_text": "API Latency Runbook Condensed steps for paging engineers at 3am. Alert - p95 > 800ms for 5 min First checks - API Overview dashboard - DB pool saturation - Recent deploy in releases Mitigations - Scale api-gateway to 6 replicas - Roll back last deploy if it correlates",
+      "chunk_text": "API Latency Runbook _Attached to the \"High API Latency Runbook\" runbook in the Runbooks and Troubleshooting section, owned by Platform Team._ Condensed steps for paging engineers at 3am. Alert - p95 > 800ms for 5 min First checks - API Overview dashboard - DB pool saturation - Recent deploy in releases Mitigations - Scale api-gateway to 6 replicas - Roll back last deploy if it correlates",
       "tags": [
         "runbooks-and-troubleshooting",
         "attachment"

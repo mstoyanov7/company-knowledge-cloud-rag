@@ -13,6 +13,12 @@ class OpsScheduler:
         self.store = store or PostgresOpsStore(settings)
 
     def enqueue_periodic_jobs(self) -> int:
+        try:
+            if self.store.get_system_runtime_settings().onenote_sync_paused:
+                return 0
+        except Exception:
+            pass
+
         enqueued = 0
         for job_type, interval in [
             (OpsJobType.onenote_reconciliation.value, self.settings.onenote_reconciliation_interval_seconds),

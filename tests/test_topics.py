@@ -256,6 +256,55 @@ def test_reconcile_disables_but_keeps_human_edited_topic_for_removed_section(tmp
     assert by_id[temp.topic_id].enabled is False
 
 
+def test_reconcile_can_skip_stale_pruning_for_partial_source_views(tmp_path) -> None:
+    settings = AppSettings(
+        app_env="test",
+        app_database_url=f"sqlite:///{tmp_path / 'app.sqlite'}",
+        auth_default_acl_tags="public",
+    )
+    store = AppDataStore(settings)
+    store.ensure_schema()
+
+    reconcile_topics_from_sources(
+        _StaticMetadata(
+            [
+                _source_document("hr-1", "HR Questions", ["employees"]),
+                _source_document("it-1", "IT Support", ["employees"]),
+            ]
+        ),
+        store,
+        settings,
+    )
+
+    reconcile_topics_from_sources(
+        _StaticMetadata([_source_document("hr-2", "HR Questions", ["employees"])]),
+        store,
+        settings,
+        prune_stale=False,
+    )
+
+    sections = {record.section_key for record in store.list_topic_records(enabled_only=False)}
+    assert sections == {"HR Questions", "IT Support"}
+
+
+def test_topic_service_can_load_without_pruning_seed_topics(tmp_path) -> None:
+    settings = AppSettings(
+        app_env="test",
+        app_database_url=f"sqlite:///{tmp_path / 'app.sqlite'}",
+        auth_default_acl_tags="public",
+    )
+    store = AppDataStore(settings)
+    store.ensure_schema()
+    store.upsert_topic_record("old-seed", {"name": "Old Seed"}, updated_by_user_id="seed")
+
+    empty_config = tmp_path / "topics.json"
+    empty_config.write_text("[]", encoding="utf-8")
+    TopicService(loader=TopicLoader(str(empty_config)), store=store, prune_orphaned_seed_topics=False)
+
+    ids = {record.topic_id for record in store.list_topic_records(enabled_only=False)}
+    assert "old-seed" in ids
+
+
 def test_topic_service_prunes_orphaned_seed_topics(tmp_path) -> None:
     settings = AppSettings(
         app_env="test",

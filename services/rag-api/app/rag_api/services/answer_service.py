@@ -346,6 +346,7 @@ class AnswerService:
                 max_chunks=ranked_top_k,
             )
             chunks = _drop_metadata_chunks_for_complete_context(question_analysis, chunks)
+            chunks = _trim_citation_pages(question_analysis, chunks, evidence_assessment)
             retrieval_result.metadata.returned_count = len(chunks)
             retrieval_result.metadata.evidence_sufficiency = evidence_assessment.sufficiency
             retrieval_result.metadata.relevance_grades = [
@@ -357,7 +358,15 @@ class AnswerService:
                 }
                 for grade in evidence_assessment.grades
             ]
-            if self.clarify_enabled and allow_clarification and not request.focus_source_item_ids:
+            # A multi-facet question legitimately spans several pages: the
+            # facets are complementary, not ambiguous, so the answer should
+            # synthesize them instead of asking the user to pick one.
+            if (
+                self.clarify_enabled
+                and allow_clarification
+                and not request.focus_source_item_ids
+                and not question_analysis.sub_questions
+            ):
                 clarification = detect_clarification(
                     question_analysis,
                     graded_chunks,
@@ -481,7 +490,10 @@ class AnswerService:
             answer_text = _strip_inline_citation_markers(answer_text)
             answer_text = _strip_trailing_source_line(answer_text)
             answer_text = _normalize_markdown_tables(answer_text)
+            answer_text = _unwrap_prose_code_fences(answer_text)
             answer_text = _merge_adjacent_code_fences(answer_text)
+            answer_text = _fix_broken_bold_spans(answer_text)
+            answer_text = _strip_prose_inline_code(answer_text)
             answer_text = _dedupe_repeated_markdown_headings(answer_text)
             answer_text = _collapse_excess_blank_lines(answer_text)
             answer_text = _normalize_no_information_text(answer_text)
@@ -1150,6 +1162,12 @@ def _ranked_context_limit(question_analysis: QuestionAnalysis, requested_top_k: 
 
 def _wants_complete_structured_context(question_analysis: QuestionAnalysis | str) -> bool:
     if isinstance(question_analysis, QuestionAnalysis):
+        # A how-to / setup question wants the full procedure, not just the
+        # single best-matching fragment: pull every section of the answering
+        # page(s) into context so preconditions, commands, and follow-up steps
+        # are never dropped just because one chunk out-ranked the rest.
+        if is_procedure_question(question_analysis):
+            return True
         text = " ".join(
             [
                 question_analysis.original_question,
@@ -1169,6 +1187,54 @@ def _wants_complete_structured_context(question_analysis: QuestionAnalysis | str
             and re.search(r"\b(day|schedule|agenda|timeline|orientation|expect|happen)\b", normalized)
         )
     )
+
+
+def _trim_citation_pages(
+    question_analysis: QuestionAnalysis,
+    chunks: list,
+    evidence_assessment: EvidenceAssessment | None,
+) -> list:
+    """Citation precision: prefer pages that directly answer the question.
+
+    When at least one page holds a chunk graded as a direct answer, pages that
+    only partially matched are dropped from the context (and therefore from
+    the citations), unless a facet of a multi-intent question needs them.
+    Related-but-wrong neighbour pages are the main source of noisy citations.
+    """
+    if evidence_assessment is None or len(chunks) <= 1:
+        return chunks
+    grade_by_id = {grade.chunk_id: grade for grade in evidence_assessment.grades}
+    # Group by parent page so a readable attachment is kept together with its
+    # OneNote page: if either the page body or its attachment is a direct answer,
+    # both stay in context (the attachment and the page complete each other).
+    direct_pages = {
+        _chunk_parent_page_id(chunk)
+        for chunk in chunks
+        if (grade := grade_by_id.get(chunk.chunk_id)) is not None
+        and grade.relevance == "direct"
+        and grade.answers_question
+    }
+    if not direct_pages:
+        return chunks
+
+    keep_pages = set(direct_pages)
+    for facet in question_analysis.sub_questions:
+        facet_tokens = _content_tokens(facet)
+        if not facet_tokens:
+            continue
+        best = max(
+            chunks,
+            key=lambda chunk: len(
+                facet_tokens
+                & _content_tokens(" ".join([chunk.title, chunk.section_path or "", chunk.chunk_text]))
+            ),
+            default=None,
+        )
+        if best is not None:
+            keep_pages.add(_chunk_parent_page_id(best))
+
+    trimmed = [chunk for chunk in chunks if _chunk_parent_page_id(chunk) in keep_pages]
+    return trimmed or chunks
 
 
 def _ensure_facet_coverage(
@@ -1348,6 +1414,134 @@ def _merge_adjacent_code_fences(answer_text: str) -> str:
         if replaced == merged:
             return merged
         merged = replaced
+
+
+# Continuation of a token a bold span was wrongly cut inside of: word
+# characters directly ("at 10:**00"), in-token punctuation followed by word
+# characters ("**10**:00" -> ":00"), or a bare percent sign ("**80**%").
+# Times, versions and percentages stay whole.
+_BOLD_TOKEN_TAIL = re.compile(r"^(?:[\wЀ-ӿ]|%|[:.,/-](?=[\wЀ-ӿ]))[\wЀ-ӿ:.%/-]*")
+_BOLD_TOKEN_CHAR = re.compile(r"[\wЀ-ӿ%:.]")
+
+
+def _fix_broken_bold_spans(answer_text: str) -> str:
+    """Repair bold markers that split a token (e.g. "**... at 10:**00").
+
+    Models sometimes close a bold span in the middle of a value such as a
+    clock time, version or percentage, which renders as half-bold text. A
+    closing ``**`` that sits between two non-space characters is moved to the
+    end of the token it interrupts. Unpaired markers are removed entirely.
+    Fenced code blocks are never touched.
+    """
+    pieces = _FENCE_BLOCK.split(answer_text)
+    for index, piece in enumerate(pieces):
+        if index % 2 == 1:
+            continue
+        result: list[str] = []
+        position = 0
+        is_open = False
+        while True:
+            marker = piece.find("**", position)
+            if marker == -1:
+                result.append(piece[position:])
+                break
+            result.append(piece[position:marker])
+            after = piece[marker + 2:]
+            previous = piece[marker - 1] if marker > 0 else ""
+            if is_open and previous and _BOLD_TOKEN_CHAR.match(previous):
+                tail = _BOLD_TOKEN_TAIL.match(after)
+                if tail:
+                    # closing marker interrupted a token: keep the token bold
+                    result.append(tail.group(0))
+                    result.append("**")
+                    position = marker + 2 + tail.end()
+                    is_open = False
+                    continue
+            result.append("**")
+            is_open = not is_open
+            position = marker + 2
+        fixed = "".join(result)
+        # drop empty bold and any single unpaired marker left at the end
+        fixed = re.sub(r"\*\*(\s*)\*\*", r"\1", fixed)
+        if fixed.count("**") % 2 == 1:
+            last = fixed.rfind("**")
+            fixed = fixed[:last] + fixed[last + 2:]
+        pieces[index] = fixed
+    return "".join(pieces)
+
+
+_PROSE_STOP_WORDS = {
+    "the", "is", "are", "and", "to", "of", "in", "a", "an", "for", "with", "that",
+    "you", "your", "it", "this", "on", "be", "from", "и", "е", "са", "на", "за",
+    "се", "да", "от", "в", "при", "като", "който", "която",
+}
+_CODE_SIGNAL = re.compile(
+    r"(^\s*[$>#]\s)|[{};`]|=[^=\s]|--[a-z]|://|^\s*[-*]\s|\|.*\||"
+    r"\b(import|def|class|return|select|insert|update|docker|kubectl|git|npm|pip3?|"
+    r"curl|make|alembic|export|sudo|winget|flutter|pytest|uvicorn|cd|ls|cat)\b|"
+    r"\b\w+\.(py|json|ya?ml|sh|md|txt|env|toml|cfg|ini)\b|[A-Z][A-Z0-9]*_[A-Z0-9_]+",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _looks_like_plain_prose(content: str) -> bool:
+    """True when fenced content is clearly a normal sentence, not code."""
+    stripped = content.strip()
+    if not stripped or _CODE_SIGNAL.search(stripped):
+        return False
+    words = re.findall(r"[A-Za-zЀ-ӿ']+", stripped)
+    if len(words) < 6:
+        return False
+    if sum(1 for word in words if word.lower() in _PROSE_STOP_WORDS) < 2:
+        return False
+    alpha_chars = sum(len(word) for word in words)
+    return alpha_chars / max(len(stripped), 1) >= 0.7
+
+
+def _unwrap_prose_code_fences(answer_text: str) -> str:
+    """Turn fenced blocks that contain ordinary prose back into paragraphs.
+
+    Models occasionally wrap a plain sentence in a code box; that renders as
+    copyable monospace text and confuses users. Real commands, configs and
+    code (detected via ``_CODE_SIGNAL``) are always left untouched.
+    """
+    def _replace(match: re.Match) -> str:
+        block = match.group(0)
+        inner = re.sub(r"^```[A-Za-z0-9_+-]*\n?|\n?```$", "", block)
+        if _looks_like_plain_prose(inner):
+            return inner.strip()
+        return block
+
+    return re.sub(r"```[A-Za-z0-9_+-]*\n.*?\n?```", _replace, answer_text, flags=re.DOTALL)
+
+
+def _strip_prose_inline_code(answer_text: str) -> str:
+    """Unwrap inline code that is clearly a plain multi-word phrase.
+
+    Identifiers, paths, commands and other technical tokens keep their
+    backticks; only spans of four or more purely alphabetic words containing
+    everyday language are demoted to normal text.
+    """
+    pieces = _FENCE_BLOCK.split(answer_text)
+    for index, piece in enumerate(pieces):
+        if index % 2 == 1:
+            continue
+
+        def _replace(match: re.Match) -> str:
+            value = match.group(1)
+            words = value.split()
+            if len(words) < 4:
+                return match.group(0)
+            if any(not re.fullmatch(r"[A-Za-zЀ-ӿ']+", word) for word in words):
+                return match.group(0)
+            if _CODE_SIGNAL.search(value):
+                return match.group(0)
+            if not any(word.lower() in _PROSE_STOP_WORDS for word in words):
+                return match.group(0)
+            return value
+
+        pieces[index] = re.sub(r"(?<!`)`([^`\n]+)`(?!`)", _replace, piece)
+    return "".join(pieces)
 
 
 def _normalize_markdown_tables(answer_text: str) -> str:
@@ -1887,6 +2081,7 @@ def _extractive_response(
 _PROCEDURE_FALLBACK_KINDS = {
     "procedure",
     "prerequisites",
+    "steps",
     "install",
     "configuration",
     "commands",

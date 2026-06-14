@@ -46,6 +46,33 @@ _STOP_WORDS = {
 }
 
 
+# Pipeline-wide semantic gate, configured once from settings at service start.
+# 0.0 keeps every branch below inert, so the lexical-only tiers are unchanged.
+_SEMANTIC_CONFIDENT_SCORE = 0.0
+
+
+def configure_semantic_scoring(confident_score: float) -> None:
+    """Set the cosine threshold above which a chunk counts as a strong semantic
+    match throughout ranking and grading. Called from the service wiring."""
+    global _SEMANTIC_CONFIDENT_SCORE
+    _SEMANTIC_CONFIDENT_SCORE = max(0.0, float(confident_score or 0.0))
+
+
+def semantic_score_of(chunk: ChunkDocument) -> float:
+    """Raw cosine the semantic retriever stashed on the chunk (0.0 if lexical)."""
+    return float((chunk.metadata or {}).get("semantic_score") or 0.0)
+
+
+def is_strong_semantic_match(chunk: ChunkDocument) -> bool:
+    """True when semantic gating is on and this chunk's cosine clears the bar."""
+    return _SEMANTIC_CONFIDENT_SCORE > 0.0 and semantic_score_of(chunk) >= _SEMANTIC_CONFIDENT_SCORE
+
+
+# A strong semantic match is worth this many lexical-scale points, so a cosine of
+# ~0.7 lands above the grade thresholds (8.0/7.0) that pure keyword overlap uses.
+_SEMANTIC_RELEVANCE_GAIN = 12.0
+
+
 def rank_chunks_by_question_analysis(
     question_analysis: QuestionAnalysis,
     chunks: list[ChunkDocument],
@@ -73,8 +100,12 @@ def chunk_relevance_breakdown(question_analysis: QuestionAnalysis, chunk: ChunkD
     wrong_topic_penalty = _wrong_topic_penalty(question_analysis, chunk)
     avoid_concept_penalty = _avoid_concept_penalty(question_analysis, chunk)
     procedure_adjustment = procedure_relevance_adjustment(question_analysis, chunk)
+    # A strong semantic match contributes lexical-scale evidence so meaning-based
+    # hits reach the same grade thresholds as keyword hits.
+    semantic_boost = semantic_score_of(chunk) * _SEMANTIC_RELEVANCE_GAIN if is_strong_semantic_match(chunk) else 0.0
     score = (
         semantic_similarity
+        + semantic_boost
         + title_relevance
         + key_phrase_match
         + fuzzy_metadata_match
@@ -107,6 +138,7 @@ def analysis_relevance_score(question_analysis: QuestionAnalysis, chunk: ChunkDo
     if not query_tokens:
         return 0.0
 
+    strong_semantic = is_strong_semantic_match(chunk)
     title_tokens = _content_tokens(chunk.title)
     section_tokens = _content_tokens(chunk.section_path or "")
     body_tokens = _content_tokens(chunk.chunk_text)
@@ -117,10 +149,14 @@ def analysis_relevance_score(question_analysis: QuestionAnalysis, chunk: ChunkDo
     phrase_score = _key_phrase_score(question_analysis, chunk)
     fuzzy_score = _fuzzy_metadata_score(question_analysis, chunk)
     if not overlap:
-        if phrase_score <= 0 and fuzzy_score <= 0:
+        # A paraphrase can share no keywords with its page; a strong semantic
+        # match still has to clear the relevance filter, so don't zero it out.
+        if phrase_score <= 0 and fuzzy_score <= 0 and not strong_semantic:
             return 0.0
 
     score = 0.0
+    if strong_semantic:
+        score += semantic_score_of(chunk) * _SEMANTIC_RELEVANCE_GAIN
     score += len(overlap) * 1.5
     score += (len(overlap) / len(query_tokens)) * 3.0
     score += _title_relevance_score(question_analysis, chunk)
@@ -157,6 +193,7 @@ def fuzzy_metadata_relevance_score(question: str, chunk: ChunkDocument) -> float
 _PROCEDURE_KINDS = {
     "procedure",
     "prerequisites",
+    "steps",
     "install",
     "configuration",
     "commands",
@@ -338,6 +375,10 @@ def _weak_keyword_only_penalty(question_analysis: QuestionAnalysis, chunk: Chunk
 
 
 def _wrong_topic_penalty(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> float:
+    if is_strong_semantic_match(chunk):
+        # The page is semantically on-topic even if it phrases the subject
+        # differently; the lexical "wrong topic" heuristic must not bury it.
+        return 0.0
     must_tokens = _concept_tokens(question_analysis.must_have_concepts)
     if not must_tokens:
         return 0.0
@@ -414,6 +455,10 @@ def subject_supports_confident_grade(question_analysis: QuestionAnalysis, chunk:
     through when the distinctive phrase itself is present. Returns ``True`` when the
     question has no distinctive subject, leaving generic questions ungated.
     """
+    if is_strong_semantic_match(chunk):
+        # Strong vector similarity is itself evidence the page is about the
+        # question's subject, even when the wording differs entirely.
+        return True
     subject_tokens = _subject_concept_tokens(question_analysis)
     if not subject_tokens:
         return True
@@ -438,6 +483,8 @@ def subject_supports_confident_grade(question_analysis: QuestionAnalysis, chunk:
 
 
 def _has_must_have_concept(question_analysis: QuestionAnalysis, chunk: ChunkDocument) -> bool:
+    if is_strong_semantic_match(chunk):
+        return True
     must_tokens = _concept_tokens(question_analysis.must_have_concepts)
     if not must_tokens:
         return True

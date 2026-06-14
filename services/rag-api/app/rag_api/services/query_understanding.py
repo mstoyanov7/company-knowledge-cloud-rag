@@ -214,8 +214,9 @@ def analyze_question(question: str) -> QuestionAnalysis:
 
 _FACET_SPLIT = re.compile(r"\s+(?:and|&)\s+|;\s+|,\s+and\s+", re.IGNORECASE)
 _INTERROGATIVE_LEAD = re.compile(
-    r"^(how\s+(?:do(?:es)?|can|to|should)(?:\s+\w+)?|what\s+(?:is|are|do(?:es)?)|where\s+(?:is|are|do(?:es)?|can)|"
-    r"when\s+(?:is|are|do(?:es)?|can)|who\s+(?:is|are|do(?:es)?)|which|why|can\s+\w+|do\s+\w+|is\s+there|are\s+there)\b[^?]*?",
+    r"^(how\s+(?:do(?:es)?|can|to|should|must)(?:\s+\w+)?|what\s+(?:is|are|do(?:es)?|should|must)|"
+    r"where\s+(?:is|are|do(?:es)?|can|should|must)|when\s+(?:is|are|do(?:es)?|can|should|must)|"
+    r"who\s+(?:is|are|do(?:es)?|should)|which|why|can\s+\w+|do\s+\w+|is\s+there|are\s+there)\b[^?]*?",
     re.IGNORECASE,
 )
 

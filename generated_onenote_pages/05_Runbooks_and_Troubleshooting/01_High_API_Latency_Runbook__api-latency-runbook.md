@@ -1,5 +1,7 @@
 # API Latency Runbook
 
+_Attached to the "High API Latency Runbook" runbook in the Runbooks and Troubleshooting section, owned by Platform Team._
+
 Condensed steps for paging engineers at 3am.
 
 ## Alert

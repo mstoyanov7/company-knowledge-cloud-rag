@@ -1,5 +1,7 @@
 # Workstation Setup Checklist
 
+_Attached to the "Developer Workstation Setup" onboarding guide in the Onboarding section, owned by Developer Platform._
+
 Copy-paste checklist to confirm a workstation is ready.
 
 - Git installed and commit signing verified

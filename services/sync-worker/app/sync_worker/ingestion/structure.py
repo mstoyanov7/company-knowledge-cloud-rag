@@ -27,12 +27,17 @@ _KIND_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(repository structure|structure|layout)", re.IGNORECASE), "reference"),
 )
 
-# Sections, in canonical order, that make up a setup procedure.
+# Sections, in canonical order, that make up a setup procedure. "steps" and
+# "commands" are inferred from a section's *content shape* (numbered steps /
+# command lines), so a procedure is recognized even when the author titled the
+# section with words the keyword table does not know ("Setup Process", "Commands").
 PROCEDURE_KINDS: tuple[str, ...] = (
     "prerequisites",
+    "steps",
     "install",
     "configuration",
     "run",
+    "commands",
     "verification",
 )
 
@@ -111,19 +116,68 @@ def _looks_like_metadata(body: str) -> bool:
     return meta_lines / len(lines) >= 0.6
 
 
+# A line that is (or starts with) a shell command. Tolerates a leading bullet or
+# number marker so a "Commands" list written as bullets is still recognized.
+_COMMAND_LINE = re.compile(
+    r"^\s*(?:[-*]\s+|\d+[.)]\s+)?"
+    r"(?:\$\s|>\s|#!|sudo\s|pip3?\s+install|pipx\s|npm\s|yarn\s|pnpm\s|"
+    r"winget\s|brew\s|apt(?:-get)?\s|dnf\s|yum\s|docker(?:\s+compose)?\s|"
+    r"kubectl\s|helm\s|git\s+(?:clone|checkout|pull|push|init|submodule)\b|"
+    r"curl\s|wget\s|make\s|cmake\s|python3?\s|node\s|go\s+(?:run|build|get|test)\b|"
+    r"cargo\s|alembic\s|uvicorn\s|gunicorn\s|flutter\s|dotnet\s|mvn\s|gradle\s|"
+    r"terraform\s|ansible(?:-playbook)?\s|vagrant\s|nw\s|psql\s|mysql\s|redis-cli\s|"
+    r"export\s+[A-Z_]+=|[A-Z][A-Z0-9_]{2,}=\S)",
+    re.IGNORECASE,
+)
+# A line that is an ordered step: "1. ...", "2) ...", "Step 3 ...", or an
+# imperative bullet in a sequence ("- First ...", "- Then ...").
+_STEP_LINE = re.compile(
+    r"^\s*(?:\d+[.)]\s+\S|step\s+\d+\b|[-*]\s+(?:first|then|next|after that|afterwards|finally)\b)",
+    re.IGNORECASE,
+)
+
+
+def _has_code_block(body: str) -> bool:
+    return body.startswith("```") or "\n```" in f"\n{body}"
+
+
+def _count_lines(body: str, pattern: re.Pattern[str]) -> int:
+    return sum(1 for line in body.splitlines() if pattern.match(line))
+
+
+def _body_kind(body: str) -> str | None:
+    """Classify a section by the shape of its body, independent of its heading.
+
+    This is what makes classification robust to writing style: a section is
+    procedural because it *contains* commands or numbered steps, not because the
+    author used a keyword like "Install" or "Setup" in the heading.
+    """
+    if _has_code_block(body) or _count_lines(body, _COMMAND_LINE) >= 2:
+        return "commands"
+    if _count_lines(body, _STEP_LINE) >= 2:
+        return "steps"
+    if body.startswith("|") or "\n|" in body:
+        return "table"
+    return None
+
+
 def classify_section(heading_text: str, body: str) -> str:
     # Metadata-shaped bodies (Repository/Owner/Summary lines, breadcrumbs) win
     # even under a title heading that happens to contain words like "Setup".
     if _looks_like_metadata(body):
         return "metadata"
+    # A recognized heading keyword is the most precise signal when the author
+    # uses one, so it is honored first.
     if heading_text:
         for pattern, kind in _KIND_PATTERNS:
             if pattern.search(heading_text):
                 return kind
-    if "\n```" in f"\n{body}" or body.startswith("```"):
-        return "commands"
-    if body.startswith("|") or "\n|" in body:
-        return "table"
+    # Otherwise fall back to the body's content shape, so a section whose heading
+    # uses no known keyword ("Setup Process", "Spin it up locally", "Commands")
+    # is still classified by what it actually contains.
+    body_kind = _body_kind(body)
+    if body_kind is not None:
+        return body_kind
     return "section"
 
 

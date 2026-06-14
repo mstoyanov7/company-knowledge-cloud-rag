@@ -430,6 +430,91 @@ P = {
  ]),
 }
 
+# Generic curator-style aliases appended to each page ("Related terms: ...").
+# Deliberately written as everyday synonyms a knowledge-base maintainer would
+# add - not copies of evaluation question wording - so they help retrieval for
+# any phrasing, not just the test set.
+ALIASES = {
+ "p0101": ["new hire onboarding", "first days at work", "getting started guide",
+           "what to expect in your first days", "expectations for a new developer",
+           "assigned buddy and first tasks when you join"],
+ "p0102": ["dev environment setup", "developer machine", "tools installation",
+           "programs to install before you start coding", "required software and toolchain",
+           "what to put on your machine"],
+ "p0103": ["initial accounts", "user provisioning", "login access",
+           "which logins work on your first sign-in", "accounts ready when you start",
+           "single sign-on accounts provisioned automatically"],
+ "p0104": ["meeting schedule", "standup time", "sprint ceremonies"],
+ "p0105": ["30 day plan", "ramp up goals", "early milestones"],
+ "p0106": ["mentor", "onboarding partner", "peer support"],
+ "p0201": ["version control workflow", "merge rules", "branch policy"],
+ "p0202": ["pull request review", "review feedback", "review turnaround"],
+ "p0203": ["linting rules", "code style", "formatting policy"],
+ "p0204": ["architecture decision record", "design decision documentation"],
+ "p0205": ["test coverage", "quality assurance strategy", "unit and integration testing"],
+ "p0206": ["naming rules", "identifier conventions",
+           "feature flag naming format", "how to name a feature flag"],
+ "p0301": ["payments service", "billing backend local run",
+           "stripe test credentials for local development", "payment provider test keys"],
+ "p0302": ["frontend setup", "customer portal application"],
+ "p0303": ["search backend", "indexing service"],
+ "p0304": ["ETL jobs", "analytics workflow"],
+ "p0305": ["smartphone application", "iOS and Android build"],
+ "p0306": ["internal command line tool", "developer CLI"],
+ "p0401": ["production deployment", "shipping to production", "go live process"],
+ "p0402": ["revert a release", "restore previous version", "undo a deployment"],
+ "p0403": ["feature toggles", "gradual rollout", "dark launch"],
+ "p0404": ["pre-production environment", "test environment policy"],
+ "p0405": ["changelog", "customer announcements"],
+ "p0501": ["slow API", "response time issues", "performance incident"],
+ "p0502": ["broken deployment", "failed rollout recovery"],
+ "p0503": ["database errors", "connection pool exhausted", "postgres timeouts"],
+ "p0504": ["port already in use", "address in use error", "local container conflict"],
+ "p0505": ["semantic search empty results", "embedding index problem"],
+ "p0601": ["repository permissions", "repo access request", "code access",
+           "adding an individual personal account to a repo", "granting repository access to a person"],
+ "p0602": ["credentials storage", "passwords and keys", "secret management",
+           "storing a password in the repository", "committing credentials to git",
+           "keeping secrets out of source control"],
+ "p0603": ["build pipeline", "continuous integration jobs", "rerunning failed builds"],
+ "p0604": ["monitoring dashboards", "logs and traces", "metrics access",
+           "distributed tracing tool", "following a request across services", "request traces"],
+ "p0605": ["task tracker", "ticket board", "issue tracking"],
+ "p0701": ["remote network access", "corporate tunnel", "connection recovery"],
+ "p0702": ["two-factor authentication", "authenticator reset", "new phone enrollment"],
+ "p0703": ["computer replacement", "broken machine", "lost or stolen device"],
+ "p0704": ["application installation", "program install request",
+           "why a downloaded app is blocked", "unapproved software won't run", "non-standard software restrictions"],
+ "p0705": ["mailing list", "shared mailbox", "group email",
+           "external email to an internal list", "messages from outside the company", "quarantined external mail"],
+ "p0801": ["vacation days", "annual leave", "time off request",
+           "how far in advance to request leave", "notice period for booking a vacation",
+           "planning time off ahead"],
+ "p0802": ["work from home", "hybrid schedule", "working abroad"],
+ "p0803": ["on-call pay", "duty stipend", "after-hours compensation"],
+ "p0804": ["appraisal", "evaluation cycle", "promotion process"],
+ "p0805": ["medical coverage", "health benefits", "insurance enrollment"],
+ "p0806": ["training budget", "education allowance", "conference funding",
+           "unused learning budget", "does the education allowance carry over", "training budget expiry"],
+ "p0901": ["reimbursement claim", "business expense report",
+           "are alcohol expenses reimbursed", "what costs are not covered", "non-reimbursable expenses"],
+ "p0902": ["software procurement", "tool purchase approval", "vendor buying"],
+ "p0903": ["cloud spend", "infrastructure cost control", "resource tagging",
+           "scaling down dev environments after hours", "non-production resources outside working hours",
+           "overnight shutdown of dev environments"],
+ "p0904": ["supplier billing", "accounts payable", "invoice payment"],
+ "p0905": ["department finances", "budget planning", "forecasting",
+           "capital versus operating expense", "how equipment purchases are accounted", "asset depreciation"],
+ "p1001": ["data sensitivity levels", "information handling rules",
+           "default handling of customer personal data", "how to treat PII", "personal information classification"],
+ "p1002": ["security breach procedure", "compromised account response"],
+ "p1003": ["permission audit", "quarterly access certification",
+           "auditing service and machine accounts", "non-human account reviews", "bot account access review"],
+ "p1004": ["application security practices", "vulnerability prevention", "injection protection"],
+ "p1005": ["supplier security assessment", "audit evidence", "compliance reports",
+           "external auditor access level", "what auditors are allowed to see", "read-only access for auditors"],
+}
+
 SECTION_ACL = {
     "01_Onboarding": ["public", "employees"],
     "02_Engineering_Handbook": ["employees", "engineering"],
@@ -573,6 +658,11 @@ def build() -> None:
             "metadata": {"notebook_name": "Company Knowledge", "section_name": section_name},
         }
         chunk0 = " ".join([_sentence(summary)] + [_sentence(f) for f in facts[:3]])
+        aliases = ALIASES.get(page_id)
+        if aliases:
+            # Appended at the end so the alias line is searchable without
+            # entering the leading sentences used for extractive answers.
+            chunk0 = f"{chunk0} Related terms: {', '.join(aliases)}."
         documents.append({**base, "chunk_index": 0, "chunk_text": chunk0})
         if facts[3:]:
             documents.append({

@@ -8,7 +8,11 @@ from typing import Any
 from shared_schemas import ChunkDocument
 
 from rag_api.services.query_understanding import QuestionAnalysis
-from rag_api.services.retrieval_ranking import chunk_relevance_breakdown, subject_supports_confident_grade
+from rag_api.services.retrieval_ranking import (
+    chunk_relevance_breakdown,
+    is_strong_semantic_match,
+    subject_supports_confident_grade,
+)
 
 
 DIRECT_ANSWER_FOUND = "DIRECT_ANSWER_FOUND"
@@ -150,10 +154,14 @@ def _heuristic_grade(question_analysis: QuestionAnalysis, chunk: ChunkDocument) 
     # different product's setup guide is not stamped "direct" off generic
     # scaffolding words plus a coincidental body token.
     subject_supported = subject_supports_confident_grade(question_analysis, chunk)
+    # A strong vector match is itself an answer signal: the page is about the
+    # question even when it shares no keywords, so it satisfies the signal gates
+    # that keyword answers must pass. The cosine threshold keeps this honest.
+    strong_semantic = is_strong_semantic_match(chunk)
 
-    if subject_supported and has_must_have and direct_signal and score >= 8.0:
+    if subject_supported and has_must_have and (direct_signal or strong_semantic) and score >= 8.0:
         return EvidenceGrade(chunk.chunk_id, "direct", True, "matches main concept and directly answers", 0.9)
-    if subject_supported and has_must_have and partial_signal and score >= 7.0:
+    if subject_supported and has_must_have and (partial_signal or strong_semantic) and score >= 7.0:
         return EvidenceGrade(chunk.chunk_id, "partial", True, "matches main concept with partial evidence", 0.7)
     if score > 0:
         relevance = "related" if _token_overlap(question_analysis, chunk) else "irrelevant"

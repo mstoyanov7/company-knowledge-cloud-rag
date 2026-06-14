@@ -38,7 +38,12 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     LocalAuthService(settings=resolved_settings, store=app_data_store).bootstrap_admin()
     TopicService(loader=TopicLoader(resolved_settings.topics_config_path), store=app_data_store)
     try:
-        reconcile_topics_from_sources(get_document_metadata(resolved_settings), app_data_store, resolved_settings)
+        reconcile_topics_from_sources(
+            get_document_metadata(resolved_settings),
+            app_data_store,
+            resolved_settings,
+            prune_stale=resolved_settings.retrieval_provider == "qdrant",
+        )
     except Exception:
         logger.exception("Failed to reconcile topics from indexed source sections during startup.")
     application.state.app_data_store = app_data_store
