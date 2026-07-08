@@ -36,6 +36,30 @@ def test_qdrant_acl_filter_includes_tenant_acl_and_source_scope() -> None:
     assert payload_filter["must"][3] == {"key": "metadata.section_name", "match": {"any": ["Benefits", "First day"]}}
 
 
+def test_qdrant_acl_filter_omits_acl_condition_for_admin() -> None:
+    access_scope = AccessScope(
+        user_id="admin",
+        email="admin@example.com",
+        tenant_id="tenant-1",
+        allowed_acl_tags=["public"],
+        source_filters=["onenote"],
+        is_admin=True,
+    )
+
+    payload_filter = QdrantAclRetriever.build_payload_filter(access_scope).model_dump(
+        mode="json",
+        by_alias=True,
+        exclude_none=True,
+    )
+
+    keys = [condition["key"] for condition in payload_filter["must"]]
+    # Admins still scope to their tenant and source filters, but the acl_tags
+    # gate is dropped so every notebook in the tenant is retrievable.
+    assert "tenant_id" in keys
+    assert "source_system" in keys
+    assert "acl_tags" not in keys
+
+
 def test_mock_retriever_filters_by_section_name() -> None:
     retriever = MockRetriever(AppSettings(app_env="test", mock_top_k=10))
 

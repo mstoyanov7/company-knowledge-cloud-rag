@@ -1379,7 +1379,7 @@ def _strip_inline_citation_markers(answer_text: str) -> str:
     for index, piece in enumerate(pieces):
         if index % 2 == 1:  # captured fenced block
             continue
-        piece = re.sub(r"\s*\[\d+\](?=([.,;:!?])|\s|$)", "", piece)
+        piece = re.sub(r"\s*(?:\[\d+\])+(?=[.,;:!?]|\s|$)", "", piece)
         piece = re.sub(r"[ \t]+([.,;:!?])", r"\1", piece)
         piece = re.sub(r"[ \t]+\n", "\n", piece)
         pieces[index] = piece
@@ -1976,15 +1976,10 @@ def _unsupported_critical_values(answer_text: str, source_text: str) -> set[str]
 
 
 def _append_missing_citation(answer_text: str, citations: list[Citation]) -> str:
-    if not citations or re.search(r"\[\d+\]", answer_text):
-        return answer_text
-    citation_marker = f"[{citations[0].index}]"
-    stripped = answer_text.rstrip()
-    if not stripped:
-        return answer_text
-    if stripped.endswith((".", "!", "?")):
-        return f"{stripped} {citation_marker}"
-    return f"{stripped} {citation_marker}"
+    # Inline citation markers ([1], [2], ...) are intentionally not shown in the
+    # answer text; sources are presented separately in the UI's citation list.
+    # This is kept as a no-op so callers stay unchanged.
+    return answer_text
 
 
 _HEDGE_RELEVANCE_ORDER = {"direct": 3, "partial": 2, "related": 1, "irrelevant": 0}

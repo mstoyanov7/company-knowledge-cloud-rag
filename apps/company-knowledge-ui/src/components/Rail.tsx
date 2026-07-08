@@ -9,7 +9,7 @@ import { type RefObject } from "react";
 
 import type { UserProfile } from "../api/auth";
 import type { UiSettings } from "../api/admin";
-import type { Topic } from "../api/topics";
+import { ALL_TOPICS_ID, type Topic } from "../api/topics";
 import type { Conversation } from "../state/conversations";
 import { isPinned, type PinnedItem } from "../state/pins";
 import { initialsOf } from "../utils/user";
@@ -95,7 +95,12 @@ export function Rail({
                 <span className="topic-row__ico">
                   <Icon size={15} aria-hidden="true" />
                 </span>
-                <span className="topic-row__label">{topic.name}</span>
+                <span className="topic-row__text">
+                  <span className="topic-row__label">{topic.name}</span>
+                  {topic.id === ALL_TOPICS_ID ? (
+                    <span className="topic-row__sub">Increased answer time</span>
+                  ) : null}
+                </span>
               </button>
             );
           })}

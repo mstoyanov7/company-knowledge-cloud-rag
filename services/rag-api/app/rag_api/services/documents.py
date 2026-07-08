@@ -139,7 +139,7 @@ class DocumentService:
             if access_scope.source_filters and document.source_system not in access_scope.source_filters:
                 continue
             document_acl_tags = set(document.acl_tags)
-            if document_acl_tags and not document_acl_tags.intersection(allowed_acl_tags):
+            if not access_scope.is_admin and document_acl_tags and not document_acl_tags.intersection(allowed_acl_tags):
                 continue
             allowed.append(document)
         return allowed
@@ -242,6 +242,8 @@ def _metadata_url(document: SourceDocument, key: str) -> str | None:
 def _attachment_allowed(attachment: SourceAttachment, access_scope: AccessScope) -> bool:
     if attachment.tenant_id != access_scope.tenant_id:
         return False
+    if access_scope.is_admin:
+        return True
     attachment_acl_tags = set(attachment.acl_tags)
     return not attachment_acl_tags or bool(attachment_acl_tags.intersection(access_scope.allowed_acl_tags))
 

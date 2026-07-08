@@ -243,14 +243,17 @@ async def force_system_sync(
 ) -> ForceSyncResponse:
     store = PostgresOpsStore(settings)
     now = datetime.now(UTC)
+    # "Run sync now" performs a full bootstrap: it re-pulls and re-hashes every
+    # page regardless of the incremental timestamp cursor, so it reliably picks
+    # up OneNote edits (OneNote does not always advance a page's lastModified).
     job, created = store.enqueue_job(
-        OpsJobType.onenote_reconciliation.value,
+        OpsJobType.onenote_bootstrap.value,
         {
             "trigger": "admin",
             "actor_user_id": admin.user_id,
             "requested_at_utc": now.isoformat(),
         },
-        dedupe_key=f"admin:{OpsJobType.onenote_reconciliation.value}:{now.timestamp()}:{uuid4().hex[:8]}",
+        dedupe_key=f"admin:{OpsJobType.onenote_bootstrap.value}:{now.timestamp()}:{uuid4().hex[:8]}",
         max_attempts=settings.ops_job_max_attempts,
         available_at_utc=now,
     )
@@ -332,7 +335,9 @@ async def _admin_system_settings(
         onenote_sync_paused=runtime.onenote_sync_paused,
         updated_at_utc=runtime.updated_at_utc,
         updated_by_user_id=runtime.updated_by_user_id,
-        last_sync_job=store.latest_job(OpsJobType.onenote_reconciliation.value),
+        last_sync_job=store.latest_job(
+            [OpsJobType.onenote_bootstrap.value, OpsJobType.onenote_reconciliation.value]
+        ),
     )
 
 

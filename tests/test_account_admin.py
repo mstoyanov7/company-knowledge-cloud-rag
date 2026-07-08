@@ -91,6 +91,9 @@ def test_admin_apis_require_system_admin(tmp_path) -> None:
 def test_admin_topics_control_public_topic_visibility(tmp_path) -> None:
     client = _client(tmp_path)
     admin_token = _login(client, "admin@example.com", "admin-password-123")
+    # ACL gating is verified against a regular employee (public, employees);
+    # the admin bypasses ACL tags and is checked separately below.
+    employee_token = _register_and_approve(client, admin_token, "employee@example.com", "employee-pass-123")
 
     create_response = client.post(
         "/api/v1/admin/topics",
@@ -109,19 +112,23 @@ def test_admin_topics_control_public_topic_visibility(tmp_path) -> None:
     )
     assert create_response.status_code == 200
 
-    visible_for_employees = client.get("/api/v1/topics", headers=_auth(admin_token)).json()
+    visible_for_employees = client.get("/api/v1/topics", headers=_auth(employee_token)).json()
     assert "finance-admin-only" not in {topic["id"] for topic in visible_for_employees}
+
+    # Admins bypass ACL tags entirely, so a finance-only topic is still visible.
+    visible_for_admin = client.get("/api/v1/topics", headers=_auth(admin_token)).json()
+    assert "finance-admin-only" in {topic["id"] for topic in visible_for_admin}
 
     client.patch(
         "/api/v1/admin/topics/finance-admin-only",
         headers=_auth(admin_token),
         json={"acl_tags": ["employees"], "retrieval_tags": ["finance", "budget"]},
     )
-    visible_after_acl_change = client.get("/api/v1/topics", headers=_auth(admin_token)).json()
+    visible_after_acl_change = client.get("/api/v1/topics", headers=_auth(employee_token)).json()
     assert "finance-admin-only" in {topic["id"] for topic in visible_after_acl_change}
 
     client.delete("/api/v1/admin/topics/finance-admin-only", headers=_auth(admin_token))
-    visible_after_disable = client.get("/api/v1/topics", headers=_auth(admin_token)).json()
+    visible_after_disable = client.get("/api/v1/topics", headers=_auth(employee_token)).json()
     assert "finance-admin-only" not in {topic["id"] for topic in visible_after_disable}
 
 
@@ -176,6 +183,19 @@ def _login(client: TestClient, email: str, password: str) -> str:
     response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200, response.json()
     return response.json()["access_token"]
+
+
+def _register_and_approve(client: TestClient, admin_token: str, email: str, password: str) -> str:
+    register_response = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": password, "name": "Employee"},
+    )
+    assert register_response.status_code == 200, register_response.json()
+    users = client.get("/api/v1/admin/users", headers=_auth(admin_token)).json()
+    user_id = next(user["user_id"] for user in users if user["email"] == email)
+    approve = client.post(f"/api/v1/admin/users/{user_id}/approve", headers=_auth(admin_token))
+    assert approve.status_code == 200, approve.json()
+    return _login(client, email, password)
 
 
 def _auth(token: str) -> dict[str, str]:

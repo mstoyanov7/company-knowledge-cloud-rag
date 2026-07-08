@@ -79,6 +79,14 @@ class AppSettings(BaseSettings):
 
     embedding_base_url: str = ""
     embedding_api_key: SecretStr = SecretStr("")
+
+    # Redis-backed query-embedding cache (rag-api). An empty redis_host disables
+    # it; the cache also degrades to a no-op if Redis is unreachable, so the API
+    # answers correctly with or without Redis present.
+    redis_host: str = ""
+    redis_port: int = 6379
+    query_embedding_cache_enabled: bool = True
+    query_embedding_cache_ttl_seconds: int = 3600
     default_model_name: str = "mock-onboarding-assistant"
     llm_openai_base_url: str = "http://host.docker.internal:11434/v1"
     llm_openai_api_key: SecretStr = SecretStr("ollama")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
@@ -378,8 +379,9 @@ class PostgresOpsStore:
                 )
             connection.commit()
 
-    def latest_job(self, job_type: str) -> OpsJobRecord | None:
+    def latest_job(self, job_type: str | Sequence[str]) -> OpsJobRecord | None:
         self.ensure_schema()
+        job_types = [job_type] if isinstance(job_type, str) else list(job_type)
         with psycopg.connect(self.settings.postgres_dsn) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -388,11 +390,11 @@ class PostgresOpsStore:
                            available_at_utc, locked_at_utc, locked_by, last_error, created_at_utc,
                            updated_at_utc, completed_at_utc
                     FROM ops_jobs
-                    WHERE job_type = %s
+                    WHERE job_type = ANY(%s)
                     ORDER BY created_at_utc DESC
                     LIMIT 1
                     """,
-                    (job_type,),
+                    (job_types,),
                 )
                 row = cursor.fetchone()
         return _job_from_row(row) if row else None

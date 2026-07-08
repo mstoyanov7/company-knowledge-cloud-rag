@@ -419,6 +419,30 @@ def test_onenote_normalizer_attaches_topic_metadata_from_config(tmp_path) -> Non
     assert "topic:hr" in document.tags
 
 
+def test_onenote_normalizer_scopes_acl_tag_to_notebook() -> None:
+    site = OneNoteSite(
+        id="site-1",
+        name="Onboarding",
+        web_url="https://contoso.example.test/sites/onboarding",
+        hostname="contoso.example.test",
+        relative_path="sites/onboarding",
+    )
+    parsed = OneNoteHtmlParser().parse("<html><body><p>Team A only.</p></body></html>")
+    normalizer = OneNoteDocumentNormalizer()
+
+    # make_page defaults notebook_name="Team Notebook".
+    team_a = normalizer.normalize(
+        site=site,
+        page=make_page("page-a", title="Team A welcome"),
+        parsed_page=parsed,
+    )
+
+    # Each page inherits a single ACL tag derived from its notebook name, so a
+    # user without that tag cannot retrieve the page.
+    assert team_a.acl_tags == ["team-notebook"]
+    assert team_a.metadata["acl_source"] == "notebook-scoped"
+
+
 def test_mock_onenote_client_uses_all_notebooks_when_scope_is_blank() -> None:
     settings = AppSettings(
         app_env="test",

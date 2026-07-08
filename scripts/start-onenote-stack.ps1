@@ -1,15 +1,15 @@
 param(
-    [switch]$Build,
-    [switch]$Bootstrap,
-    [switch]$SkipSync,
-    [switch]$SkipOpsWorker,
-    [switch]$SkipCompanyKnowledgeUI,
     [switch]$NoBrowser,
-    [switch]$NoEnvUpdate,
-    [switch]$ApplyLocalDefaults,
-    [int]$HealthTimeoutSeconds = 120,
-    [int]$CompanyKnowledgeUITimeoutSeconds = 180
+    [int]$HealthTimeoutSeconds = 180,
+    [int]$CompanyKnowledgeUITimeoutSeconds = 240
 )
+
+# Power button: starts the stack and nothing else.
+#   - Does NOT stop, remove, recreate, or rebuild anything.
+#   - Does NOT touch host ports or any process outside this project.
+#   - Does NOT sync/re-index data.
+# `docker compose up -d` starts services that are down and leaves running ones
+# (and all data volumes) untouched. Safe to run repeatedly.
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -57,41 +57,6 @@ function Read-DotEnv {
     return $values
 }
 
-function Set-DotEnvValues {
-    param(
-        [string]$Path,
-        [hashtable]$Updates
-    )
-
-    $lines = [System.Collections.Generic.List[string]]::new()
-    $seen = @{}
-
-    if (Test-Path $Path) {
-        foreach ($line in Get-Content $Path) {
-            if ($line.Trim().StartsWith("#") -or -not $line.Contains("=")) {
-                $lines.Add($line)
-                continue
-            }
-
-            $key = $line.Split("=", 2)[0].Trim()
-            if ($Updates.ContainsKey($key)) {
-                $lines.Add("$key=$($Updates[$key])")
-                $seen[$key] = $true
-            } else {
-                $lines.Add($line)
-            }
-        }
-    }
-
-    foreach ($key in $Updates.Keys) {
-        if (-not $seen.ContainsKey($key)) {
-            $lines.Add("$key=$($Updates[$key])")
-        }
-    }
-
-    Set-Content -Path $Path -Value $lines -Encoding UTF8
-}
-
 function Get-Setting {
     param(
         [hashtable]$Values,
@@ -125,160 +90,50 @@ function Wait-Http {
     throw "Timed out waiting for $Url"
 }
 
-function Show-ComposeDiagnostics {
-    param([string[]]$Services)
-
-    Write-Host ""
-    Write-Host "Docker Compose status:" -ForegroundColor Yellow
-    & docker compose ps @Services
-
-    foreach ($service in $Services) {
-        Write-Host ""
-        Write-Host "Recent logs for ${service}:" -ForegroundColor Yellow
-        & docker compose logs --tail 80 $service
-    }
-}
-
 Push-Location $RepoRoot
 try {
-    Write-Step "Checking prerequisites"
+    Write-Step "Checking Docker"
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-        throw "Docker CLI was not found. Install/start Docker Desktop first."
+        throw "Docker CLI was not found. Start Docker Desktop first."
     }
-
     Invoke-Checked docker info | Out-Null
-
-    if (Get-Command ollama -ErrorAction SilentlyContinue) {
-        Write-Step "Ensuring Ollama embedding model nomic-embed-text is available"
-        & ollama pull nomic-embed-text
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "Warning: 'ollama pull nomic-embed-text' failed. Semantic retrieval needs this model." -ForegroundColor Yellow
-        }
-    } else {
-        Write-Host "Ollama CLI not found. Pull the embedding model on the Ollama host: ollama pull nomic-embed-text" -ForegroundColor Yellow
-    }
 
     if (-not (Test-Path $EnvPath)) {
         if (-not (Test-Path $EnvExamplePath)) {
             throw ".env is missing and .env.example was not found."
         }
-
         Copy-Item $EnvExamplePath $EnvPath
-        Write-Host "Created .env from .env.example"
-    }
-
-    if ($ApplyLocalDefaults -and -not $NoEnvUpdate) {
-        Write-Step "Applying OneNote-only local defaults to .env"
-        Set-DotEnvValues -Path $EnvPath -Updates @{
-            ONENOTE_GRAPH_MODE             = "live"
-            ONENOTE_AUTH_MODE              = "device_code"
-            GRAPH_ONENOTE_SCOPES           = "Notes.Read"
-            GRAPH_ONENOTE_SCOPE_MODE       = "me"
-            GRAPH_ONENOTE_SITE_HOSTNAME    = ""
-            GRAPH_ONENOTE_SITE_SCOPE       = ""
-            DEFAULT_LLM_PROVIDER           = "ollama"
-            DEFAULT_MODEL_NAME             = "gpt-oss:120b-cloud"
-            DEFAULT_EMBEDDING_PROVIDER     = "ollama"
-            EMBEDDING_MODEL_NAME           = "nomic-embed-text"
-            EMBEDDING_VECTOR_SIZE          = "768"
-            LLM_OPENAI_BASE_URL            = "http://host.docker.internal:11434/v1"
-            LLM_OPENAI_API_KEY             = "ollama"
-            LLM_MAX_TOKENS                 = "1400"
-            RETRIEVAL_PROVIDER             = "qdrant"
-            RETRIEVAL_VECTOR_COLLECTIONS   = "onenote_chunks"
-            RETRIEVAL_MIN_KEYWORD_OVERLAP  = "1"
-            RETRIEVAL_LEXICAL_SCAN_LIMIT   = "1000"
-            AUTH_DEFAULT_ACL_TAGS          = "public,employees"
-            TOPICS_CONFIG_PATH             = "config/topics.json"
-            COMPANY_KNOWLEDGE_UI_PORT      = "5173"
-        }
-    } else {
-        Write-Host "Preserving existing .env values"
+        Write-Host "Created .env from .env.example (existing .env is never modified)."
     }
 
     $envValues = Read-DotEnv $EnvPath
-    $onenoteGraphMode = Get-Setting $envValues "ONENOTE_GRAPH_MODE" "mock"
-    $tenantId = Get-Setting $envValues "GRAPH_ONENOTE_TENANT_ID"
-    $clientId = Get-Setting $envValues "GRAPH_ONENOTE_CLIENT_ID"
-    $postgresUser = Get-Setting $envValues "POSTGRES_USER" "cloudrag"
-    $postgresDb = Get-Setting $envValues "POSTGRES_DB" "cloudrag"
-
-    if (-not $SkipSync -and $onenoteGraphMode -eq "live" -and (-not $tenantId -or -not $clientId)) {
-        throw "Set GRAPH_ONENOTE_TENANT_ID and GRAPH_ONENOTE_CLIENT_ID in .env before running live OneNote sync."
-    }
-
     $ragApiPort = Get-Setting $envValues "RAG_API_PORT" "8080"
     $companyKnowledgeUiPort = Get-Setting $envValues "COMPANY_KNOWLEDGE_UI_PORT" "5173"
     $ragApiUrl = "http://localhost:$ragApiPort"
     $companyKnowledgeUiUrl = "http://localhost:$companyKnowledgeUiPort"
 
-    Write-Step "Starting PostgreSQL, Redis, and Qdrant"
-    Invoke-Checked docker compose up -d postgres redis qdrant
+    Write-Step "Starting the stack (nothing is stopped, removed, or rebuilt)"
+    Invoke-Checked docker compose up -d
 
-    Write-Step "Verifying PostgreSQL"
-    Invoke-Checked docker compose exec -T postgres psql -U $postgresUser -d $postgresDb -c "select current_user, current_database();"
-
-    if (-not $SkipSync) {
-        $syncJob = if ($Bootstrap) { "onenote_bootstrap" } else { "onenote_incremental" }
-        Write-Step "Running OneNote $syncJob"
-
-        $syncArgs = @("compose", "run", "--rm", "--build")
-        $syncArgs += @("sync-worker", "python", "-m", "sync_worker.jobs.$syncJob")
-
-        Invoke-Checked docker @syncArgs
-
-        Write-Step "Checking indexed OneNote chunks"
-        Invoke-Checked docker compose exec -T postgres psql -U $postgresUser -d $postgresDb -c "select count(*) as onenote_chunks from chunk_documents where source_system='onenote';"
-    }
-
-    if (-not $SkipOpsWorker) {
-        Write-Step "Starting background sync worker"
-        $workerArgs = @("compose", "up", "-d", "--force-recreate", "--build")
-        $workerArgs += "sync-worker"
-        Invoke-Checked docker @workerArgs
-
-        Write-Step "Starting OneNote 60-second poller"
-        $pollerArgs = @("compose", "up", "-d", "--force-recreate", "--build")
-        $pollerArgs += "onenote-poller"
-        Invoke-Checked docker @pollerArgs
-    }
-
-    Write-Step "Starting RAG API"
-    $apiArgs = @("compose", "up", "-d", "--force-recreate", "--build")
-    $apiArgs += "rag-api"
-    Invoke-Checked docker @apiArgs
-
+    Write-Step "Waiting for the RAG API at $ragApiUrl"
     Wait-Http -Url "$ragApiUrl/health" -TimeoutSeconds $HealthTimeoutSeconds
     Wait-Http -Url "$ragApiUrl/ready" -TimeoutSeconds $HealthTimeoutSeconds
 
-    if (-not $SkipCompanyKnowledgeUI) {
-        Write-Step "Starting Company Knowledge UI"
-        $uiArgs = @("compose", "up", "-d", "--force-recreate", "--build")
-        $uiArgs += "company-knowledge-ui"
-        Invoke-Checked docker @uiArgs
+    Write-Step "Waiting for the Company Knowledge UI at $companyKnowledgeUiUrl"
+    try {
+        Wait-Http -Url $companyKnowledgeUiUrl -TimeoutSeconds $CompanyKnowledgeUITimeoutSeconds
+    } catch {
+        Write-Host "UI not reachable yet; it may still be starting. Check: docker compose logs company-knowledge-ui" -ForegroundColor Yellow
+    }
 
-        Write-Step "Waiting for Company Knowledge UI at $companyKnowledgeUiUrl"
-        try {
-            Wait-Http -Url $companyKnowledgeUiUrl -TimeoutSeconds $CompanyKnowledgeUITimeoutSeconds
-        } catch {
-            Show-ComposeDiagnostics -Services @("rag-api", "company-knowledge-ui")
-            throw
-        }
-
-        if (-not $NoBrowser) {
-            Start-Process $companyKnowledgeUiUrl
-        }
+    if (-not $NoBrowser) {
+        Start-Process $companyKnowledgeUiUrl
     }
 
     Write-Step "Ready"
     Write-Host "RAG API:              $ragApiUrl"
     Write-Host "API docs:             $ragApiUrl/docs"
-    if (-not $SkipCompanyKnowledgeUI) {
-        Write-Host "Company Knowledge UI: $companyKnowledgeUiUrl"
-    }
-    Write-Host ""
-    Write-Host "Default run uses incremental sync. For the first real OneNote import, run:"
-    Write-Host ".\scripts\start-onenote-stack.ps1 -Build -Bootstrap"
+    Write-Host "Company Knowledge UI: $companyKnowledgeUiUrl"
 } finally {
     Pop-Location
 }

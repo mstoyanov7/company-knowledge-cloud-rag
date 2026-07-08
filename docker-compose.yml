@@ -25,6 +25,16 @@ services:
     volumes:
       - qdrant-data:/qdrant/storage
 
+  redis:
+    image: redis:7
+    ports:
+      - "${REDIS_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   rag-api:
     build:
       context: .
@@ -36,6 +46,8 @@ services:
       POSTGRES_PORT: 5432
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       RAG_API_PORT: 8080
     ports:
       - "${RAG_API_PORT}:8080"
@@ -45,6 +57,8 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
+        condition: service_started
+      redis:
         condition: service_started
     healthcheck:
       test:

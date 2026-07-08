@@ -65,7 +65,6 @@ type TopicDraft = {
   description: string;
   icon: string;
   acl_tags: string;
-  retrieval_tags: string;
   suggested_questions: string;
   enabled: boolean;
 };
@@ -81,7 +80,6 @@ const BLANK_TOPIC: TopicDraft = {
   description: "",
   icon: "layers",
   acl_tags: "public,employees",
-  retrieval_tags: "",
   suggested_questions: "",
   enabled: true
 };
@@ -140,6 +138,7 @@ export function AdminPanel({
   const [topicDraft, setTopicDraft] = useState<TopicDraft>(BLANK_TOPIC);
   const [systemDraft, setSystemDraft] = useState<SystemDraft | null>(null);
   const [isNewTopic, setIsNewTopic] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [brandDraft, setBrandDraft] = useState({
     app_name: uiSettings.app_name,
     app_subtitle: uiSettings.app_subtitle,
@@ -254,7 +253,6 @@ export function AdminPanel({
       description: topicDraft.description.trim(),
       icon: emptyToNull(topicDraft.icon),
       acl_tags: splitCsv(topicDraft.acl_tags),
-      retrieval_tags: splitCsv(topicDraft.retrieval_tags),
       suggested_questions: splitLines(topicDraft.suggested_questions),
       enabled: topicDraft.enabled
     };
@@ -275,17 +273,21 @@ export function AdminPanel({
     }
   }
 
-  async function disableTopic() {
+  async function toggleTopicEnabled() {
     if (!selectedTopic) {
       return;
     }
+    const willDisable = selectedTopic.enabled;
     setIsSaving(true);
     try {
-      const saved = await disableAdminTopic(selectedTopic.id);
+      const saved = willDisable
+        ? await disableAdminTopic(selectedTopic.id)
+        : await updateAdminTopic(selectedTopic.id, { enabled: true });
       setTopics((current) => replaceTopic(current, saved));
+      setSelectedTopicId(saved.id);
       setTopicDraft(draftFromTopic(saved));
       onTopicsChanged();
-      toast("Topic disabled.", "ok");
+      toast(saved.enabled ? "Topic enabled." : "Topic disabled.", "ok");
     } catch (error) {
       toast(error instanceof Error ? error.message : "Topic update failed.", "err");
     } finally {
@@ -353,16 +355,40 @@ export function AdminPanel({
   }
 
   async function runSyncNow() {
-    setIsSaving(true);
+    setIsSyncing(true);
     try {
       const response = await forceSystemSync();
       setSystemSettings(response.settings);
       setSystemDraft(draftFromSystemSettings(response.settings));
-      toast(`Sync job queued (${response.job.status}).`, "ok");
+      toast("Full sync started — this can take up to 30 minutes.", "ok");
+
+      // Poll until the bootstrap job finishes so we can show progress and
+      // refresh topics/answers once the index is rebuilt. A full re-index of a
+      // large notebook set can take up to ~30 minutes, so allow ample time
+      // before giving up (the job still finishes in the background regardless).
+      const deadline = Date.now() + 35 * 60 * 1000;
+      const terminal = new Set(["succeeded", "failed", "dead_letter"]);
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        const latest = await fetchAdminSystemSettings();
+        setSystemSettings(latest);
+        setSystemDraft(draftFromSystemSettings(latest));
+        const status = latest.last_sync_job?.status;
+        if (status && terminal.has(status)) {
+          if (status === "succeeded") {
+            toast("Sync complete — knowledge base updated.", "ok");
+            onTopicsChanged();
+          } else {
+            toast(`Sync ${status}. Check the worker logs.`, "err");
+          }
+          return;
+        }
+      }
+      toast("Sync is taking longer than expected; it will finish in the background.", "err");
     } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not queue sync job.", "err");
+      toast(error instanceof Error ? error.message : "Could not start sync.", "err");
     } finally {
-      setIsSaving(false);
+      setIsSyncing(false);
     }
   }
 
@@ -643,23 +669,21 @@ export function AdminPanel({
                     </span>
                   </label>
                   <label className="fld">
-                    <span className="fld__lbl">Retrieval tags</span>
-                    <span className="fld__box">
-                      <input className="fld__in" value={topicDraft.retrieval_tags} onChange={(event) => setTopicDraft({ ...topicDraft, retrieval_tags: event.target.value })} />
-                    </span>
-                  </label>
-                  <label className="fld">
                     <span className="fld__lbl">Suggested questions</span>
                     <textarea className="admin-textarea admin-textarea--tall" value={topicDraft.suggested_questions} onChange={(event) => setTopicDraft({ ...topicDraft, suggested_questions: event.target.value })} />
                   </label>
-                  <label className="admin-check">
-                    <input type="checkbox" checked={topicDraft.enabled} onChange={(event) => setTopicDraft({ ...topicDraft, enabled: event.target.checked })} />
-                    <span>Enabled</span>
-                  </label>
                   <div className="admin-actions">
                     {!isNewTopic && selectedTopic ? (
-                      <button className="btn" type="button" disabled={isSaving} onClick={disableTopic}>
-                        Disable
+                      <button className="btn" type="button" disabled={isSaving} onClick={toggleTopicEnabled}>
+                        {selectedTopic.enabled ? (
+                          <>
+                            <Pause size={14} aria-hidden="true" /> Disable
+                          </>
+                        ) : (
+                          <>
+                            <Play size={14} aria-hidden="true" /> Enable
+                          </>
+                        )}
                       </button>
                     ) : null}
                     <span className="topbar__spacer" />
@@ -752,22 +776,34 @@ export function AdminPanel({
 
                 <div className="admin-actions admin-actions--wrap">
                   {systemSettings.onenote_sync_paused ? (
-                    <button className="btn btn--accent" type="button" disabled={isSaving} onClick={() => setSyncPaused(false)}>
+                    <button className="btn btn--accent" type="button" disabled={isSaving || isSyncing} onClick={() => setSyncPaused(false)}>
                       <Play size={14} aria-hidden="true" /> Resume automatic sync
                     </button>
                   ) : (
-                    <button className="btn" type="button" disabled={isSaving} onClick={() => setSyncPaused(true)}>
+                    <button className="btn" type="button" disabled={isSaving || isSyncing} onClick={() => setSyncPaused(true)}>
                       <Pause size={14} aria-hidden="true" /> Pause automatic sync
                     </button>
                   )}
-                  <button className="btn" type="button" disabled={isSaving} onClick={runSyncNow}>
-                    <RefreshCw size={14} aria-hidden="true" /> Run sync now
+                  <button className="btn" type="button" disabled={isSaving || isSyncing} onClick={runSyncNow}>
+                    <RefreshCw size={14} aria-hidden="true" className={isSyncing ? "icon-spin" : undefined} />
+                    {isSyncing ? " Syncing…" : " Run sync now"}
                   </button>
                   <span className="topbar__spacer" />
-                  <button className="btn btn--accent" type="submit" disabled={isSaving}>
+                  <button className="btn btn--accent" type="submit" disabled={isSaving || isSyncing}>
                     <Save size={14} aria-hidden="true" /> Save system settings
                   </button>
                 </div>
+
+                {isSyncing ? (
+                  <div className="sync-progress" role="status" aria-live="polite">
+                    <div className="sync-progress__track">
+                      <div className="sync-progress__bar" />
+                    </div>
+                    <span className="sync-progress__label">
+                      Rebuilding the knowledge base — {systemSettings.last_sync_job?.status ?? "queued"}. This can take up to 30 minutes.
+                    </span>
+                  </div>
+                ) : null}
               </form>
             ) : null}
 
@@ -835,7 +871,6 @@ function draftFromTopic(topic: TopicAdmin): TopicDraft {
     description: topic.description,
     icon: topic.icon || "notebook-tabs",
     acl_tags: topic.acl_tags.join(","),
-    retrieval_tags: topic.retrieval_tags.join(","),
     suggested_questions: topic.suggested_questions.join("\n"),
     enabled: topic.enabled
   };

@@ -70,6 +70,7 @@ class FixtureSemanticRetriever(MockRetriever):
             groups=request.user_context.groups,
             roles=request.user_context.roles,
             source_filters=request.source_filters,
+            is_admin=request.user_context.is_admin,
         )
         allowed_acl_tags = set(access_scope.allowed_acl_tags)
         source_filters = set(access_scope.source_filters)
@@ -92,7 +93,7 @@ class FixtureSemanticRetriever(MockRetriever):
             if section_filter_set and section_name not in section_filter_set:
                 filtered_count += 1
                 continue
-            if not allowed_acl_tags.intersection(set(document.acl_tags)):
+            if not access_scope.is_admin and not allowed_acl_tags.intersection(set(document.acl_tags)):
                 filtered_count += 1
                 continue
 

@@ -28,8 +28,8 @@ def test_openai_compatible_llm_calls_chat_completions() -> None:
         assert "Current user question to answer now" in body["messages"][1]["content"]
         assert f"reply exactly: {NO_INFORMATION_ANSWER}" in body["messages"][1]["content"]
         assert "Internal question analysis" in body["messages"][1]["content"]
-        assert "append that block's marker" in body["messages"][1]["content"]
-        assert "Do not add a separate Source or Sources line" in body["messages"][1]["content"]
+        assert "Do not add any inline citations" in body["messages"][1]["content"]
+        assert "do not add a Source or Sources line" in body["messages"][1]["content"]
         return httpx.Response(
             200,
             json={

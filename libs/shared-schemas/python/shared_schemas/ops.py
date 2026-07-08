@@ -17,6 +17,7 @@ class OpsJobStatus(StrEnum):
 
 class OpsJobType(StrEnum):
     onenote_reconciliation = "onenote_reconciliation"
+    onenote_bootstrap = "onenote_bootstrap"
 
 
 class OpsJobRecord(BaseModel):

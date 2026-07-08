@@ -14,4 +14,5 @@ class AccessScopeResolver:
             groups=sorted({group.strip() for group in user_context.groups if group.strip()}),
             roles=sorted({role.strip() for role in user_context.roles if role.strip()}),
             source_filters=sorted({source.strip() for source in (source_filters or []) if source.strip()}),
+            is_admin=user_context.is_admin,
         )

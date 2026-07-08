@@ -8,6 +8,18 @@ from sync_worker.onenote.parser import ParsedOneNotePage
 from sync_worker.onenote.topic_classifier import OneNoteTopicClassifier
 
 
+def notebook_acl_tag(notebook_name: str) -> str:
+    """Stable ACL tag for a OneNote notebook ("file").
+
+    Access is scoped per notebook: every page inherits the tag derived from its
+    notebook name, so the retrieval filter only returns pages from notebooks the
+    user holds the matching tag for. The transform matches the notebook entry in
+    ``base_tags`` (lowercase, spaces -> hyphens) so the tag an admin assigns to a
+    user is predictable from the notebook name, e.g. "TEAM A" -> "team-a".
+    """
+    return notebook_name.strip().lower().replace(" ", "-") or "unscoped-notebook"
+
+
 class OneNoteDocumentNormalizer:
     def __init__(self, topic_classifier: OneNoteTopicClassifier | None = None) -> None:
         self.topic_classifier = topic_classifier
@@ -27,7 +39,8 @@ class OneNoteDocumentNormalizer:
             if self.topic_classifier
             else None
         )
-        base_tags = ["onenote", page.notebook_name.lower().replace(" ", "-")]
+        acl_tag = notebook_acl_tag(page.notebook_name)
+        base_tags = ["onenote", acl_tag]
         topic_tags = list(classification.tags) if classification else []
         return SourceDocument(
             tenant_id="local-tenant",
@@ -41,7 +54,7 @@ class OneNoteDocumentNormalizer:
             mime_type="text/html",
             section_path=section_path,
             last_modified_utc=page.last_modified_utc,
-            acl_tags=["employees"],
+            acl_tags=[acl_tag],
             content_hash=compute_content_hash(parsed_page.text),
             content_text=parsed_page.text,
             tags=list(dict.fromkeys([*base_tags, *topic_tags])),
@@ -75,6 +88,6 @@ class OneNoteDocumentNormalizer:
                     for resource in parsed_page.resources
                 ],
                 "parser_stats": parsed_page.metadata,
-                "acl_source": "restricted-onboarding-default",
+                "acl_source": "notebook-scoped",
             },
         )

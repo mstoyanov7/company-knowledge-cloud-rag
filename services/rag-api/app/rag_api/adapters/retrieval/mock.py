@@ -61,6 +61,7 @@ class MockRetriever:
             groups=request.user_context.groups,
             roles=request.user_context.roles,
             source_filters=request.source_filters,
+            is_admin=request.user_context.is_admin,
         )
         question_tokens = _tokenize(request.question)
         bm25_scores = (
@@ -89,7 +90,7 @@ class MockRetriever:
                 continue
 
             document_acl_tags = set(document.acl_tags)
-            is_allowed = bool(allowed_acl_tags.intersection(document_acl_tags))
+            is_allowed = access_scope.is_admin or bool(allowed_acl_tags.intersection(document_acl_tags))
             if not is_allowed:
                 filtered_count += 1
                 continue

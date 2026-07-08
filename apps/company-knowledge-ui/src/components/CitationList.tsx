@@ -46,26 +46,30 @@ export function CitationList({ citations, onOpenSource }: CitationListProps) {
                 {citation.last_modified_utc ? <span>Updated {formatUpdateTime(citation.last_modified_utc)}</span> : null}
               </span>
             </button>
-            {downloadUrl ? (
-              <button
-                type="button"
-                className="citation-ext"
-                onClick={() => downloadCitation(citation, downloadUrl)}
-                aria-label={`Download ${citation.title}`}
-              >
-                <Download size={16} aria-hidden="true" />
-              </button>
-            ) : null}
-            {citation.source_url ? (
-              <a
-                className="citation-ext"
-                href={citation.source_url}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`Open ${citation.title} in a new tab`}
-              >
-                <ExternalLink size={16} aria-hidden="true" />
-              </a>
+            {downloadUrl || citation.source_url ? (
+              <span className="citation-actions">
+                {downloadUrl ? (
+                  <button
+                    type="button"
+                    className="citation-ext"
+                    onClick={() => downloadCitation(citation, downloadUrl)}
+                    aria-label={`Download ${citation.title}`}
+                  >
+                    <Download size={16} aria-hidden="true" />
+                  </button>
+                ) : null}
+                {citation.source_url ? (
+                  <a
+                    className="citation-ext"
+                    href={citation.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open ${citation.title} in a new tab`}
+                  >
+                    <ExternalLink size={16} aria-hidden="true" />
+                  </a>
+                ) : null}
+              </span>
             ) : null}
           </li>
           );

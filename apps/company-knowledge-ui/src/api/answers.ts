@@ -73,7 +73,7 @@ export type ConversationTurn = {
 };
 
 export type TopicAnswerRequest = {
-  topic_id: string;
+  topic_id?: string;
   conversation_id?: string;
   answer_depth?: "concise" | "normal" | "detailed";
   answer_style?: string;

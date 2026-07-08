@@ -1,3 +1,4 @@
+import { scopedKey } from "./scope";
 import { safeParseJson, type StorageLike } from "./storage";
 
 // Pinned chat sessions, persisted in localStorage alongside conversations.
@@ -10,7 +11,7 @@ export type PinnedItem = {
 };
 
 export function loadPins(storage: StorageLike = window.localStorage): PinnedItem[] {
-  const parsed = safeParseJson<unknown[]>(storage.getItem(PINS_KEY), []);
+  const parsed = safeParseJson<unknown[]>(storage.getItem(scopedKey(PINS_KEY)), []);
   return parsed
     .map((value) => {
       if (!value || typeof value !== "object") {
@@ -27,7 +28,7 @@ export function loadPins(storage: StorageLike = window.localStorage): PinnedItem
 }
 
 export function savePins(pins: PinnedItem[], storage: StorageLike = window.localStorage): void {
-  storage.setItem(PINS_KEY, JSON.stringify(pins));
+  storage.setItem(scopedKey(PINS_KEY), JSON.stringify(pins));
 }
 
 export function togglePin(pins: PinnedItem[], item: PinnedItem): PinnedItem[] {

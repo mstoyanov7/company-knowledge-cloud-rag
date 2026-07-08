@@ -20,6 +20,9 @@ class UserContext(BaseModel):
     acl_tags: list[str] = Field(default_factory=lambda: ["public"])
     groups: list[str] = Field(default_factory=list)
     roles: list[str] = Field(default_factory=list)
+    # System administrators bypass ACL-tag filtering and see every notebook in
+    # their tenant, so admin access does not need a maintained tag list.
+    is_admin: bool = False
 
 
 class AccessScope(BaseModel):
@@ -30,6 +33,7 @@ class AccessScope(BaseModel):
     groups: list[str] = Field(default_factory=list)
     roles: list[str] = Field(default_factory=list)
     source_filters: list[str] = Field(default_factory=list)
+    is_admin: bool = False
 
 
 class ChunkDocument(BaseModel):

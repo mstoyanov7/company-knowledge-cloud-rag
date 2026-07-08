@@ -192,7 +192,6 @@ export function SourcePanel({ source, onClose, onAskSource }: SourcePanelProps) 
               </span>
               <span className="deeplink__main">
                 <b>Open in OneNote for the web</b>
-                <span>{shortUrl(source.url)}</span>
               </span>
               <span className="deeplink__go">
                 <ExternalLink size={15} aria-hidden="true" />
@@ -206,7 +205,6 @@ export function SourcePanel({ source, onClose, onAskSource }: SourcePanelProps) 
               </span>
               <span className="deeplink__main">
                 <b>Open in OneNote desktop</b>
-                <span>{shortUrl(source.clientUrl)}</span>
               </span>
               <span className="deeplink__go">
                 <ExternalLink size={15} aria-hidden="true" />

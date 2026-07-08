@@ -3,13 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchMe, logout, updateMe, type AuthResponse, type UserProfile } from "./api/auth";
 import { fetchUiSettings, type UiSettings } from "./api/admin";
 import { clearAuthToken, getAuthToken } from "./api/client";
-import { fetchTopics, type Topic } from "./api/topics";
+import { ALL_TOPICS_TOPIC, fetchTopics, type Topic } from "./api/topics";
 import { AuthGate } from "./components/AuthGate";
 import { ErrorState } from "./components/ErrorState";
 import { KnowledgeShell } from "./components/KnowledgeShell";
 import { LoadingState } from "./components/LoadingState";
 import { useToast } from "./components/ToastProvider";
 import { applyPrefs, loadPrefs, savePrefs, type AccentHue, type Density, type Prefs } from "./state/prefs";
+import { setUserScope } from "./state/scope";
 import { loadTheme, nextTheme, saveTheme, type Theme } from "./state/theme";
 
 const DEFAULT_UI_SETTINGS: UiSettings = {
@@ -70,6 +71,7 @@ export default function App() {
     fetchMe()
       .then((profile) => {
         if (isCurrent) {
+          setUserScope(profile.user_id);
           setUser(profile);
         }
       })
@@ -105,18 +107,22 @@ export default function App() {
     };
   }, []);
 
+  // "Everything" is always offered first, ahead of the real topics.
+  const visibleTopics = useMemo(() => [ALL_TOPICS_TOPIC, ...topics], [topics]);
+
   const selectedTopic = useMemo(
-    () => topics.find((topic) => topic.id === selectedTopicId) || null,
-    [selectedTopicId, topics]
+    () => visibleTopics.find((topic) => topic.id === selectedTopicId) || null,
+    [selectedTopicId, visibleTopics]
   );
 
   useEffect(() => {
-    if (selectedTopicId && !topics.some((topic) => topic.id === selectedTopicId)) {
+    if (selectedTopicId && !visibleTopics.some((topic) => topic.id === selectedTopicId)) {
       setSelectedTopicId(null);
     }
-  }, [selectedTopicId, topics]);
+  }, [selectedTopicId, visibleTopics]);
 
   function signIn(response: AuthResponse, message: string) {
+    setUserScope(response.user.user_id);
     setUser(response.user);
     refreshTopics().catch((refreshError: Error) => toast(refreshError.message, "err"));
     toast(message, "ok");
@@ -124,6 +130,7 @@ export default function App() {
 
   function signOut() {
     logout().catch(() => undefined);
+    setUserScope(null);
     setUser(null);
     setSelectedTopicId(null);
   }
@@ -175,7 +182,8 @@ export default function App() {
 
   return (
     <KnowledgeShell
-      topics={topics}
+      key={user.user_id}
+      topics={visibleTopics}
       selectedTopic={selectedTopic}
       theme={theme}
       prefs={prefs}

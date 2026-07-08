@@ -1,3 +1,4 @@
+# Python
 .pytest_cache/
 .cache/
 .venv/
@@ -6,6 +7,24 @@ __pycache__/
 *.pyo
 *.pyd
 *.egg-info/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+build/
+dist/
+
+# IDE / editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+# Node
 node_modules/
 apps/company-knowledge-ui/dist/
 htmlcov/
@@ -13,11 +32,17 @@ eval/results/
 benchmarks/results/*
 !benchmarks/results/templates/
 !benchmarks/results/templates/**
+# Secrets — never commit real environment files
 .env
 .env.*
 !.env.example
+
+# Local-only thesis & defense materials
 /thesis/
 THESIS_CHANGELOG.md
 thesis-requirements.txt
+/presentation/
+
+# Local content-generation working dirs
 /prompts/
-/generated_onenote_pages/
+/generated_onenote_pages*/

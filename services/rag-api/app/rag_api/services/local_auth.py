@@ -295,6 +295,7 @@ def user_context_from_profile(profile: UserProfile) -> UserContext:
         acl_tags=profile.acl_tags,
         groups=profile.groups,
         roles=profile.roles,
+        is_admin=profile.app_role == "system_admin",
     )
 
 

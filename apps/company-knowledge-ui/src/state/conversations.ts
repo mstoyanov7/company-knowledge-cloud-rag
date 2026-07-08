@@ -1,4 +1,5 @@
 import type { AnswerMetadata, Citation, Clarification, DownloadLink } from "../api/answers";
+import { scopedKey } from "./scope";
 import { safeParseJson, type StorageLike } from "./storage";
 
 const CONVERSATION_STORAGE_KEY = "companyKnowledgeConversations.v1";
@@ -30,7 +31,7 @@ export type Conversation = {
 };
 
 export function loadConversations(storage: StorageLike = window.localStorage): Conversation[] {
-  const rawConversations = safeParseJson<unknown[]>(storage.getItem(CONVERSATION_STORAGE_KEY), []);
+  const rawConversations = safeParseJson<unknown[]>(storage.getItem(scopedKey(CONVERSATION_STORAGE_KEY)), []);
   return rawConversations.map(normalizeConversation).filter((conversation): conversation is Conversation => {
     return conversation !== null;
   });
@@ -40,7 +41,7 @@ export function saveConversations(
   conversations: Conversation[],
   storage: StorageLike = window.localStorage
 ): void {
-  storage.setItem(CONVERSATION_STORAGE_KEY, JSON.stringify(conversations));
+  storage.setItem(scopedKey(CONVERSATION_STORAGE_KEY), JSON.stringify(conversations));
 }
 
 export function createConversation(topicId: string, now = new Date()): Conversation {

@@ -193,17 +193,22 @@ class QdrantAclRetriever:
         section_filters: list[str] | None = None,
         focus_source_item_ids: list[str] | None = None,
     ) -> models.Filter:
-        acl_tags = access_scope.allowed_acl_tags or ["__no_allowed_acl_tags__"]
         must: list[models.FieldCondition] = [
             models.FieldCondition(
                 key="tenant_id",
                 match=models.MatchValue(value=access_scope.tenant_id),
             ),
-            models.FieldCondition(
-                key="acl_tags",
-                match=models.MatchAny(any=acl_tags),
-            ),
         ]
+        # System admins bypass ACL-tag filtering and see every notebook in the
+        # tenant; everyone else is restricted to their allowed tags.
+        if not access_scope.is_admin:
+            acl_tags = access_scope.allowed_acl_tags or ["__no_allowed_acl_tags__"]
+            must.append(
+                models.FieldCondition(
+                    key="acl_tags",
+                    match=models.MatchAny(any=acl_tags),
+                )
+            )
         if access_scope.source_filters:
             must.append(
                 models.FieldCondition(

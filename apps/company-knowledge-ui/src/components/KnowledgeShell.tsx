@@ -7,7 +7,7 @@ import type { UiSettings } from "../api/admin";
 import type { UserProfile } from "../api/auth";
 import type { DocumentSummary } from "../api/documents";
 import type { NotebookPage } from "../api/notebooks";
-import type { Topic } from "../api/topics";
+import { ALL_TOPICS_ID, type Topic } from "../api/topics";
 import {
   addAssistantPlaceholder,
   addUserMessage,
@@ -255,7 +255,8 @@ export function KnowledgeShell({
     };
     streamTopicQuestion(
       {
-        topic_id: topic.id,
+        // "Everything" sends no topic_id so the backend searches all accessible content.
+        ...(topic.id === ALL_TOPICS_ID ? {} : { topic_id: topic.id }),
         conversation_id: pendingConversation.id,
         answer_depth: "detailed",
         question,
@@ -583,7 +584,7 @@ export function KnowledgeShell({
                 isSubmitting={isSubmitting}
                 onSubmit={askQuestion}
                 onStop={stopAnswer}
-                placeholder={`Ask anything about ${selectedTopic.name}...`}
+                placeholder={selectedTopic.id === ALL_TOPICS_ID ? "Ask anything across all topics..." : `Ask anything about ${selectedTopic.name}...`}
               />
               <div className="composer-scoperow">
                 <button

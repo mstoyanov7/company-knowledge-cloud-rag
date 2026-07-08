@@ -71,7 +71,8 @@ class TopicService:
 
     def list_topics(self, user_context: UserContext | None = None) -> list[Topic]:
         topics = self._topic_configs(enabled_only=True)
-        if user_context is None:
+        if user_context is None or user_context.is_admin:
+            # Admins see every topic; their access is not gated by ACL tags.
             visible_topics = topics
         else:
             user_acl_tags = _normalized_set(user_context.acl_tags)
@@ -118,6 +119,10 @@ class TopicService:
 
 
 def _scope_user_context_to_topic(user_context: UserContext, topic: TopicConfig) -> UserContext:
+    if user_context.is_admin:
+        # Admins bypass ACL filtering, so picking a topic must not narrow their
+        # access down to the topic's tags.
+        return user_context
     topic_acl_tags = _normalized_set(topic.acl_tags)
     if not topic_acl_tags:
         return user_context

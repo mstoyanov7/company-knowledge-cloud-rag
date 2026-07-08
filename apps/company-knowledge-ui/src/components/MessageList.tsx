@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import type { Citation, ClarificationOption } from "../api/answers";
-import type { Topic } from "../api/topics";
+import { ALL_TOPICS_ID, type Topic } from "../api/topics";
 import type { ChatMessage as ChatMessageModel } from "../state/conversations";
 import { ChatMessage } from "./ChatMessage";
 import { SuggestedQuestions } from "./SuggestedQuestions";
@@ -32,7 +32,7 @@ export function MessageList({
   if (messages.length === 0) {
     return (
       <div className="chat-empty">
-        <h2>Start a chat about {topic.name}</h2>
+        <h2>{topic.id === ALL_TOPICS_ID ? "Ask anything across all topics" : `Start a chat about ${topic.name}`}</h2>
         <p>{topic.description}</p>
         <SuggestedQuestions questions={topic.suggested_questions} onSelectQuestion={onSelectQuestion} compact />
       </div>

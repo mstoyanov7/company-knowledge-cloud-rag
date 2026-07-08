@@ -89,12 +89,22 @@ class OpsJobRunner:
             time.sleep(self.settings.worker_poll_interval_seconds)
 
     def _execute(self, job: OpsJobRecord) -> None:
-        if job.job_type == OpsJobType.onenote_reconciliation.value:
+        if job.job_type in (
+            OpsJobType.onenote_reconciliation.value,
+            OpsJobType.onenote_bootstrap.value,
+        ):
             runtime = self.store.get_system_runtime_settings()
             if runtime.onenote_sync_paused and job.payload.get("trigger") != "admin":
                 self.logger.info("event=ops_job_skipped reason=onenote_sync_paused job_id=%s", job.job_id)
                 return
-            build_onenote_sync_service(self.settings).reconciliation()
+            service = build_onenote_sync_service(self.settings)
+            # A bootstrap re-pulls and re-hashes every page (ignoring the
+            # incremental timestamp cursor), so it reliably picks up edits that
+            # OneNote does not reflect in its lastModified timestamp.
+            if job.job_type == OpsJobType.onenote_bootstrap.value:
+                service.bootstrap()
+            else:
+                service.reconciliation()
             refresh_app_topics_from_sources(self.settings)
             return
 

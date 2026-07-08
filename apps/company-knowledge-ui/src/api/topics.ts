@@ -8,6 +8,19 @@ export type Topic = {
   suggested_questions: string[];
 };
 
+// Sentinel "topic" that searches across everything the user can access. It is
+// not a real topic: when selected, the answer request is sent without a
+// topic_id so the backend searches all accessible content (ACL still applies).
+export const ALL_TOPICS_ID = "__all__";
+
+export const ALL_TOPICS_TOPIC: Topic = {
+  id: ALL_TOPICS_ID,
+  name: "Everything",
+  description: "Searches across all topics — not selecting a filter may increase answer time.",
+  icon: "layers",
+  suggested_questions: []
+};
+
 export type TopicAdmin = Topic & {
   acl_tags: string[];
   source_filters: string[];
@@ -24,7 +37,7 @@ export type TopicCreateRequest = {
   description: string;
   icon?: string | null;
   acl_tags: string[];
-  retrieval_tags: string[];
+  retrieval_tags?: string[];
   suggested_questions: string[];
   enabled: boolean;
 };
